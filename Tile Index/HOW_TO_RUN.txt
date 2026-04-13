@@ -1,0 +1,75 @@
+===========================================
+HOW TO RUN TILE INDEX APPLICATION
+===========================================
+
+METHOD 1: Using Command Prompt / PowerShell
+---------------------------------------------
+
+1. Open Command Prompt or PowerShell
+2. Navigate to the project folder:
+   cd "C:\Users\salee\Desktop\projects\Tile Index"
+
+3. Run the application:
+   python main.py
+
+4. The application window will open automatically!
+
+
+METHOD 2: Using Python IDLE
+----------------------------
+
+1. Right-click on main.py
+2. Select "Edit with IDLE" (if available)
+3. Press F5 to run
+
+
+METHOD 3: Double-click (if Python is configured)
+-------------------------------------------------
+
+1. Double-click on main.py file
+2. If Python is properly installed, it will run automatically
+
+
+REQUIREMENTS:
+-------------
+- Python 3.8 or higher must be installed
+- Check Python installation: python --version
+- No additional packages needed (uses built-in libraries only)
+
+
+TROUBLESHOOTING:
+----------------
+If you see "python is not recognized":
+  - Python is not installed or not in PATH
+  - Install Python from python.org
+  - Make sure to check "Add Python to PATH" during installation
+
+If the window doesn't appear:
+  - Check for error messages in the terminal
+  - Make sure you have write permissions in the project folder
+  - The database will be created automatically in the 'data' folder
+
+If you see import errors:
+  - Make sure you're in the correct directory
+  - All files should be in the project folder
+
+
+FIRST TIME SETUP:
+-----------------
+1. Run: python main.py
+2. Database will be created automatically
+3. Four branches will be initialized automatically
+4. You're ready to start using the system!
+
+
+QUICK START:
+------------
+1. Run the application
+2. Click "Inventory Management"
+3. Add a product
+4. Add stock for that product
+5. Click "Invoice & Billing"
+6. Create your first invoice!
+
+===========================================
+

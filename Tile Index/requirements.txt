@@ -1,0 +1,9 @@
+anas# Tile Index - Desktop Inventory & Billing System
+# Python 3.8+
+
+# No external dependencies required - using built-in libraries only
+# tkinter - GUI (built-in)
+# sqlite3 - Database (built-in)
+# datetime - Date handling (built-in)
+# json - Configuration (built-in)
+
