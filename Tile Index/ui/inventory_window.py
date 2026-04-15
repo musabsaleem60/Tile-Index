@@ -12,6 +12,7 @@ from services.auth_service import AuthenticationService
 from models.product import Product
 from utils.validators import validate_positive_number, validate_integer, validate_required, validate_grade
 from utils.grade_constants import VALID_GRADES, GRADE_1
+from utils.searchable_combobox import SearchableCombobox
 
 
 class InventoryWindow:
@@ -20,8 +21,6 @@ class InventoryWindow:
     def __init__(self, parent, current_user):
         self.parent = parent
         self.current_user = current_user
-        self.parent.title("Inventory Management - Tile Index")
-        self.parent.geometry("1100x700")
         
         self.branches = BranchRepository.get_all()
         self.products = ProductRepository.get_all()
@@ -129,22 +128,20 @@ class InventoryWindow:
         # Branch selection
         tk.Label(right_frame, text="Select Branch:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W, pady=5)
         self.branch_var = tk.StringVar()
-        branch_combo = ttk.Combobox(right_frame, textvariable=self.branch_var, width=27, state="readonly", font=("Arial", 10))
-        branch_combo['values'] = [f"{b.name}" for b in self.branches]
-        branch_combo.grid(row=0, column=1, pady=5, padx=5, sticky=tk.W)
-        branch_combo.bind('<<ComboboxSelected>>', self.on_branch_select)
+        self.branch_combo = SearchableCombobox(right_frame, textvariable=self.branch_var, width=27, state="normal", font=("Arial", 10))
+        self.branch_combo.set_completion_list([f"{b.name}" for b in self.branches])
+        self.branch_combo.grid(row=0, column=1, pady=5, padx=5, sticky=tk.W)
+        self.branch_combo.bind('<<ComboboxSelected>>', self.on_branch_select)
         
         # Disable branch selection for employees (they can only access their branch)
         if AuthenticationService.is_employee(self.current_user):
-            branch_combo.config(state="disabled")
+            self.branch_combo.config(state="disabled")
         
         # Product selection (for Stock IN/OUT)
         tk.Label(right_frame, text="Select Product:", font=("Arial", 10, "bold")).grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.stock_product_var = tk.StringVar()
-        stock_product_combo = ttk.Combobox(right_frame, textvariable=self.stock_product_var, width=27, state="readonly", font=("Arial", 10))
-        stock_product_combo.grid(row=1, column=1, pady=5, padx=5, sticky=tk.W)
-        stock_product_combo.bind('<<ComboboxSelected>>', self.on_stock_product_select)
-        self.stock_product_combo = stock_product_combo  # Store reference for updates
+        self.stock_product_combo = SearchableCombobox(right_frame, textvariable=self.stock_product_var, width=45, state="normal", font=("Arial", 10))
+        self.stock_product_combo.grid(row=1, column=1, pady=5, padx=5, sticky=tk.W)
+        self.stock_product_combo.bind('<<ComboboxSelected>>', self.on_stock_product_select)
         
         # Grade selection
         tk.Label(right_frame, text="Grade:", font=("Arial", 10)).grid(row=2, column=0, sticky=tk.W, pady=5)
@@ -226,7 +223,7 @@ class InventoryWindow:
         # Update stock product dropdown (for Stock IN/OUT)
         if hasattr(self, 'stock_product_combo'):
             product_values = [f"{p.name} - {p.tile_size}" for p in self.products]
-            self.stock_product_combo['values'] = product_values
+            self.stock_product_combo.set_completion_list(product_values)
     
     def on_product_select(self, event):
         """Handle product selection"""

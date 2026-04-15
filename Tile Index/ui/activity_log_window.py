@@ -18,8 +18,6 @@ class ActivityLogWindow:
     
     def __init__(self, parent):
         self.parent = parent
-        self.parent.title("Activity Log - Tile Index")
-        self.parent.geometry("1400x700")
         
         self.branches = BranchRepository.get_all()
         self.users = UserRepository.get_all()

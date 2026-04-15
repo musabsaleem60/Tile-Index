@@ -8,6 +8,7 @@ from tkinter import ttk, messagebox
 from datetime import datetime, date
 from repositories.branch_repository import BranchRepository
 from services.report_service import ReportService
+from utils.searchable_combobox import SearchableCombobox
 
 
 class ReportWindow:
@@ -15,8 +16,6 @@ class ReportWindow:
     
     def __init__(self, parent):
         self.parent = parent
-        self.parent.title("Reports - Tile Index")
-        self.parent.geometry("1200x700")
         
         self.branches = BranchRepository.get_all()
         self.selected_branch_id = None
@@ -47,10 +46,10 @@ class ReportWindow:
         # Branch selection
         tk.Label(left_frame, text="Select Branch:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W, pady=5)
         self.branch_var = tk.StringVar()
-        branch_combo = ttk.Combobox(left_frame, textvariable=self.branch_var, width=25, state="readonly", font=("Arial", 10))
-        branch_combo['values'] = ["All Branches"] + [f"{b.name}" for b in self.branches]
-        branch_combo.grid(row=0, column=1, pady=5, padx=5, sticky=tk.W)
-        branch_combo.bind('<<ComboboxSelected>>', self.on_branch_select)
+        self.branch_combo = SearchableCombobox(left_frame, textvariable=self.branch_var, width=25, state="normal", font=("Arial", 10))
+        self.branch_combo.set_completion_list(["All Branches"] + [f"{b.name}" for b in self.branches])
+        self.branch_combo.grid(row=0, column=1, pady=5, padx=5, sticky=tk.W)
+        self.branch_combo.bind('<<ComboboxSelected>>', self.on_branch_select)
         
         # Report type selection
         tk.Label(left_frame, text="Report Type:", font=("Arial", 10, "bold")).grid(row=1, column=0, sticky=tk.W, pady=10)

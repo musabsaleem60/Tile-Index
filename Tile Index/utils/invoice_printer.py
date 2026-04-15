@@ -8,6 +8,7 @@ from tkinter import ttk
 from datetime import datetime
 from repositories.branch_repository import BranchRepository
 from repositories.product_repository import ProductRepository
+from repositories.accessory_repository import AccessoryRepository
 from services.invoice_service import InvoiceService
 
 
@@ -30,9 +31,10 @@ class InvoicePrintWindow:
         if not self.invoice:
             raise ValueError("Invoice not found")
         
-        # Get branch and products
+        # Get branch, products, and accessories
         self.branch = BranchRepository.get_by_id(self.invoice.branch_id)
         self.products = {p.id: p for p in ProductRepository.get_all()}
+        self.accessories = {a.id: a for a in AccessoryRepository.get_all()}
         
         self.setup_ui()
     
@@ -141,19 +143,51 @@ class InvoicePrintWindow:
         
         # Items rows
         for row_idx, item in enumerate(self.invoice.items, 1):
-            product = self.products.get(item.product_id)
-            product_name = product.name if product else "N/A"
-            
+            if item.product_id:
+                product = self.products.get(item.product_id)
+                product_name = product.name if product else "N/A"
+                size = item.tile_size
+                grade = item.grade
+                qty_main = str(item.boxes)
+                qty_loose = str(item.loose_pieces)
+                rate_sqm = f"Rs. {item.rate_per_sqm:.2f}"
+                rate_main = f"Rs. {item.rate_per_box:.2f}"
+                rate_loose = f"Rs. {item.rate_per_piece:.2f}"
+            elif item.accessory_id:
+                accessory = self.accessories.get(item.accessory_id)
+                if accessory:
+                    product_name = f"{accessory.name} ({accessory.company})"
+                    size = accessory.category
+                else:
+                    product_name = "Unknown Accessory"
+                    size = "-"
+                
+                grade = "-"
+                qty_main = str(item.boxes)  # Reuse boxes for quantity
+                qty_loose = "-"
+                rate_sqm = "-"
+                rate_main = f"Rs. {item.rate_per_box:.2f}"
+                rate_loose = "-"
+            else:
+                product_name = "Unknown Item"
+                size = "-"
+                grade = "-"
+                qty_main = "-"
+                qty_loose = "-"
+                rate_sqm = "-"
+                rate_main = "-"
+                rate_loose = "-"
+                
             row_data = [
                 str(row_idx),
                 product_name,
-                item.tile_size,
-                item.grade,
-                str(item.boxes),
-                str(item.loose_pieces),
-                f"Rs. {item.rate_per_sqm:.2f}",
-                f"Rs. {item.rate_per_box:.2f}",
-                f"Rs. {item.rate_per_piece:.2f}",
+                size,
+                grade,
+                qty_main,
+                qty_loose,
+                rate_sqm,
+                rate_main,
+                rate_loose,
                 f"Rs. {item.line_total:.2f}"
             ]
             

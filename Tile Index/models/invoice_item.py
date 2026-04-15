@@ -7,12 +7,13 @@ Represents a line item in an invoice
 class InvoiceItem:
     """Invoice Item model class"""
     
-    def __init__(self, id=None, invoice_id=None, product_id=None, tile_size=None,
+    def __init__(self, id=None, invoice_id=None, product_id=None, accessory_id=None, tile_size=None,
                  grade=None, boxes=0, loose_pieces=0, rate_per_sqm=0,
                  rate_per_box=0, rate_per_piece=0, line_total=0):
         self.id = id
         self.invoice_id = invoice_id
         self.product_id = product_id
+        self.accessory_id = accessory_id
         self.tile_size = tile_size
         self.grade = grade  # G1, G2, or G3
         self.boxes = boxes
@@ -23,7 +24,7 @@ class InvoiceItem:
         self.line_total = line_total
     
     def __repr__(self):
-        return f"InvoiceItem(id={self.id}, invoice_id={self.invoice_id}, product_id={self.product_id}, grade='{self.grade}', total={self.line_total})"
+        return f"InvoiceItem(id={self.id}, invoice_id={self.invoice_id}, product_id={self.product_id}, accessory_id={self.accessory_id}, grade='{self.grade}', total={self.line_total})"
     
     def to_dict(self):
         """Convert invoice item to dictionary"""
@@ -31,6 +32,7 @@ class InvoiceItem:
             'id': self.id,
             'invoice_id': self.invoice_id,
             'product_id': self.product_id,
+            'accessory_id': self.accessory_id,
             'tile_size': self.tile_size,
             'grade': self.grade,
             'boxes': self.boxes,
@@ -48,6 +50,7 @@ class InvoiceItem:
             id=data.get('id'),
             invoice_id=data.get('invoice_id'),
             product_id=data.get('product_id'),
+            accessory_id=data.get('accessory_id'),
             tile_size=data.get('tile_size'),
             grade=data.get('grade'),
             boxes=data.get('boxes', 0),

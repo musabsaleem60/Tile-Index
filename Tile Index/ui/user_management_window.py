@@ -17,8 +17,6 @@ class UserManagementWindow:
     def __init__(self, parent, current_user=None):
         self.parent = parent
         self.current_user = current_user  # Admin user managing others
-        self.parent.title("User Management - Tile Index")
-        self.parent.geometry("900x600")
         
         self.branches = BranchRepository.get_all()
         self.users = UserRepository.get_all()

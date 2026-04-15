@@ -8,11 +8,14 @@ from tkinter import ttk, messagebox
 from datetime import datetime
 from repositories.branch_repository import BranchRepository
 from repositories.product_repository import ProductRepository
+from repositories.accessory_repository import AccessoryRepository
 from services.invoice_service import InvoiceService
 from services.inventory_service import InventoryService
+from services.accessory_service import AccessoryService
 from utils.validators import validate_positive_number, validate_integer, validate_required
 from utils.invoice_printer import InvoicePrintWindow
 from utils.grade_constants import VALID_GRADES, GRADE_1
+from utils.searchable_combobox import SearchableCombobox
 
 
 class InvoiceWindow:
@@ -21,11 +24,10 @@ class InvoiceWindow:
     def __init__(self, parent, current_user):
         self.parent = parent
         self.current_user = current_user
-        self.parent.title("Invoice & Billing - Tile Index")
-        self.parent.geometry("1400x800")
         
         self.branches = BranchRepository.get_all()
         self.products = ProductRepository.get_all()
+        self.accessories = AccessoryService.get_all_accessories()
         self.selected_branch_id = None
         self.invoice_items = []  # List of item dicts
         
@@ -67,15 +69,15 @@ class InvoiceWindow:
         # Branch selection
         tk.Label(left_frame, text="Branch:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W, pady=5)
         self.branch_var = tk.StringVar()
-        branch_combo = ttk.Combobox(left_frame, textvariable=self.branch_var, width=25, state="readonly", font=("Arial", 10))
-        branch_combo['values'] = [f"{b.name}" for b in self.branches]
-        branch_combo.grid(row=0, column=1, pady=5, padx=5, sticky=tk.W)
-        branch_combo.bind('<<ComboboxSelected>>', self.on_branch_select)
+        self.branch_combo = SearchableCombobox(left_frame, textvariable=self.branch_var, width=25, state="normal", font=("Arial", 10))
+        self.branch_combo.set_completion_list([f"{b.name}" for b in self.branches])
+        self.branch_combo.grid(row=0, column=1, pady=5, padx=5, sticky=tk.W)
+        self.branch_combo.bind('<<ComboboxSelected>>', self.on_branch_select)
         
         # Disable branch selection for employees
         from services.auth_service import AuthenticationService
         if AuthenticationService.is_employee(self.current_user):
-            branch_combo.config(state="disabled")
+            self.branch_combo.config(state="disabled")
         
         # Customer details
         tk.Label(left_frame, text="Customer Name:", font=("Arial", 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
@@ -95,35 +97,46 @@ class InvoiceWindow:
         item_frame = tk.LabelFrame(left_frame, text="Add Item", font=("Arial", 10, "bold"), padx=5, pady=5)
         item_frame.grid(row=4, column=0, columnspan=2, sticky=tk.EW, pady=10)
         
-        tk.Label(item_frame, text="Product:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=3)
+        tk.Label(item_frame, text="Item Type:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=3)
+        self.item_type_var = tk.StringVar(value="Tiles")
+        item_type_combo = ttk.Combobox(item_frame, textvariable=self.item_type_var, width=22, state="readonly", font=("Arial", 9))
+        item_type_combo['values'] = ("Tiles", "Accessories")
+        item_type_combo.grid(row=0, column=1, pady=3, padx=5, sticky=tk.W)
+        item_type_combo.bind('<<ComboboxSelected>>', self.on_item_type_change)
+        
+        self.product_label = tk.Label(item_frame, text="Product:", font=("Arial", 9))
+        self.product_label.grid(row=1, column=0, sticky=tk.W, pady=3)
         self.product_var = tk.StringVar()
-        product_combo = ttk.Combobox(item_frame, textvariable=self.product_var, width=22, state="readonly", font=("Arial", 9))
-        product_combo['values'] = [f"{p.name} - {p.tile_size}" for p in self.products]
-        product_combo.grid(row=0, column=1, pady=3, padx=5, sticky=tk.W)
-        product_combo.bind('<<ComboboxSelected>>', self.on_product_select)
+        self.product_combo = SearchableCombobox(item_frame, textvariable=self.product_var, width=45, state="normal", font=("Arial", 9))
+        self.product_combo.set_completion_list([f"{p.name} - {p.tile_size}" for p in self.products])
+        self.product_combo.grid(row=1, column=1, pady=3, padx=5, sticky=tk.W)
+        self.product_combo.bind('<<ComboboxSelected>>', self.on_product_select)
         
-        tk.Label(item_frame, text="Grade:", font=("Arial", 9)).grid(row=1, column=0, sticky=tk.W, pady=3)
+        self.grade_label = tk.Label(item_frame, text="Grade:", font=("Arial", 9))
+        self.grade_label.grid(row=2, column=0, sticky=tk.W, pady=3)
         self.grade_var = tk.StringVar(value=GRADE_1)
-        grade_combo = ttk.Combobox(item_frame, textvariable=self.grade_var, width=22, state="readonly", font=("Arial", 9))
-        grade_combo['values'] = VALID_GRADES
-        grade_combo.grid(row=1, column=1, pady=3, padx=5, sticky=tk.W)
-        grade_combo.bind('<<ComboboxSelected>>', self.on_grade_select)
+        self.grade_combo = ttk.Combobox(item_frame, textvariable=self.grade_var, width=22, state="readonly", font=("Arial", 9))
+        self.grade_combo['values'] = VALID_GRADES
+        self.grade_combo.grid(row=2, column=1, pady=3, padx=5, sticky=tk.W)
+        self.grade_combo.bind('<<ComboboxSelected>>', self.on_grade_select)
         
-        tk.Label(item_frame, text="Boxes:", font=("Arial", 9)).grid(row=2, column=0, sticky=tk.W, pady=3)
+        self.boxes_label = tk.Label(item_frame, text="Boxes:", font=("Arial", 9))
+        self.boxes_label.grid(row=3, column=0, sticky=tk.W, pady=3)
         self.item_boxes_entry = tk.Entry(item_frame, width=25, font=("Arial", 9))
-        self.item_boxes_entry.grid(row=2, column=1, pady=3, padx=5)
+        self.item_boxes_entry.grid(row=3, column=1, pady=3, padx=5)
         self.item_boxes_entry.insert(0, "0")
         
-        tk.Label(item_frame, text="Loose Pieces:", font=("Arial", 9)).grid(row=3, column=0, sticky=tk.W, pady=3)
+        self.pieces_label = tk.Label(item_frame, text="Loose Pieces:", font=("Arial", 9))
+        self.pieces_label.grid(row=4, column=0, sticky=tk.W, pady=3)
         self.item_pieces_entry = tk.Entry(item_frame, width=25, font=("Arial", 9))
-        self.item_pieces_entry.grid(row=3, column=1, pady=3, padx=5)
+        self.item_pieces_entry.grid(row=4, column=1, pady=3, padx=5)
         self.item_pieces_entry.insert(0, "0")
         
         # Stock info display
         self.stock_info_label = tk.Label(item_frame, text="", font=("Arial", 8), fg="blue", wraplength=200)
-        self.stock_info_label.grid(row=4, column=0, columnspan=2, pady=5)
+        self.stock_info_label.grid(row=5, column=0, columnspan=2, pady=5)
         
-        tk.Button(item_frame, text="Add to Invoice", command=self.add_item, bg="#3498db", fg="white", width=20).grid(row=5, column=0, columnspan=2, pady=10)
+        tk.Button(item_frame, text="Add to Invoice", command=self.add_item, bg="#3498db", fg="white", width=20).grid(row=6, column=0, columnspan=2, pady=10)
         
         # Totals section
         totals_frame = tk.LabelFrame(left_frame, text="Totals", font=("Arial", 10, "bold"), padx=5, pady=5)
@@ -188,6 +201,30 @@ class InvoiceWindow:
         # Configure grid
         left_frame.grid_columnconfigure(1, weight=1)
     
+    def on_item_type_change(self, event):
+        """Handle item type change (Tiles vs Accessories)"""
+        item_type = self.item_type_var.get()
+        self.product_var.set("")
+        
+        if item_type == "Tiles":
+            self.product_label.config(text="Product:")
+            self.product_combo.set_completion_list([f"{p.name} - {p.tile_size}" for p in self.products])
+            self.grade_label.grid()
+            self.grade_combo.grid()
+            self.boxes_label.config(text="Boxes:")
+            self.pieces_label.grid()
+            self.item_pieces_entry.grid()
+        else:
+            self.product_label.config(text="Accessory:")
+            self.product_combo.set_completion_list([f"{a.name} ({a.company}) - {a.category}" for a in self.accessories])
+            self.grade_label.grid_remove()
+            self.grade_combo.grid_remove()
+            self.boxes_label.config(text="Quantity:")
+            self.pieces_label.grid_remove()
+            self.item_pieces_entry.grid_remove()
+            
+        self.update_stock_info()
+    
     def on_branch_select(self, event):
         """Handle branch selection"""
         selected = self.branch_var.get()
@@ -208,33 +245,55 @@ class InvoiceWindow:
     def update_stock_info(self):
         """Update stock information display"""
         try:
-            product_str = self.product_var.get()
-            if not product_str or not self.selected_branch_id:
+            item_type = self.item_type_var.get()
+            item_str = self.product_var.get()
+            
+            if not item_str or not self.selected_branch_id:
                 self.stock_info_label.config(text="")
                 return
             
-            # Find product
-            product = None
-            for p in self.products:
-                if f"{p.name} - {p.tile_size}" == product_str:
-                    product = p
-                    break
-            
-            if not product:
-                self.stock_info_label.config(text="")
-                return
-            
-            grade = self.grade_var.get()
-            inv = InventoryService.get_inventory(self.selected_branch_id, product.id, grade)
-            
-            if inv:
-                total_pieces = (inv.boxes * product.pieces_per_box) + inv.loose_pieces
-                self.stock_info_label.config(
-                    text=f"Available: {inv.boxes} boxes + {inv.loose_pieces} pieces\n"
-                         f"Rate/Box: Rs. {inv.rate_per_box:.2f} | Rate/Piece: Rs. {inv.rate_per_piece:.2f}"
-                )
+            if item_type == "Tiles":
+                # Find product
+                product = None
+                for p in self.products:
+                    if f"{p.name} - {p.tile_size}" == item_str:
+                        product = p
+                        break
+                
+                if not product:
+                    self.stock_info_label.config(text="")
+                    return
+                
+                grade = self.grade_var.get()
+                inv = InventoryService.get_inventory(self.selected_branch_id, product.id, grade)
+                
+                if inv:
+                    self.stock_info_label.config(
+                        text=f"Available: {inv.boxes} boxes + {inv.loose_pieces} pieces\n"
+                             f"Rate/Box: Rs. {inv.rate_per_box:.2f} | Rate/Piece: Rs. {inv.rate_per_piece:.2f}"
+                    )
+                else:
+                    self.stock_info_label.config(text="No stock available for this grade", fg="red")
             else:
-                self.stock_info_label.config(text="No stock available for this grade", fg="red")
+                # Find accessory
+                accessory = None
+                for a in self.accessories:
+                    if f"{a.name} ({a.company}) - {a.category}" == item_str:
+                        accessory = a
+                        break
+                
+                if not accessory:
+                    self.stock_info_label.config(text="")
+                    return
+                
+                acc_inv = AccessoryService.get_inventory(self.selected_branch_id, accessory.id)
+                available = acc_inv.quantity if acc_inv else 0
+                
+                self.stock_info_label.config(
+                    text=f"Available: {available} items\n"
+                         f"Unit Price: Rs. {accessory.unit_price:.2f}",
+                    fg="blue"
+                )
         except:
             self.stock_info_label.config(text="")
     
@@ -244,53 +303,93 @@ class InvoiceWindow:
             if not self.selected_branch_id:
                 raise ValueError("Please select a branch")
             
-            product_str = self.product_var.get()
-            if not product_str:
-                raise ValueError("Please select a product")
+            item_type = self.item_type_var.get()
+            item_str = self.product_var.get()
+            if not item_str:
+                raise ValueError(f"Please select a {'product' if item_type == 'Tiles' else 'accessory'}")
             
-            # Find product
-            product = None
-            for p in self.products:
-                if f"{p.name} - {p.tile_size}" == product_str:
-                    product = p
-                    break
-            
-            if not product:
-                raise ValueError("Product not found")
-            
-            grade = self.grade_var.get()
-            boxes = validate_integer(self.item_boxes_entry.get() or "0", "Boxes")
-            loose_pieces = validate_integer(self.item_pieces_entry.get() or "0", "Loose Pieces")
-            
-            if boxes == 0 and loose_pieces == 0:
-                raise ValueError("Please enter at least some quantity")
-            
-            # Check stock
-            inv = InventoryService.get_inventory(self.selected_branch_id, product.id, grade)
-            if not inv:
-                raise ValueError(f"No stock available for {product.name} - Grade {grade}")
-            
-            total_available_pieces = (inv.boxes * product.pieces_per_box) + inv.loose_pieces
-            total_requested_pieces = (boxes * product.pieces_per_box) + loose_pieces
-            
-            if total_requested_pieces > total_available_pieces:
-                raise ValueError(f"Insufficient stock. Available: {inv.boxes} boxes + {inv.loose_pieces} pieces")
-            
-            # Calculate line total
-            line_total = (boxes * inv.rate_per_box) + (loose_pieces * inv.rate_per_piece)
-            
-            # Add to items list
-            item_data = {
-                'product_id': product.id,
-                'product_name': product.name,
-                'tile_size': product.tile_size,
-                'grade': grade,
-                'boxes': boxes,
-                'loose_pieces': loose_pieces,
-                'rate_per_box': inv.rate_per_box,
-                'rate_per_piece': inv.rate_per_piece,
-                'line_total': line_total
-            }
+            if item_type == "Tiles":
+                # Find product
+                product = None
+                for p in self.products:
+                    if f"{p.name} - {p.tile_size}" == item_str:
+                        product = p
+                        break
+                
+                if not product:
+                    raise ValueError("Product not found")
+                
+                grade = self.grade_var.get()
+                boxes = validate_integer(self.item_boxes_entry.get() or "0", "Boxes")
+                loose_pieces = validate_integer(self.item_pieces_entry.get() or "0", "Loose Pieces")
+                
+                if boxes == 0 and loose_pieces == 0:
+                    raise ValueError("Please enter at least some quantity")
+                
+                # Check stock
+                inv = InventoryService.get_inventory(self.selected_branch_id, product.id, grade)
+                if not inv:
+                    raise ValueError(f"No stock available for {product.name} - Grade {grade}")
+                
+                total_available_pieces = (inv.boxes * product.pieces_per_box) + inv.loose_pieces
+                total_requested_pieces = (boxes * product.pieces_per_box) + loose_pieces
+                
+                if total_requested_pieces > total_available_pieces:
+                    raise ValueError(f"Insufficient stock. Available: {inv.boxes} boxes + {inv.loose_pieces} pieces")
+                
+                # Calculate line total
+                line_total = (boxes * inv.rate_per_box) + (loose_pieces * inv.rate_per_piece)
+                
+                # Add to items list
+                item_data = {
+                    'type': 'Tiles',
+                    'product_id': product.id,
+                    'product_name': product.name,
+                    'tile_size': product.tile_size,
+                    'grade': grade,
+                    'boxes': boxes,
+                    'loose_pieces': loose_pieces,
+                    'rate_per_box': inv.rate_per_box,
+                    'rate_per_piece': inv.rate_per_piece,
+                    'line_total': line_total
+                }
+            else:
+                # Accessory logic
+                accessory = None
+                for a in self.accessories:
+                    if f"{a.name} ({a.company}) - {a.category}" == item_str:
+                        accessory = a
+                        break
+                
+                if not accessory:
+                    raise ValueError("Accessory not found")
+                
+                quantity = validate_integer(self.item_boxes_entry.get() or "0", "Quantity")
+                if quantity <= 0:
+                    raise ValueError("Please enter a valid quantity")
+                
+                # Check stock
+                acc_inv = AccessoryService.get_inventory(self.selected_branch_id, accessory.id)
+                available = acc_inv.quantity if acc_inv else 0
+                if quantity > available:
+                    raise ValueError(f"Insufficient stock for accessory {accessory.name}. Available: {available}")
+                
+                # Calculate line total
+                line_total = quantity * accessory.unit_price
+                
+                # Add to items list
+                item_data = {
+                    'type': 'Accessory',
+                    'accessory_id': accessory.id,
+                    'product_name': f"{accessory.name} ({accessory.company})",
+                    'tile_size': accessory.category,
+                    'grade': '-',
+                    'boxes': quantity,
+                    'loose_pieces': 0,
+                    'rate_per_box': accessory.unit_price,
+                    'rate_per_piece': 0,
+                    'line_total': line_total
+                }
             
             self.invoice_items.append(item_data)
             self.update_items_table()
@@ -379,12 +478,18 @@ class InvoiceWindow:
             # Prepare items data
             items_data = []
             for item in self.invoice_items:
-                items_data.append({
-                    'product_id': item['product_id'],
-                    'grade': item['grade'],
-                    'boxes': item['boxes'],
-                    'loose_pieces': item['loose_pieces']
-                })
+                if item.get('type') == 'Tiles':
+                    items_data.append({
+                        'product_id': item['product_id'],
+                        'grade': item['grade'],
+                        'boxes': item['boxes'],
+                        'loose_pieces': item['loose_pieces']
+                    })
+                else:
+                    items_data.append({
+                        'accessory_id': item['accessory_id'],
+                        'quantity': item['boxes']  # boxes field used for quantity in accessories
+                    })
             
             # Check branch access for employees
             from services.auth_service import AuthenticationService
@@ -417,6 +522,9 @@ class InvoiceWindow:
         """Clear invoice form"""
         self.customer_name_entry.delete(0, tk.END)
         self.customer_contact_entry.delete(0, tk.END)
+        self.item_type_var.set("Tiles")
+        self.on_item_type_change(None)
+        self.product_var.set("")
         self.discount_entry.delete(0, tk.END)
         self.discount_entry.insert(0, "0")
         self.paid_entry.delete(0, tk.END)

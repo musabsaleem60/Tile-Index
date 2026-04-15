@@ -9,6 +9,7 @@ from datetime import datetime, date
 from repositories.branch_repository import BranchRepository
 from services.invoice_service import InvoiceService
 from utils.invoice_printer import InvoicePrintWindow
+from utils.searchable_combobox import SearchableCombobox
 
 
 class InvoiceSearchWindow:
@@ -16,8 +17,6 @@ class InvoiceSearchWindow:
     
     def __init__(self, parent):
         self.parent = parent
-        self.parent.title("Search Invoices - Tile Index")
-        self.parent.geometry("1000x600")
         
         self.branches = BranchRepository.get_all()
         self.setup_ui()
@@ -42,9 +41,9 @@ class InvoiceSearchWindow:
         # Branch
         tk.Label(search_frame, text="Branch:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, pady=5, padx=5)
         self.branch_var = tk.StringVar()
-        branch_combo = ttk.Combobox(search_frame, textvariable=self.branch_var, width=25, state="readonly", font=("Arial", 10))
-        branch_combo['values'] = ["All Branches"] + [f"{b.name}" for b in self.branches]
-        branch_combo.grid(row=0, column=1, pady=5, padx=5, sticky=tk.W)
+        self.branch_combo = SearchableCombobox(search_frame, textvariable=self.branch_var, width=25, state="normal", font=("Arial", 10))
+        self.branch_combo.set_completion_list(["All Branches"] + [f"{b.name}" for b in self.branches])
+        self.branch_combo.grid(row=0, column=1, pady=5, padx=5, sticky=tk.W)
         
         # Invoice number
         tk.Label(search_frame, text="Invoice Number:", font=("Arial", 10)).grid(row=0, column=2, sticky=tk.W, pady=5, padx=5)
@@ -104,7 +103,6 @@ class InvoiceSearchWindow:
         btn_frame.pack(pady=10)
         
         tk.Button(btn_frame, text="View/Print Invoice", command=self.view_invoice, bg="#3498db", fg="white", width=20).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Close", command=self.parent.destroy, bg="#95a5a6", fg="white", width=15).pack(side=tk.LEFT, padx=5)
     
     def search_invoices(self):
         """Search for invoices"""

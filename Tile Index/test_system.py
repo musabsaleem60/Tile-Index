@@ -11,10 +11,10 @@ def test_database():
     try:
         from database.init_db import init_database
         db_path = init_database()
-        print(f"✓ Database initialized: {db_path}")
+        print(f"DATABASE: OK - {db_path}")
         return True
     except Exception as e:
-        print(f"✗ Database error: {e}")
+        print(f"DATABASE: FAILED - {e}")
         traceback.print_exc()
         return False
 
@@ -28,20 +28,20 @@ def test_auth():
         # Check default admin
         user = UserRepository.get_by_username('musab')
         if user:
-            print(f"✓ Default admin user found: {user.username}")
+            print(f"AUTH: OK - Default admin user found: {user.username}")
             # Test login
             try:
                 logged_user = AuthenticationService.login('musab', 'musab123')
-                print(f"✓ Login successful: {logged_user.username} ({logged_user.role})")
+                print(f"LOGIN: OK - Login successful: {logged_user.username} ({logged_user.role})")
             except Exception as e:
-                print(f"✗ Login failed: {e}")
+                print(f"LOGIN: FAILED - {e}")
                 return False
         else:
-            print("✗ Default admin user not found")
+            print("AUTH: FAILED - Default admin user not found")
             return False
         return True
     except Exception as e:
-        print(f"✗ Authentication error: {e}")
+        print(f"AUTH: ERROR - {e}")
         traceback.print_exc()
         return False
 
@@ -67,9 +67,9 @@ def test_imports():
     for module in modules:
         try:
             __import__(module)
-            print(f"✓ {module}")
+            print(f"IMPORT: OK - {module}")
         except Exception as e:
-            print(f"✗ {module}: {e}")
+            print(f"IMPORT: FAILED - {module}: {e}")
             failed.append(module)
     
     return len(failed) == 0
@@ -80,12 +80,12 @@ def test_branches():
     try:
         from repositories.branch_repository import BranchRepository
         branches = BranchRepository.get_all()
-        print(f"✓ Found {len(branches)} branches")
+        print(f"BRANCH: OK - Found {len(branches)} branches")
         for branch in branches:
             print(f"  - {branch.name} ({branch.code})")
         return len(branches) > 0
     except Exception as e:
-        print(f"✗ Branch error: {e}")
+        print(f"BRANCH: ERROR - {e}")
         traceback.print_exc()
         return False
 
@@ -108,18 +108,18 @@ def main():
     all_passed = True
     for name, result in results:
         status = "PASS" if result else "FAIL"
-        symbol = "✓" if result else "✗"
+        symbol = "[OK]" if result else "[FAIL]"
         print(f"{symbol} {name}: {status}")
         if not result:
             all_passed = False
     
     print("=" * 60)
     if all_passed:
-        print("✓ All tests passed! System is ready to use.")
+        print("SYSTEM STATUS: OK - All tests passed! System is ready to use.")
         print("\nTo start the application, run: python main.py")
         print("Default login: musab / musab123")
     else:
-        print("✗ Some tests failed. Please check the errors above.")
+        print("SYSTEM STATUS: FAILED - Some tests failed. Please check the errors above.")
     print("=" * 60)
     
     return all_passed

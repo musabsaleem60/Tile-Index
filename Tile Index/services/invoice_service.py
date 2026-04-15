@@ -8,7 +8,8 @@ from repositories.inventory_repository import InventoryRepository
 from repositories.product_repository import ProductRepository
 from repositories.user_repository import UserRepository
 from services.inventory_service import InventoryService
-from services.activity_log_service import ActivityLogService
+from repositories.accessory_repository import AccessoryRepository
+from services.accessory_service import AccessoryService
 from models.invoice import Invoice
 from models.invoice_item import InvoiceItem
 from datetime import datetime
@@ -55,51 +56,83 @@ class InvoiceService:
         subtotal = 0
         
         for item_data in items_data:
-            product_id = item_data['product_id']
-            grade = item_data['grade']
-            boxes = item_data.get('boxes', 0)
-            loose_pieces = item_data.get('loose_pieces', 0)
+            product_id = item_data.get('product_id')
+            accessory_id = item_data.get('accessory_id')
             
-            # Validate item
-            if boxes < 0 or loose_pieces < 0:
-                raise ValueError("Item quantities cannot be negative")
-            
-            if boxes == 0 and loose_pieces == 0:
-                continue  # Skip empty items
-            
-            # Get product
-            product = ProductRepository.get_by_id(product_id)
-            if not product:
-                raise ValueError(f"Product with ID {product_id} not found")
-            
-            # Get inventory for rates
-            inventory = InventoryRepository.get_by_branch_product_grade(branch_id, product_id, grade)
-            if not inventory:
-                raise ValueError(f"No inventory found for this product and grade at this branch")
-            
-            # Check stock availability
-            total_available_pieces = (inventory.boxes * product.pieces_per_box) + inventory.loose_pieces
-            total_requested_pieces = (boxes * product.pieces_per_box) + loose_pieces
-            
-            if total_requested_pieces > total_available_pieces:
-                raise ValueError(f"Insufficient stock for {product.name} ({product.tile_size}) - {grade}. Available: {inventory.boxes} boxes + {inventory.loose_pieces} pieces")
-            
-            # Calculate line total
-            line_total = (boxes * inventory.rate_per_box) + (loose_pieces * inventory.rate_per_piece)
-            
-            # Create invoice item
-            item = InvoiceItem(
-                invoice_id=None,  # Will be set after invoice is created
-                product_id=product_id,
-                tile_size=product.tile_size,
-                grade=grade,
-                boxes=boxes,
-                loose_pieces=loose_pieces,
-                rate_per_sqm=inventory.rate_per_sqm,
-                rate_per_box=inventory.rate_per_box,
-                rate_per_piece=inventory.rate_per_piece,
-                line_total=line_total
-            )
+            if product_id:
+                grade = item_data['grade']
+                boxes = item_data.get('boxes', 0)
+                loose_pieces = item_data.get('loose_pieces', 0)
+                
+                # Validate item
+                if boxes < 0 or loose_pieces < 0:
+                    raise ValueError("Item quantities cannot be negative")
+                
+                if boxes == 0 and loose_pieces == 0:
+                    continue  # Skip empty items
+                
+                # Get product
+                product = ProductRepository.get_by_id(product_id)
+                if not product:
+                    raise ValueError(f"Product with ID {product_id} not found")
+                
+                # Get inventory for rates
+                inventory = InventoryRepository.get_by_branch_product_grade(branch_id, product_id, grade)
+                if not inventory:
+                    raise ValueError(f"No inventory found for this product and grade at this branch")
+                
+                # Check stock availability
+                total_available_pieces = (inventory.boxes * product.pieces_per_box) + inventory.loose_pieces
+                total_requested_pieces = (boxes * product.pieces_per_box) + loose_pieces
+                
+                if total_requested_pieces > total_available_pieces:
+                    raise ValueError(f"Insufficient stock for {product.name} ({product.tile_size}) - {grade}. Available: {inventory.boxes} boxes + {inventory.loose_pieces} pieces")
+                
+                # Calculate line total
+                line_total = (boxes * inventory.rate_per_box) + (loose_pieces * inventory.rate_per_piece)
+                
+                # Create invoice item
+                item = InvoiceItem(
+                    invoice_id=None,
+                    product_id=product_id,
+                    tile_size=product.tile_size,
+                    grade=grade,
+                    boxes=boxes,
+                    loose_pieces=loose_pieces,
+                    rate_per_sqm=inventory.rate_per_sqm,
+                    rate_per_box=inventory.rate_per_box,
+                    rate_per_piece=inventory.rate_per_piece,
+                    line_total=line_total
+                )
+            elif accessory_id:
+                quantity = item_data.get('quantity', 0)
+                if quantity <= 0:
+                    continue
+                
+                # Get accessory
+                accessory = AccessoryRepository.get_by_id(accessory_id)
+                if not accessory:
+                    raise ValueError(f"Accessory with ID {accessory_id} not found")
+                
+                # Get accessory inventory
+                acc_inv = AccessoryService.get_inventory(branch_id, accessory_id)
+                if not acc_inv or acc_inv.quantity < quantity:
+                    available = acc_inv.quantity if acc_inv else 0
+                    raise ValueError(f"Insufficient stock for accessory {accessory.name} ({accessory.company}). Available: {available}")
+                
+                # Calculate line total
+                line_total = quantity * accessory.unit_price
+                
+                # Create invoice item
+                item = InvoiceItem(
+                    invoice_id=None,
+                    accessory_id=accessory_id,
+                    boxes=quantity,  # Reuse boxes as quantity for accessories
+                    rate_per_box=accessory.unit_price,  # Reuse rate_per_box as unit_price
+                    line_total=line_total
+                )
+            else:
+                continue
             
             invoice.items.append(item)
             subtotal += line_total
@@ -118,19 +151,26 @@ class InvoiceService:
         # Deduct stock from inventory for each item
         for item in invoice.items:
             try:
-                InventoryService.deduct_stock(
-                    branch_id,
-                    item.product_id,
-                    item.grade,
-                    item.boxes,
-                    item.loose_pieces,
-                    user_id=user_id,
-                    notes=f"Invoice: {invoice.invoice_number}"
-                )
+                if item.product_id:
+                    InventoryService.deduct_stock(
+                        branch_id,
+                        item.product_id,
+                        item.grade,
+                        item.boxes,
+                        item.loose_pieces,
+                        user_id=user_id,
+                        notes=f"Invoice: {invoice.invoice_number}"
+                    )
+                elif item.accessory_id:
+                    AccessoryService.deduct_stock(
+                        branch_id,
+                        item.accessory_id,
+                        item.boxes  # boxes field used for accessory quantity
+                    )
             except Exception as e:
                 # If stock deduction fails, we should rollback the invoice
                 # For simplicity, we'll raise an error (in production, use transactions)
-                raise ValueError(f"Failed to update inventory: {str(e)}")
+                raise ValueError(f"Failed to update inventory for {item.product_id or item.accessory_id}: {str(e)}")
         
         # Log activity
         try:
