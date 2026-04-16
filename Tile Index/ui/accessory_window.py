@@ -69,7 +69,7 @@ class AccessoryWindow:
         category_combo.grid(row=0, column=1, pady=5, padx=5)
         category_combo.bind('<<ComboboxSelected>>', self.on_category_filter)
         
-        tk.Label(left_frame, text="Company:", font=("Arial", 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
+        tk.Label(left_frame, text="Company/Details:", font=("Arial", 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
         self.company_entry = tk.Entry(left_frame, width=30, font=("Arial", 10))
         self.company_entry.grid(row=1, column=1, pady=5, padx=5)
         
@@ -89,7 +89,7 @@ class AccessoryWindow:
         tk.Label(left_frame, text="Filter:", font=("Arial", 10, "bold")).grid(row=4, column=0, sticky=tk.W, pady=(10, 0))
         self.filter_var = tk.StringVar(value="All")
         self.filter_combo = SearchableCombobox(left_frame, textvariable=self.filter_var, width=27, state="normal", font=("Arial", 10))
-        self.filter_combo.set_completion_list(['All', 'Grout', 'Bond', 'Floor Waste'])
+        self.filter_combo.set_completion_list(['All', 'Grout', 'Bond', 'Floor Waste', 'Spacer'])
         self.filter_combo.grid(row=4, column=1, pady=(10, 0), padx=5)
         self.filter_combo.bind('<<ComboboxSelected>>', self.on_filter_change)
         
@@ -100,13 +100,15 @@ class AccessoryWindow:
         tree_frame = tk.Frame(left_frame)
         tree_frame.grid(row=6, column=0, columnspan=2, sticky=tk.NSEW, pady=5)
         
-        columns = ('Category', 'Company', 'Price')
+        columns = ('S.No', 'Category', 'Company', 'Price')
         self.accessories_tree = ttk.Treeview(tree_frame, columns=columns, show='headings', height=12)
         
+        self.accessories_tree.heading('S.No', text='S.No')
         self.accessories_tree.heading('Category', text='Category')
-        self.accessories_tree.heading('Company', text='Company')
+        self.accessories_tree.heading('Company', text='Company/Details')
         self.accessories_tree.heading('Price', text='Price (Rs.)')
         
+        self.accessories_tree.column('S.No', width=50, anchor=tk.CENTER)
         self.accessories_tree.column('Category', width=80, anchor=tk.CENTER)
         self.accessories_tree.column('Company', width=120, anchor=tk.W)
         self.accessories_tree.column('Price', width=100, anchor=tk.CENTER)
@@ -183,15 +185,17 @@ class AccessoryWindow:
         stock_display_frame.grid(row=4, column=0, columnspan=2, sticky=tk.NSEW, pady=10)
         
         # Stock treeview
-        stock_columns = ('Category', 'Company', 'Price', 'Quantity', 'Total Value')
+        stock_columns = ('S.No', 'Category', 'Company', 'Price', 'Quantity', 'Total Value')
         self.stock_tree = ttk.Treeview(stock_display_frame, columns=stock_columns, show='headings', height=10)
         
+        self.stock_tree.heading('S.No', text='S.No')
         self.stock_tree.heading('Category', text='Category')
-        self.stock_tree.heading('Company', text='Company')
+        self.stock_tree.heading('Company', text='Company/Details')
         self.stock_tree.heading('Price', text='Price (Rs.)')
         self.stock_tree.heading('Quantity', text='Qty')
         self.stock_tree.heading('Total Value', text='Total Value')
         
+        self.stock_tree.column('S.No', width=50, anchor=tk.CENTER)
         self.stock_tree.column('Category', width=70, anchor=tk.CENTER)
         self.stock_tree.column('Company', width=100, anchor=tk.W)
         self.stock_tree.column('Price', width=80, anchor=tk.CENTER)
@@ -226,8 +230,9 @@ class AccessoryWindow:
             for item in self.accessories_tree.get_children():
                 self.accessories_tree.delete(item)
             
-            for acc in self.accessories:
+            for idx, acc in enumerate(self.accessories, 1):
                 self.accessories_tree.insert('', tk.END, values=(
+                    idx,
                     acc.category,
                     acc.company,
                     f"Rs. {acc.unit_price:.0f}"
@@ -251,7 +256,7 @@ class AccessoryWindow:
             values = item['values']
             # Find matching accessory
             for acc in self.accessories:
-                if acc.category == values[0] and acc.company == values[1]:
+                if acc.category == values[1] and acc.company == values[2]:
                     self.selected_accessory_id = acc.id
                     break
     
@@ -338,7 +343,7 @@ class AccessoryWindow:
             # Find the accessory
             acc = None
             for a in self.accessories:
-                if a.category == values[0] and a.company == values[1]:
+                if a.category == values[1] and a.company == values[2]:
                     acc = a
                     break
             
@@ -371,7 +376,7 @@ class AccessoryWindow:
             
             acc = None
             for a in self.accessories:
-                if a.category == values[0] and a.company == values[1]:
+                if a.category == values[1] and a.company == values[2]:
                     acc = a
                     break
             
@@ -509,12 +514,13 @@ class AccessoryWindow:
         # Get all accessory inventory for this branch
         all_accessories = AccessoryRepository.get_all()
         
-        for acc in all_accessories:
+        for idx, acc in enumerate(all_accessories, 1):
             inv = AccessoryInventoryRepository.get_by_branch_accessory(self.selected_branch_id, acc.id)
             qty = inv.quantity if inv else 0
             total_value = qty * acc.unit_price
             
             self.stock_tree.insert('', tk.END, values=(
+                idx,
                 acc.category,
                 acc.company,
                 f"Rs. {acc.unit_price:.0f}",

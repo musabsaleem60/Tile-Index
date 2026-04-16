@@ -163,7 +163,7 @@ def init_database():
         CREATE TABLE IF NOT EXISTS accessories (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
-            category TEXT NOT NULL CHECK(category IN ('Grout', 'Bond', 'Floor Waste')),
+            category TEXT NOT NULL CHECK(category IN ('Grout', 'Bond', 'Floor Waste', 'Spacer')),
             company TEXT NOT NULL,
             unit_price REAL NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -271,6 +271,20 @@ def init_database():
         ('Floor Waste', 'Floor Waste', 'Heritage (Chrome)', 1700),
         ('Floor Waste', 'Floor Waste', 'Heritage (Black)', 2200),
         ('Floor Waste', 'Floor Waste', 'Heritage (White)', 1700),
+        # Spacers
+        ('Wall Spacer (1mm)', 'Spacer', 'Wall Spacer (1mm)', 100),
+        ('Wall Spacer (1.5mm)', 'Spacer', 'Wall Spacer (1.5mm)', 100),
+        ('Wall Spacer (2mm)', 'Spacer', 'Wall Spacer (2mm)', 100),
+        ('Wall Spacer (3mm)', 'Spacer', 'Wall Spacer (3mm)', 100),
+        ('Wall Spacer (4mm)', 'Spacer', 'Wall Spacer (4mm)', 100),
+        ('Wall Spacer (5mm)', 'Spacer', 'Wall Spacer (5mm)', 100),
+        ('Floor Spacer Male', 'Spacer', 'Floor Spacer Male (Standard)', 300),
+        ('Floor Spacer Female (1mm)', 'Spacer', 'Floor Spacer Female (1mm)', 300),
+        ('Floor Spacer Female (1.5mm)', 'Spacer', 'Floor Spacer Female (1.5mm)', 300),
+        ('Floor Spacer Female (2mm)', 'Spacer', 'Floor Spacer Female (2mm)', 300),
+        ('Floor Spacer Female (3mm)', 'Spacer', 'Floor Spacer Female (3mm)', 300),
+        ('Floor Spacer Female (4mm)', 'Spacer', 'Floor Spacer Female (4mm)', 300),
+        ('Floor Spacer Female (5mm)', 'Spacer', 'Floor Spacer Female (5mm)', 300),
     ]
     
     cursor.executemany("""

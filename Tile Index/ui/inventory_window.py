@@ -139,6 +139,7 @@ class InventoryWindow:
         
         # Product selection (for Stock IN/OUT)
         tk.Label(right_frame, text="Select Product:", font=("Arial", 10, "bold")).grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.stock_product_var = tk.StringVar()
         self.stock_product_combo = SearchableCombobox(right_frame, textvariable=self.stock_product_var, width=45, state="normal", font=("Arial", 10))
         self.stock_product_combo.grid(row=1, column=1, pady=5, padx=5, sticky=tk.W)
         self.stock_product_combo.bind('<<ComboboxSelected>>', self.on_stock_product_select)

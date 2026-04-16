@@ -11,7 +11,8 @@ class Accessory:
     CATEGORY_GROUT = 'Grout'
     CATEGORY_BOND = 'Bond'
     CATEGORY_FLOOR_WASTE = 'Floor Waste'
-    VALID_CATEGORIES = [CATEGORY_GROUT, CATEGORY_BOND, CATEGORY_FLOOR_WASTE]
+    CATEGORY_SPACER = 'Spacer'
+    VALID_CATEGORIES = [CATEGORY_GROUT, CATEGORY_BOND, CATEGORY_FLOOR_WASTE, CATEGORY_SPACER]
     
     def __init__(self, id=None, name=None, category=None, company=None,
                  unit_price=0, created_at=None):
