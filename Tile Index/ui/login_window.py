@@ -6,8 +6,9 @@ User authentication screen
 import tkinter as tk
 from tkinter import messagebox
 from desktop_client.api_client import ApiClientError
-from desktop_client.config import API_BASE_URL
+from desktop_client.config import API_BASE_URL, CHECK_UPDATES
 from desktop_client.session import api_client, set_authenticated_session
+from desktop_client.update_checker import check_for_update
 from models.user import User
 
 
@@ -27,6 +28,7 @@ class LoginWindow:
         self.current_user = None
         
         self.setup_ui()
+        self.check_for_updates()
     
     def center_window(self):
         """Center the window on screen"""
@@ -153,4 +155,20 @@ class LoginWindow:
             self.password_entry.delete(0, tk.END)
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {str(e)}")
+
+    def check_for_updates(self):
+        """Notify users when a newer desktop build is available."""
+        if not CHECK_UPDATES:
+            return
+        try:
+            update = check_for_update(api_client)
+            if update:
+                message = (
+                    f"A new Tile Index version is available: {update['latest_version']}\n\n"
+                    f"{update.get('release_notes') or ''}\n\n"
+                    f"Download: {update.get('download_url') or 'Ask administrator for installer'}"
+                )
+                messagebox.showinfo("Update Available", message)
+        except Exception:
+            pass
 

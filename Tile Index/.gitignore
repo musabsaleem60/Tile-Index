@@ -50,4 +50,5 @@ invoice.ps
 # Environment variables
 .env
 .env.local
+tile_index_config.json
 
