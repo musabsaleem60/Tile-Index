@@ -8,6 +8,10 @@ from datetime import datetime, timedelta
 from repositories.branch_repository import BranchRepository
 from repositories.product_repository import ProductRepository
 from repositories.inventory_repository import InventoryRepository
+from repositories.sanitary_repository import SanitaryInventoryRepository
+from repositories.sanitary_repository import SanitaryProductRepository
+from services.invoice_service import InvoiceService
+from desktop_client.remote_state import is_api_authenticated
 
 
 class ReportService:
@@ -16,6 +20,31 @@ class ReportService:
     @staticmethod
     def get_daily_sales_report(branch_id, date=None):
         """Get daily sales report for a branch"""
+        if is_api_authenticated():
+            if not date:
+                date = datetime.now().date()
+            date_str = str(date)
+            invoices = InvoiceService.search_invoices(branch_id=branch_id, date_from=date_str, date_to=date_str)
+            return {
+                'date': date,
+                'branch_id': branch_id,
+                'total_invoices': len(invoices),
+                'total_sales': sum(inv.grand_total for inv in invoices),
+                'total_paid': sum(inv.paid_amount for inv in invoices),
+                'total_balance': sum(inv.balance for inv in invoices),
+                'invoices': [
+                    {
+                        'invoice_number': inv.invoice_number,
+                        'customer_name': inv.customer_name,
+                        'invoice_date': inv.invoice_date,
+                        'grand_total': inv.grand_total,
+                        'paid_amount': inv.paid_amount,
+                        'balance': inv.balance
+                    }
+                    for inv in invoices
+                ]
+            }
+
         if not date:
             date = datetime.now().date()
         
@@ -66,8 +95,10 @@ class ReportService:
         """Get complete stock report for a branch"""
         inventory_list = InventoryRepository.get_all_by_branch(branch_id)
         products = {p.id: p for p in ProductRepository.get_all()}
+        sanitary_products = {p.id: p for p in SanitaryProductRepository.get_all()} if is_api_authenticated() else {}
         
         report_data = []
+        sanitary_report_data = []
         total_value = 0
         
         for inv in inventory_list:
@@ -95,6 +126,33 @@ class ReportService:
                 'rate_per_piece': inv.rate_per_piece,
                 'stock_value': stock_value
             })
+
+        sanitary_inventory = SanitaryInventoryRepository.get_all_by_branch(branch_id)
+        for inv in sanitary_inventory:
+            product = sanitary_products.get(inv.sanitary_product_id)
+            sale_price = getattr(inv, 'sale_price', None)
+            if sale_price is None and product:
+                sale_price = product.sale_price
+                inv.company_name = product.company_name
+                inv.product_category = product.product_category
+                inv.color = product.color
+                inv.sku = product.sku
+                inv.purchase_price = product.purchase_price
+            sale_price = sale_price or 0
+            stock_value = inv.quantity * sale_price
+            total_value += stock_value
+
+            sanitary_report_data.append({
+                'sanitary_product_id': inv.sanitary_product_id,
+                'company_name': inv.company_name,
+                'product_category': inv.product_category,
+                'color': inv.color,
+                'sku': inv.sku,
+                'quantity': inv.quantity,
+                'purchase_price': inv.purchase_price,
+                'sale_price': sale_price,
+                'stock_value': stock_value
+            })
         
         # Get branch name
         branch = BranchRepository.get_by_id(branch_id)
@@ -104,7 +162,8 @@ class ReportService:
             'branch_id': branch_id,
             'branch_name': branch_name,
             'total_value': total_value,
-            'items': report_data
+            'items': report_data,
+            'sanitary_items': sanitary_report_data
         }
     
     @staticmethod
@@ -114,18 +173,22 @@ class ReportService:
         
         branches = BranchRepository.get_all()
         products = {p.id: p for p in ProductRepository.get_all()}
+        sanitary_products = {p.id: p for p in SanitaryProductRepository.get_all()} if is_api_authenticated() else {}
         
         report_data = {
             'total_branches': len(branches),
             'total_products': len(products),
+            'total_sanitary_products': 0,
             'total_value': 0,
             'branches': []
         }
         
         for branch in branches:
             branch_inventory = InventoryRepository.get_all_by_branch(branch.id)
+            sanitary_inventory = SanitaryInventoryRepository.get_all_by_branch(branch.id)
             
             branch_items = []
+            sanitary_items = []
             branch_total_value = 0
             
             for inv in branch_inventory:
@@ -153,15 +216,42 @@ class ReportService:
                     'rate_per_piece': inv.rate_per_piece,
                     'stock_value': stock_value
                 })
+
+            for inv in sanitary_inventory:
+                product = sanitary_products.get(inv.sanitary_product_id)
+                sale_price = getattr(inv, 'sale_price', None)
+                if sale_price is None and product:
+                    sale_price = product.sale_price
+                    inv.company_name = product.company_name
+                    inv.product_category = product.product_category
+                    inv.color = product.color
+                    inv.sku = product.sku
+                    inv.purchase_price = product.purchase_price
+                sale_price = sale_price or 0
+                stock_value = inv.quantity * sale_price
+                branch_total_value += stock_value
+                sanitary_items.append({
+                    'sanitary_product_id': inv.sanitary_product_id,
+                    'company_name': inv.company_name,
+                    'product_category': inv.product_category,
+                    'color': inv.color,
+                    'sku': inv.sku,
+                    'quantity': inv.quantity,
+                    'purchase_price': inv.purchase_price,
+                    'sale_price': sale_price,
+                    'stock_value': stock_value
+                })
             
             report_data['branches'].append({
                 'branch_id': branch.id,
                 'branch_name': branch.name,
                 'items': branch_items,
+                'sanitary_items': sanitary_items,
                 'branch_total_value': branch_total_value
             })
             
             report_data['total_value'] += branch_total_value
+            report_data['total_sanitary_products'] += len(sanitary_items)
         
         return report_data
 

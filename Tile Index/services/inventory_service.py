@@ -10,6 +10,8 @@ from services.activity_log_service import ActivityLogService
 from models.inventory import Inventory
 from models.stock_transaction import StockTransaction
 from datetime import datetime
+from desktop_client.remote_state import is_api_authenticated
+from desktop_client.session import api_client
 
 
 class InventoryService:
@@ -28,6 +30,32 @@ class InventoryService:
     @staticmethod
     def add_stock(branch_id, product_id, grade, boxes, loose_pieces, rate_per_sqm, rate_per_box, rate_per_piece, user_id=None):
         """Add stock to inventory (Stock IN)"""
+        if is_api_authenticated():
+            from models.inventory import Inventory
+            data = api_client.post("/inventory/tiles/stock-in", {
+                "branch_id": branch_id,
+                "product_id": product_id,
+                "grade": grade,
+                "boxes": boxes,
+                "loose_pieces": loose_pieces,
+                "rate_per_sqm": rate_per_sqm,
+                "rate_per_box": rate_per_box,
+                "rate_per_piece": rate_per_piece,
+                "notes": "Desktop stock in",
+            })
+            return Inventory(
+                id=data["id"],
+                branch_id=data["branch_id"],
+                product_id=data["product_id"],
+                grade=data["grade"],
+                boxes=data["boxes"],
+                loose_pieces=data["loose_pieces"],
+                rate_per_sqm=data["rate_per_sqm"],
+                rate_per_box=data["rate_per_box"],
+                rate_per_piece=data["rate_per_piece"],
+                updated_at=data.get("updated_at")
+            )
+
         # Validate inputs
         if boxes < 0 or loose_pieces < 0:
             raise ValueError("Stock quantities cannot be negative")
@@ -98,6 +126,32 @@ class InventoryService:
     @staticmethod
     def deduct_stock(branch_id, product_id, grade, boxes, loose_pieces, user_id=None, notes=None):
         """Deduct stock from inventory (Stock OUT)"""
+        if is_api_authenticated():
+            from models.inventory import Inventory
+            data = api_client.post("/inventory/tiles/stock-out", {
+                "branch_id": branch_id,
+                "product_id": product_id,
+                "grade": grade,
+                "boxes": boxes,
+                "loose_pieces": loose_pieces,
+                "rate_per_sqm": 0,
+                "rate_per_box": 0,
+                "rate_per_piece": 0,
+                "notes": notes or "Desktop stock out",
+            })
+            return Inventory(
+                id=data["id"],
+                branch_id=data["branch_id"],
+                product_id=data["product_id"],
+                grade=data["grade"],
+                boxes=data["boxes"],
+                loose_pieces=data["loose_pieces"],
+                rate_per_sqm=data["rate_per_sqm"],
+                rate_per_box=data["rate_per_box"],
+                rate_per_piece=data["rate_per_piece"],
+                updated_at=data.get("updated_at")
+            )
+
         # Validate inputs
         if boxes < 0 or loose_pieces < 0:
             raise ValueError("Deduction quantities cannot be negative")

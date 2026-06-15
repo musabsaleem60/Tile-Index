@@ -13,6 +13,7 @@ from models.product import Product
 from utils.validators import validate_positive_number, validate_integer, validate_required, validate_grade
 from utils.grade_constants import VALID_GRADES, GRADE_1
 from utils.searchable_combobox import SearchableCombobox
+from desktop_client.remote_state import is_api_authenticated
 
 
 class InventoryWindow:
@@ -341,30 +342,31 @@ class InventoryWindow:
             index = selection[0]
             product = self.products[index]
             
-            # Check if product is used in inventory
-            from database.init_db import get_connection
-            conn = get_connection()
-            cursor = conn.cursor()
-            
-            # Check inventory
-            cursor.execute("SELECT COUNT(*) FROM inventory WHERE product_id = ?", (product.id,))
-            inv_count = cursor.fetchone()[0]
-            
-            # Check invoice items
-            cursor.execute("SELECT COUNT(*) FROM invoice_items WHERE product_id = ?", (product.id,))
-            invoice_count = cursor.fetchone()[0]
-            
-            conn.close()
-            
-            if inv_count > 0 or invoice_count > 0:
-                messagebox.showerror(
-                    "Cannot Delete",
-                    f"Cannot delete product '{product.name}' because it is used in:\n"
-                    f"- {inv_count} inventory record(s)\n"
-                    f"- {invoice_count} invoice(s)\n\n"
-                    f"Please remove all inventory and invoices for this product first."
-                )
-                return
+            if not is_api_authenticated():
+                # Check if product is used in inventory
+                from database.init_db import get_connection
+                conn = get_connection()
+                cursor = conn.cursor()
+                
+                # Check inventory
+                cursor.execute("SELECT COUNT(*) FROM inventory WHERE product_id = ?", (product.id,))
+                inv_count = cursor.fetchone()[0]
+                
+                # Check invoice items
+                cursor.execute("SELECT COUNT(*) FROM invoice_items WHERE product_id = ?", (product.id,))
+                invoice_count = cursor.fetchone()[0]
+                
+                conn.close()
+                
+                if inv_count > 0 or invoice_count > 0:
+                    messagebox.showerror(
+                        "Cannot Delete",
+                        f"Cannot delete product '{product.name}' because it is used in:\n"
+                        f"- {inv_count} inventory record(s)\n"
+                        f"- {invoice_count} invoice(s)\n\n"
+                        f"Please remove all inventory and invoices for this product first."
+                    )
+                    return
             
             # Confirm deletion
             confirm = messagebox.askyesno(

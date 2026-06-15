@@ -1,4 +1,4 @@
-anas# Tile Index - Desktop Inventory & Billing System
+# Tile Index - Desktop Inventory & Billing System
 # Python 3.8+
 
 # No external dependencies required - using built-in libraries only

@@ -53,13 +53,16 @@ def test_imports():
         'ui.main_window',
         'ui.inventory_window',
         'ui.invoice_window',
+        'ui.sanitary_window',
         'ui.user_management_window',
         'ui.report_window',
         'ui.invoice_search_window',
         'services.inventory_service',
         'services.invoice_service',
+        'services.sanitary_service',
         'services.report_service',
         'repositories.user_repository',
+        'repositories.sanitary_repository',
         'repositories.stock_transaction_repository',
     ]
     

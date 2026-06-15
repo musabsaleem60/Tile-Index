@@ -5,6 +5,8 @@ Data access layer for inventory
 
 from database.init_db import get_connection
 from models.inventory import Inventory
+from desktop_client.remote_state import is_api_authenticated
+from desktop_client.session import api_client
 
 
 class InventoryRepository:
@@ -13,6 +15,24 @@ class InventoryRepository:
     @staticmethod
     def get_by_branch_product_grade(branch_id, product_id, grade):
         """Get inventory for specific branch, product, and grade"""
+        if is_api_authenticated():
+            rows = api_client.get(f"/inventory/tiles/{branch_id}")
+            for r in rows:
+                if r["product_id"] == product_id and r["grade"] == grade:
+                    return Inventory(
+                        id=r["id"],
+                        branch_id=r["branch_id"],
+                        product_id=r["product_id"],
+                        grade=r["grade"],
+                        boxes=r["boxes"],
+                        loose_pieces=r["loose_pieces"],
+                        rate_per_sqm=r["rate_per_sqm"],
+                        rate_per_box=r["rate_per_box"],
+                        rate_per_piece=r["rate_per_piece"],
+                        updated_at=r.get("updated_at")
+                    )
+            return None
+
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
@@ -33,6 +53,24 @@ class InventoryRepository:
     @staticmethod
     def get_all_by_branch(branch_id):
         """Get all inventory for a branch"""
+        if is_api_authenticated():
+            rows = api_client.get(f"/inventory/tiles/{branch_id}")
+            return [
+                Inventory(
+                    id=r["id"],
+                    branch_id=r["branch_id"],
+                    product_id=r["product_id"],
+                    grade=r["grade"],
+                    boxes=r["boxes"],
+                    loose_pieces=r["loose_pieces"],
+                    rate_per_sqm=r["rate_per_sqm"],
+                    rate_per_box=r["rate_per_box"],
+                    rate_per_piece=r["rate_per_piece"],
+                    updated_at=r.get("updated_at")
+                )
+                for r in rows
+            ]
+
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
@@ -48,6 +86,11 @@ class InventoryRepository:
         return [Inventory(id=r[0], branch_id=r[1], product_id=r[2], grade=r[3],
                         boxes=r[4], loose_pieces=r[5], rate_per_sqm=r[6],
                         rate_per_box=r[7], rate_per_piece=r[8], updated_at=r[9]) for r in rows]
+
+    @staticmethod
+    def z(branch_id):
+        """Backward-compatible alias for get_all_by_branch"""
+        return InventoryRepository.get_all_by_branch(branch_id)
     
     @staticmethod
     def create_or_update(inventory):

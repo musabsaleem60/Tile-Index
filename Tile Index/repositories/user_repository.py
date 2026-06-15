@@ -6,6 +6,8 @@ Data access layer for users
 import hashlib
 from database.init_db import get_connection
 from models.user import User
+from desktop_client.remote_state import is_api_authenticated
+from desktop_client.session import api_client
 
 
 class UserRepository:
@@ -19,6 +21,12 @@ class UserRepository:
     @staticmethod
     def get_by_username(username):
         """Get user by username"""
+        if is_api_authenticated():
+            for user in UserRepository.get_all():
+                if user.username == username:
+                    return user
+            return None
+
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
@@ -36,6 +44,12 @@ class UserRepository:
     @staticmethod
     def get_by_id(user_id):
         """Get user by ID"""
+        if is_api_authenticated():
+            data = api_client.get(f"/auth/users/{user_id}")
+            return User(id=data["id"], username=data["username"], role=data["role"],
+                        branch_id=data.get("branch_id"), is_active=data["is_active"],
+                        created_at=data.get("created_at"))
+
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
@@ -53,6 +67,12 @@ class UserRepository:
     @staticmethod
     def get_all():
         """Get all users"""
+        if is_api_authenticated():
+            rows = api_client.get("/auth/users")
+            return [User(id=r["id"], username=r["username"], role=r["role"],
+                         branch_id=r.get("branch_id"), is_active=r["is_active"],
+                         created_at=r.get("created_at")) for r in rows]
+
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
@@ -68,6 +88,18 @@ class UserRepository:
     @staticmethod
     def create(user, created_by_user=None):
         """Create a new user"""
+        if is_api_authenticated():
+            data = api_client.post("/auth/users", {
+                "username": user.username,
+                "password": user.password_hash,
+                "role": user.role,
+                "branch_id": user.branch_id,
+                "is_active": user.is_active,
+            })
+            return User(id=data["id"], username=data["username"], role=data["role"],
+                        branch_id=data.get("branch_id"), is_active=data["is_active"],
+                        created_at=data.get("created_at"))
+
         conn = get_connection()
         cursor = conn.cursor()
         
@@ -98,6 +130,20 @@ class UserRepository:
     @staticmethod
     def update(user, updated_by_user=None):
         """Update an existing user"""
+        if is_api_authenticated():
+            payload = {
+                "username": user.username,
+                "role": user.role,
+                "branch_id": user.branch_id,
+                "is_active": user.is_active,
+            }
+            if user.password_hash:
+                payload["password"] = user.password_hash
+            data = api_client.put(f"/auth/users/{user.id}", payload)
+            return User(id=data["id"], username=data["username"], role=data["role"],
+                        branch_id=data.get("branch_id"), is_active=data["is_active"],
+                        created_at=data.get("created_at"))
+
         # Get old user data for logging
         old_user = None
         if updated_by_user:
@@ -145,6 +191,10 @@ class UserRepository:
     @staticmethod
     def update_password(user_id, new_password, changed_by_user=None):
         """Update user password"""
+        if is_api_authenticated():
+            api_client.post(f"/auth/users/{user_id}/password", {"password": new_password})
+            return
+
         # Get user info for logging
         target_user = None
         if changed_by_user:

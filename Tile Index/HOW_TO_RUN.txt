@@ -7,12 +7,15 @@ METHOD 1: Using Command Prompt / PowerShell
 
 1. Open Command Prompt or PowerShell
 2. Navigate to the project folder:
-   cd "C:\Users\salee\Desktop\projects\Tile Index"
+   cd "E:\Projects\Tile Index\Tile Index"
 
 3. Run the application:
    python main.py
 
 4. The application window will open automatically!
+5. Login with:
+   Username: musab
+   Password: musab123
 
 
 METHOD 2: Using Python IDLE
@@ -33,6 +36,7 @@ METHOD 3: Double-click (if Python is configured)
 REQUIREMENTS:
 -------------
 - Python 3.8 or higher must be installed
+- Python must include Tcl/Tk support for Tkinter
 - Check Python installation: python --version
 - No additional packages needed (uses built-in libraries only)
 
@@ -48,6 +52,14 @@ If the window doesn't appear:
   - Check for error messages in the terminal
   - Make sure you have write permissions in the project folder
   - The database will be created automatically in the 'data' folder
+
+If you see "Can't find a usable init.tcl":
+  - Your Python Tcl/Tk installation is broken or incomplete
+  - Repair/reinstall Python from python.org
+  - During installation, keep "tcl/tk and IDLE" selected
+  - Also enable "Add python.exe to PATH"
+  - After repair, test Tkinter with:
+    python -c "import tkinter as tk; root=tk.Tk(); root.destroy(); print('Tkinter OK')"
 
 If you see import errors:
   - Make sure you're in the correct directory

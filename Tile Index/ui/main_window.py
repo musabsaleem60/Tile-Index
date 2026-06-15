@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from ui.inventory_window import InventoryWindow
 from ui.accessory_window import AccessoryWindow
+from ui.sanitary_window import SanitaryWindow
 from ui.invoice_window import InvoiceWindow
 from ui.invoice_search_window import InvoiceSearchWindow
 from ui.report_window import ReportWindow
@@ -133,6 +134,7 @@ class MainWindow:
         buttons = [
             ("📦 Inventory Management", "#3498db", self.open_inventory),
             ("🛠️ Accessories", "#8e44ad", self.open_accessories),
+            ("Sanitary Management", "#1abc9c", self.open_sanitary),
             ("🧾 Invoice & Billing", "#27ae60", self.open_invoice),
             ("🔍 Search Invoices", "#9b59b6", self.open_invoice_search)
         ]
@@ -253,6 +255,10 @@ class MainWindow:
     def open_accessories(self):
         """Open accessories management within the same window"""
         self.switch_view(AccessoryWindow, self.current_user)
+
+    def open_sanitary(self):
+        """Open sanitary management within the same window"""
+        self.switch_view(SanitaryWindow, self.current_user)
     
     def open_invoice(self):
         """Open invoice creation within the same window"""

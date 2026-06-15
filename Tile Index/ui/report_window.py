@@ -206,6 +206,20 @@ class ReportWindow:
         for item in report['items']:
             self.report_text.insert(tk.END, f"{item['product_name']:<20} {item['tile_size']:<10} {item['grade']:<6} "
                                            f"{item['boxes']:<8} {item['loose_pieces']:<8} {item['stock_value']:<15.2f}\n")
+
+        sanitary_items = report.get('sanitary_items', [])
+        if sanitary_items:
+            self.report_text.insert(tk.END, "\nSANITARY STOCK\n")
+            self.report_text.insert(tk.END, "-" * 90 + "\n")
+            self.report_text.insert(tk.END, f"{'Company':<18} {'Category':<22} {'Color':<10} {'SKU':<20} {'Qty':<6} {'Value (Rs.)':<15}\n")
+            self.report_text.insert(tk.END, "-" * 90 + "\n")
+
+            for item in sanitary_items:
+                self.report_text.insert(
+                    tk.END,
+                    f"{item['company_name']:<18} {item['product_category']:<22} {item['color']:<10} "
+                    f"{item['sku']:<20} {item['quantity']:<6} {item['stock_value']:<15.2f}\n"
+                )
         
         self.report_text.insert(tk.END, "-" * 90 + "\n")
         self.report_text.insert(tk.END, f"\nTotal Stock Value: Rs. {report['total_value']:.2f}\n")
@@ -218,6 +232,7 @@ class ReportWindow:
         self.report_text.insert(tk.END, f"Report Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         self.report_text.insert(tk.END, f"Total Branches: {report['total_branches']}\n")
         self.report_text.insert(tk.END, f"Total Products: {report['total_products']}\n")
+        self.report_text.insert(tk.END, f"Sanitary Stock Lines: {report.get('total_sanitary_products', 0)}\n")
         self.report_text.insert(tk.END, f"Total Stock Value: Rs. {report['total_value']:.2f}\n\n")
         
         # Display by branch
@@ -231,6 +246,19 @@ class ReportWindow:
             for item in branch_data['items']:
                 self.report_text.insert(tk.END, f"{item['product_name']:<25} {item['tile_size']:<12} {item['grade']:<20} "
                                                f"{item['boxes']:<10} {item['loose_pieces']:<10} {item['stock_value']:<15.2f}\n")
+
+            sanitary_items = branch_data.get('sanitary_items', [])
+            if sanitary_items:
+                self.report_text.insert(tk.END, "\nSANITARY STOCK\n")
+                self.report_text.insert(tk.END, f"{'Company':<18} {'Category':<22} {'Color':<10} {'SKU':<22} {'Qty':<8} {'Value (Rs.)':<15}\n")
+                self.report_text.insert(tk.END, "-" * 100 + "\n")
+
+                for item in sanitary_items:
+                    self.report_text.insert(
+                        tk.END,
+                        f"{item['company_name']:<18} {item['product_category']:<22} {item['color']:<10} "
+                        f"{item['sku']:<22} {item['quantity']:<8} {item['stock_value']:<15.2f}\n"
+                    )
             
             self.report_text.insert(tk.END, "-" * 100 + "\n")
             self.report_text.insert(tk.END, f"Branch Total Value: Rs. {branch_data['branch_total_value']:.2f}\n")

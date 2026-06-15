@@ -9,6 +9,7 @@ from datetime import datetime
 from repositories.branch_repository import BranchRepository
 from repositories.product_repository import ProductRepository
 from repositories.accessory_repository import AccessoryRepository
+from repositories.sanitary_repository import SanitaryProductRepository
 from services.invoice_service import InvoiceService
 
 
@@ -35,6 +36,7 @@ class InvoicePrintWindow:
         self.branch = BranchRepository.get_by_id(self.invoice.branch_id)
         self.products = {p.id: p for p in ProductRepository.get_all()}
         self.accessories = {a.id: a for a in AccessoryRepository.get_all()}
+        self.sanitary_products = {p.id: p for p in SanitaryProductRepository.get_all()}
         
         self.setup_ui()
     
@@ -164,6 +166,22 @@ class InvoicePrintWindow:
                 
                 grade = "-"
                 qty_main = str(item.boxes)  # Reuse boxes for quantity
+                qty_loose = "-"
+                rate_sqm = "-"
+                rate_main = f"Rs. {item.rate_per_box:.2f}"
+                rate_loose = "-"
+            elif item.sanitary_product_id:
+                sanitary_product = self.sanitary_products.get(item.sanitary_product_id)
+                if sanitary_product:
+                    product_name = f"{sanitary_product.company_name} - {sanitary_product.product_category}"
+                    size = sanitary_product.color
+                    grade = sanitary_product.sku
+                else:
+                    product_name = "Unknown Sanitary Product"
+                    size = "-"
+                    grade = "-"
+
+                qty_main = str(item.boxes)
                 qty_loose = "-"
                 rate_sqm = "-"
                 rate_main = f"Rs. {item.rate_per_box:.2f}"

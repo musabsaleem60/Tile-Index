@@ -86,6 +86,52 @@ def init_database():
             UNIQUE(branch_id, invoice_number)
         )
     """)
+
+    # Create sanitary_products table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sanitary_products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_name TEXT NOT NULL,
+            product_category TEXT NOT NULL,
+            color TEXT NOT NULL,
+            purchase_price REAL NOT NULL DEFAULT 0,
+            sale_price REAL NOT NULL DEFAULT 0,
+            sku TEXT NOT NULL UNIQUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(company_name, product_category, color)
+        )
+    """)
+
+    # Create sanitary_inventory table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sanitary_inventory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            branch_id INTEGER NOT NULL,
+            sanitary_product_id INTEGER NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 0,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+            FOREIGN KEY (sanitary_product_id) REFERENCES sanitary_products(id) ON DELETE CASCADE,
+            UNIQUE(branch_id, sanitary_product_id)
+        )
+    """)
+
+    # Create sanitary stock transaction table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sanitary_stock_transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            branch_id INTEGER NOT NULL,
+            sanitary_product_id INTEGER NOT NULL,
+            transaction_type TEXT NOT NULL CHECK(transaction_type IN ('IN', 'OUT')),
+            quantity INTEGER NOT NULL DEFAULT 0,
+            transaction_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            notes TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
+            FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+            FOREIGN KEY (sanitary_product_id) REFERENCES sanitary_products(id) ON DELETE RESTRICT
+        )
+    """)
     
     # Create invoice_items table
     cursor.execute("""
@@ -94,6 +140,7 @@ def init_database():
             invoice_id INTEGER NOT NULL,
             product_id INTEGER,
             accessory_id INTEGER,
+            sanitary_product_id INTEGER,
             tile_size TEXT,
             grade TEXT CHECK(grade IS NULL OR grade IN ('Grade 1 (Prime)', 'Grade 2 (Standard)', 'Grade 3 (Regular)')),
             boxes INTEGER DEFAULT 0,
@@ -104,7 +151,8 @@ def init_database():
             line_total REAL NOT NULL,
             FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT,
-            FOREIGN KEY (accessory_id) REFERENCES accessories(id) ON DELETE RESTRICT
+            FOREIGN KEY (accessory_id) REFERENCES accessories(id) ON DELETE RESTRICT,
+            FOREIGN KEY (sanitary_product_id) REFERENCES sanitary_products(id) ON DELETE RESTRICT
         )
     """)
     
@@ -193,6 +241,8 @@ def init_database():
             cursor.execute("ALTER TABLE invoice_items ADD COLUMN accessory_id INTEGER")
             # We also need to relax constraints on existing columns if possible, 
             # but SQLite ALTER TABLE is limited. The recreate method is safer for full schema changes.
+        if 'sanitary_product_id' not in columns:
+            cursor.execute("ALTER TABLE invoice_items ADD COLUMN sanitary_product_id INTEGER")
     except sqlite3.OperationalError:
         pass
     
@@ -225,6 +275,9 @@ def init_database():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_activity_log_branch ON activity_log(branch_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_accessories_category ON accessories(category)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_accessories_inventory_branch ON accessories_inventory(branch_id, accessory_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_sanitary_company_category_color ON sanitary_products(company_name, product_category, color)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_sanitary_inventory_branch ON sanitary_inventory(branch_id, sanitary_product_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_sanitary_transactions_date ON sanitary_stock_transactions(transaction_date)")
     
     # Insert default branches
     branches = [
@@ -290,6 +343,44 @@ def init_database():
     cursor.executemany("""
         INSERT OR IGNORE INTO accessories (name, category, company, unit_price) VALUES (?, ?, ?, ?)
     """, accessories)
+
+    # Insert default sanitary catalog
+    sanitary_companies = [
+        ('Durr Ceramic', ['White', 'Off-White']),
+        ('Sunny Ceramic', ['White', 'Off-White']),
+        ('ACL Ceramic', ['White', 'Off-White']),
+        ('UCI Ceramic', ['White', 'Off-White']),
+        ('BONZ', ['White', 'Off-White']),
+        ('ORIENT (Local)', ['White', 'Off-White', 'Blue', 'Grey', 'Pink', 'Black']),
+    ]
+    sanitary_categories = [
+        '1 Piece Commode',
+        '2 Piece Commode',
+        'Vanity',
+        '1 Piece Basin',
+        'Basin Pedestal',
+        'Corner Basin Pedestal',
+        'WC',
+    ]
+
+    def make_sku(company, category, color):
+        raw = f"{company}-{category}-{color}"
+        cleaned = ''.join(ch if ch.isalnum() else '-' for ch in raw.upper())
+        while '--' in cleaned:
+            cleaned = cleaned.replace('--', '-')
+        return cleaned.strip('-')
+
+    sanitary_products = []
+    for company, colors in sanitary_companies:
+        for category in sanitary_categories:
+            for color in colors:
+                sanitary_products.append((company, category, color, 0, 0, make_sku(company, category, color)))
+
+    cursor.executemany("""
+        INSERT OR IGNORE INTO sanitary_products
+            (company_name, product_category, color, purchase_price, sale_price, sku)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, sanitary_products)
     
     # Migrate existing grade data from old format to new format if needed
     # Import migration function

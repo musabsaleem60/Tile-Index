@@ -5,7 +5,10 @@ User authentication screen
 
 import tkinter as tk
 from tkinter import messagebox
-from services.auth_service import AuthenticationService
+from desktop_client.api_client import ApiClientError
+from desktop_client.config import API_BASE_URL
+from desktop_client.session import api_client, set_authenticated_session
+from models.user import User
 
 
 class LoginWindow:
@@ -106,7 +109,7 @@ class LoginWindow:
         
         tk.Label(
             hint_frame,
-            text="Default Admin: musab / musab123",
+            text=f"API: {API_BASE_URL}",
             font=("Arial", 9),
             bg="#ecf0f1",
             fg="#7f8c8d"
@@ -122,18 +125,29 @@ class LoginWindow:
             return
         
         try:
-            user = AuthenticationService.login(username, password)
+            response = api_client.post("/auth/login", {
+                "username": username,
+                "password": password
+            })
+            set_authenticated_session(response["access_token"])
+
+            api_user = response["user"]
+            user = User(
+                id=api_user["id"],
+                username=api_user["username"],
+                role=api_user["role"],
+                branch_id=api_user.get("branch_id"),
+                is_active=api_user.get("is_active", True),
+                created_at=api_user.get("created_at")
+            )
+            user.api_token = response["access_token"]
             self.current_user = user
-            
-            # Log login activity
-            try:
-                from services.activity_log_service import ActivityLogService
-                ActivityLogService.log_login(user)
-            except:
-                pass  # Don't fail login if logging fails
-            
+
             self.parent.destroy()
             self.on_success_callback(user)
+        except ApiClientError as e:
+            messagebox.showerror("Login Failed", str(e))
+            self.password_entry.delete(0, tk.END)
         except ValueError as e:
             messagebox.showerror("Login Failed", str(e))
             self.password_entry.delete(0, tk.END)

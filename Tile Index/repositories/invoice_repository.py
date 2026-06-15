@@ -91,11 +91,11 @@ class InvoiceRepository:
             # Insert invoice items
             for item in invoice.items:
                 cursor.execute("""
-                    INSERT INTO invoice_items (invoice_id, product_id, accessory_id, tile_size, grade,
+                    INSERT INTO invoice_items (invoice_id, product_id, accessory_id, sanitary_product_id, tile_size, grade,
                                              boxes, loose_pieces, rate_per_sqm, rate_per_box,
                                              rate_per_piece, line_total)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (invoice.id, item.product_id, item.accessory_id, item.tile_size, item.grade,
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (invoice.id, item.product_id, item.accessory_id, item.sanitary_product_id, item.tile_size, item.grade,
                       item.boxes, item.loose_pieces, item.rate_per_sqm, item.rate_per_box,
                       item.rate_per_piece, item.line_total))
                 item.id = cursor.lastrowid
@@ -153,7 +153,7 @@ class InvoiceRepository:
             
             # Get invoice items
             cursor.execute("""
-                SELECT id, invoice_id, product_id, accessory_id, tile_size, grade, boxes, loose_pieces,
+                SELECT id, invoice_id, product_id, accessory_id, sanitary_product_id, tile_size, grade, boxes, loose_pieces,
                        rate_per_sqm, rate_per_box, rate_per_piece, line_total
                 FROM invoice_items WHERE invoice_id = ?
                 ORDER BY id
@@ -161,10 +161,10 @@ class InvoiceRepository:
             item_rows = cursor.fetchall()
             
             invoice.items = [InvoiceItem(id=r[0], invoice_id=r[1], product_id=r[2], accessory_id=r[3],
-                                        tile_size=r[4], grade=r[5], boxes=r[6],
-                                        loose_pieces=r[7], rate_per_sqm=r[8],
-                                        rate_per_box=r[9], rate_per_piece=r[10],
-                                        line_total=r[11]) for r in item_rows]
+                                        sanitary_product_id=r[4], tile_size=r[5], grade=r[6], boxes=r[7],
+                                        loose_pieces=r[8], rate_per_sqm=r[9],
+                                        rate_per_box=r[10], rate_per_piece=r[11],
+                                        line_total=r[12]) for r in item_rows]
             
             conn.close()
             return invoice
