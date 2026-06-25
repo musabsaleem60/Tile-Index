@@ -18,7 +18,7 @@ def _load_config_file():
     if not config_path.exists():
         return {}
     try:
-        return json.loads(config_path.read_text(encoding="utf-8"))
+        return json.loads(config_path.read_text(encoding="utf-8-sig"))
     except Exception:
         return {}
 
@@ -26,3 +26,4 @@ def _load_config_file():
 _config = _load_config_file()
 API_BASE_URL = os.environ.get("TILE_INDEX_API_URL") or _config.get("api_base_url") or "http://localhost:8000"
 CHECK_UPDATES = bool(_config.get("check_updates", True))
+API_TIMEOUT_SECONDS = int(os.environ.get("TILE_INDEX_API_TIMEOUT_SECONDS") or _config.get("api_timeout_seconds") or 90)

@@ -1,4 +1,5 @@
 {
   "api_base_url": "https://your-render-service-url.onrender.com",
-  "check_updates": true
+  "check_updates": true,
+  "api_timeout_seconds": 90
 }

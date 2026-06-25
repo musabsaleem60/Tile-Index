@@ -2,6 +2,8 @@ import json
 import urllib.error
 import urllib.request
 
+from .config import API_TIMEOUT_SECONDS
+
 
 class ApiClientError(Exception):
     pass
@@ -10,7 +12,7 @@ class ApiClientError(Exception):
 class ApiClient:
     """Small standard-library API client for the Tkinter app."""
 
-    def __init__(self, base_url: str, token: str | None = None, timeout: int = 20):
+    def __init__(self, base_url: str, token: str | None = None, timeout: int = API_TIMEOUT_SECONDS):
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout = timeout
@@ -53,4 +55,9 @@ class ApiClient:
             detail = exc.read().decode("utf-8")
             raise ApiClientError(f"API error {exc.code}: {detail}") from exc
         except urllib.error.URLError as exc:
-            raise ApiClientError(f"Cannot connect to API: {exc}") from exc
+            reason = getattr(exc, "reason", exc)
+            raise ApiClientError(
+                f"Cannot connect to API within {self.timeout} seconds. "
+                "If this is the first open after some time, wait a minute and try again. "
+                f"Details: {reason}"
+            ) from exc
