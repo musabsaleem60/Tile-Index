@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: tile-index-api
+    env: docker
+    rootDir: backend
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: APP_NAME
+        value: Tile Index API
+      - key: APP_ENV
+        value: production
+      - key: APP_VERSION
+        value: 1.0.0
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"
+      - key: BACKEND_CORS_ORIGINS
+        value: '["*"]'
+      - key: LATEST_DESKTOP_VERSION
+        value: 1.0.0
+      - key: LATEST_DESKTOP_DOWNLOAD_URL
+        value: ""
+      - key: LATEST_DESKTOP_RELEASE_NOTES
+        value: Initial production release
