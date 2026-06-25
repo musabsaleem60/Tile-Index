@@ -13,6 +13,11 @@ if (-not $ApiBaseUrl) {
     throw "ApiBaseUrl is required. Example: .\scripts\build_desktop.ps1 -ApiBaseUrl https://tile-index-api.onrender.com"
 }
 
+python -c "import tkinter as tk; root = tk.Tk(); root.destroy(); print('Tkinter OK')"
+if ($LASTEXITCODE -ne 0) {
+    throw "Tkinter is not working in this Python installation. Repair/reinstall Python with Tcl/Tk support before building the desktop EXE."
+}
+
 python -m pip install pyinstaller
 
 $config = @{
