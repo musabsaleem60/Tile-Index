@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     database_url: str
     backend_cors_origins: str = ""
     latest_desktop_version: str = "1.0.0"
+    min_desktop_version: str = "1.0.0"
     latest_desktop_download_url: str = ""
     latest_desktop_release_notes: str = ""
 

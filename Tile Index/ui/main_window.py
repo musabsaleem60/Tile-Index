@@ -12,6 +12,7 @@ from ui.invoice_window import InvoiceWindow
 from ui.invoice_search_window import InvoiceSearchWindow
 from ui.report_window import ReportWindow
 from services.auth_service import AuthenticationService
+from desktop_client.session import get_update_warning
 
 
 class MainWindow:
@@ -41,6 +42,22 @@ class MainWindow:
     
     def setup_ui(self):
         """Setup the main UI"""
+        update_warning = get_update_warning()
+        if update_warning:
+            warning_frame = tk.Frame(self.root, bg="#c0392b", height=40)
+            warning_frame.pack(fill=tk.X)
+            warning_frame.pack_propagate(False)
+            tk.Label(
+                warning_frame,
+                text=update_warning.get(
+                    "warning_message",
+                    "This version is out of date. Stock and prices may display incorrectly. Please contact your administrator to update."
+                ),
+                font=("Arial", 11, "bold"),
+                bg="#c0392b",
+                fg="white"
+            ).pack(fill=tk.X, padx=10, pady=9)
+
         # Header
         header_frame = tk.Frame(self.root, bg="#2c3e50", height=80)
         header_frame.pack(fill=tk.X)

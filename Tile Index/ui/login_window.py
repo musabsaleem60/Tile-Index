@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import messagebox
 from desktop_client.api_client import ApiClientError
 from desktop_client.config import API_BASE_URL, CHECK_UPDATES
-from desktop_client.session import api_client, set_authenticated_session
+from desktop_client.session import api_client, set_authenticated_session, set_update_warning
 from desktop_client.update_checker import check_for_update
 from models.user import User
 
@@ -26,6 +26,8 @@ class LoginWindow:
         
         self.on_success_callback = on_success_callback
         self.current_user = None
+        self.update_warning = None
+        self.update_warning_label = None
         
         self.setup_ui()
         self.check_for_updates()
@@ -65,14 +67,26 @@ class LoginWindow:
         # Main content
         content_frame = tk.Frame(self.parent, bg="#ecf0f1")
         content_frame.pack(fill=tk.BOTH, expand=True, padx=40, pady=30)
+
+        self.update_warning_label = tk.Label(
+            content_frame,
+            font=("Arial", 10, "bold"),
+            bg="#c0392b",
+            fg="white",
+            wraplength=320,
+            justify=tk.CENTER,
+            padx=8,
+            pady=8
+        )
         
         # Username
-        tk.Label(
+        self.username_label = tk.Label(
             content_frame,
             text="Username:",
             font=("Arial", 11),
             bg="#ecf0f1"
-        ).pack(anchor=tk.W, pady=(10, 5))
+        )
+        self.username_label.pack(anchor=tk.W, pady=(10, 5))
         
         self.username_entry = tk.Entry(content_frame, width=30, font=("Arial", 11))
         self.username_entry.pack(pady=(0, 15))
@@ -158,17 +172,22 @@ class LoginWindow:
 
     def check_for_updates(self):
         """Notify users when a newer desktop build is available."""
+        self.update_warning = None
+        set_update_warning(None)
         if not CHECK_UPDATES:
             return
         try:
             update = check_for_update(api_client)
             if update:
-                message = (
-                    f"A new Tile Index version is available: {update['latest_version']}\n\n"
-                    f"{update.get('release_notes') or ''}\n\n"
-                    f"Download: {update.get('download_url') or 'Ask administrator for installer'}"
-                )
-                messagebox.showinfo("Update Available", message)
+                self.update_warning = update
+                set_update_warning(update)
+                self.show_update_warning()
         except Exception:
             pass
+
+    def show_update_warning(self):
+        if not self.update_warning_label or not self.update_warning:
+            return
+        self.update_warning_label.configure(text=self.update_warning.get("warning_message", ""))
+        self.update_warning_label.pack(fill=tk.X, pady=(0, 15), before=self.username_label)
 

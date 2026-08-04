@@ -13,6 +13,14 @@ if (-not $ApiBaseUrl) {
     throw "ApiBaseUrl is required. Example: .\scripts\build_desktop.ps1 -ApiBaseUrl https://tile-index-api.onrender.com"
 }
 
+$configPyPath = Join-Path $projectRoot "desktop_client\config.py"
+$configPy = Get-Content -Path $configPyPath -Raw
+$updatedConfigPy = $configPy -replace 'APP_VERSION\s*=\s*"[^"]+"', "APP_VERSION = `"$Version`""
+if ($updatedConfigPy -eq $configPy) {
+    throw "Could not update APP_VERSION in desktop_client\config.py"
+}
+[System.IO.File]::WriteAllText($configPyPath, $updatedConfigPy, [System.Text.UTF8Encoding]::new($false))
+
 python -c "import tkinter as tk; root = tk.Tk(); root.destroy(); print('Tkinter OK')"
 if ($LASTEXITCODE -ne 0) {
     throw "Tkinter is not working in this Python installation. Repair/reinstall Python with Tcl/Tk support before building the desktop EXE."
@@ -37,3 +45,4 @@ Copy-Item $configPath (Join-Path $packageDir "tile_index_config.json") -Force
 Write-Host "Desktop package created at: $packageDir"
 Write-Host "Configured API URL: $ApiBaseUrl"
 Write-Host "Configured API timeout: $ApiTimeoutSeconds seconds"
+Write-Host "Desktop version: $Version"

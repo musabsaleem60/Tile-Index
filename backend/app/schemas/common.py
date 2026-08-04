@@ -190,5 +190,6 @@ class InvoiceOut(ORMModel):
 
 class UpdateInfo(BaseModel):
     latest_version: str
+    min_desktop_version: str
     download_url: str
     release_notes: str

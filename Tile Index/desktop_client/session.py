@@ -9,6 +9,7 @@ from desktop_client.config import API_BASE_URL
 
 api_client = ApiClient(API_BASE_URL)
 current_token = None
+update_warning = None
 cache = {}
 
 
@@ -26,6 +27,16 @@ def clear_authenticated_session():
     current_token = None
     api_client.set_token(None)
     cache.clear()
+
+
+def set_update_warning(warning: dict | None):
+    """Store update warning state from startup checks."""
+    global update_warning
+    update_warning = warning
+
+
+def get_update_warning():
+    return update_warning
 
 
 def get_cached(key: str):
