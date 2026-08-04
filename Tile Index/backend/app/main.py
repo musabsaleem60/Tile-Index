@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, select
@@ -30,7 +32,18 @@ def health():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Tile rate card is empty. Seed tile_rates before using production workflows.",
         )
-    return {"status": "ok", "version": settings.app_version, "tile_rates": tile_rate_count}
+    commit_sha = (
+        os.getenv("RENDER_GIT_COMMIT")
+        or os.getenv("APP_GIT_SHA")
+        or os.getenv("GIT_COMMIT")
+        or "unknown"
+    )
+    return {
+        "status": "ok",
+        "version": settings.app_version,
+        "commit_sha": commit_sha,
+        "tile_rates": tile_rate_count,
+    }
 
 
 app.include_router(auth.router)
