@@ -54,7 +54,7 @@ def init_database():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             branch_id INTEGER NOT NULL,
             product_id INTEGER NOT NULL,
-            grade TEXT NOT NULL CHECK(grade IN ('G1 Prime', 'G2 Standard', 'G3 Regular')),
+            grade TEXT NOT NULL CHECK(grade IN ('Grade 1 (Prime)', 'Grade 2 (Standard)', 'Grade 3 (Regular)')),
             boxes INTEGER NOT NULL DEFAULT 0,
             loose_pieces INTEGER NOT NULL DEFAULT 0,
             rate_per_sqm REAL NOT NULL,
@@ -142,7 +142,7 @@ def init_database():
             accessory_id INTEGER,
             sanitary_product_id INTEGER,
             tile_size TEXT,
-            grade TEXT CHECK(grade IS NULL OR grade IN ('G1 Prime', 'G2 Standard', 'G3 Regular')),
+            grade TEXT CHECK(grade IS NULL OR grade IN ('Grade 1 (Prime)', 'Grade 2 (Standard)', 'Grade 3 (Regular)')),
             boxes INTEGER DEFAULT 0,
             loose_pieces INTEGER DEFAULT 0,
             rate_per_sqm REAL DEFAULT 0,
@@ -177,7 +177,7 @@ def init_database():
             user_id INTEGER NOT NULL,
             branch_id INTEGER NOT NULL,
             product_id INTEGER NOT NULL,
-            grade TEXT NOT NULL CHECK(grade IN ('G1 Prime', 'G2 Standard', 'G3 Regular')),
+            grade TEXT NOT NULL CHECK(grade IN ('Grade 1 (Prime)', 'Grade 2 (Standard)', 'Grade 3 (Regular)')),
             transaction_type TEXT NOT NULL CHECK(transaction_type IN ('IN', 'OUT')),
             boxes INTEGER NOT NULL DEFAULT 0,
             loose_pieces INTEGER NOT NULL DEFAULT 0,
@@ -381,6 +381,19 @@ def init_database():
             (company_name, product_category, color, purchase_price, sale_price, sku)
         VALUES (?, ?, ?, ?, ?, ?)
     """, sanitary_products)
+    
+    # Migrate existing grade data from old format to new format if needed
+    # Import migration function
+    try:
+        from database.migrate_grades import migrate_grades_internal
+        migrate_grades_internal(cursor, conn)
+    except ImportError:
+        # Migration module not available, skip
+        pass
+    except Exception as e:
+        # Migration failed, but don't stop initialization
+        print(f"Grade migration warning: {e}")
+        pass
     
     # Create default admin user (password: musab123)
     # Using simple hash for demonstration (in production, use bcrypt or similar)

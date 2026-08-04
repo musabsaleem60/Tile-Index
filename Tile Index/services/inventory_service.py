@@ -12,7 +12,6 @@ from models.stock_transaction import StockTransaction
 from datetime import datetime
 from desktop_client.remote_state import is_api_authenticated
 from desktop_client.session import api_client
-from stock_math import total_pieces
 
 
 class InventoryService:
@@ -32,6 +31,7 @@ class InventoryService:
     def add_stock(branch_id, product_id, grade, boxes, loose_pieces, rate_per_sqm, rate_per_box, rate_per_piece, user_id=None):
         """Add stock to inventory (Stock IN)"""
         if is_api_authenticated():
+            from models.inventory import Inventory
             data = api_client.post("/inventory/tiles/stock-in", {
                 "branch_id": branch_id,
                 "product_id": product_id,
@@ -86,6 +86,13 @@ class InventoryService:
                 rate_per_piece=rate_per_piece
             )
         
+        # Normalize pieces (convert to boxes if possible)
+        product = ProductRepository.get_by_id(product_id)
+        if product:
+            while inventory.loose_pieces >= product.pieces_per_box:
+                inventory.boxes += 1
+                inventory.loose_pieces -= product.pieces_per_box
+        
         inventory = InventoryRepository.create_or_update(inventory)
         
         # Record stock transaction
@@ -120,6 +127,7 @@ class InventoryService:
     def deduct_stock(branch_id, product_id, grade, boxes, loose_pieces, user_id=None, notes=None):
         """Deduct stock from inventory (Stock OUT)"""
         if is_api_authenticated():
+            from models.inventory import Inventory
             data = api_client.post("/inventory/tiles/stock-out", {
                 "branch_id": branch_id,
                 "product_id": product_id,
@@ -159,10 +167,10 @@ class InventoryService:
             raise ValueError(f"Product not found")
         
         # Calculate total pieces available
-        total_available_pieces = total_pieces(inventory.boxes, inventory.loose_pieces, product.pieces_per_box)
+        total_available_pieces = (inventory.boxes * product.pieces_per_box) + inventory.loose_pieces
         
         # Calculate total pieces requested
-        total_requested_pieces = total_pieces(boxes, loose_pieces, product.pieces_per_box)
+        total_requested_pieces = (boxes * product.pieces_per_box) + loose_pieces
         
         # Check if sufficient stock
         if total_requested_pieces > total_available_pieces:

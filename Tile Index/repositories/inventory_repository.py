@@ -7,7 +7,6 @@ from database.init_db import get_connection
 from models.inventory import Inventory
 from desktop_client.remote_state import is_api_authenticated
 from desktop_client.session import api_client
-from stock_math import deduct_verbatim_stock
 
 
 class InventoryRepository:
@@ -141,30 +140,25 @@ class InventoryRepository:
         if not inventory:
             raise ValueError(f"Inventory not found for branch {branch_id}, product {product_id}, grade {grade}")
         
+        new_boxes = inventory.boxes + boxes_delta
+        new_pieces = inventory.loose_pieces + pieces_delta
+        
+        # Normalize: convert excess pieces to boxes if possible
         from repositories.product_repository import ProductRepository
         product = ProductRepository.get_by_id(product_id)
-        if not product:
-            raise ValueError(f"Product not found")
-
-        if boxes_delta >= 0 and pieces_delta >= 0:
-            new_boxes = inventory.boxes + boxes_delta
-            new_pieces = inventory.loose_pieces + pieces_delta
-        elif boxes_delta <= 0 and pieces_delta <= 0:
-            requested_boxes = abs(boxes_delta)
-            requested_pieces = abs(pieces_delta)
-            new_boxes, new_pieces = deduct_verbatim_stock(
-                inventory.boxes,
-                inventory.loose_pieces,
-                requested_boxes,
-                requested_pieces,
-                product.pieces_per_box,
-            )
-        else:
-            new_boxes = inventory.boxes + boxes_delta
-            new_pieces = inventory.loose_pieces + pieces_delta
+        if product:
+            # If we have enough pieces to make a box, convert them
+            while new_pieces >= product.pieces_per_box and new_pieces > 0:
+                new_boxes += 1
+                new_pieces -= product.pieces_per_box
+            
+            # If pieces are negative, try to convert boxes to pieces
+            while new_pieces < 0 and new_boxes > 0:
+                new_boxes -= 1
+                new_pieces += product.pieces_per_box
         
         # Check for negative stock
-        if new_boxes < 0 or new_pieces < 0:
+        if new_boxes < 0 or (new_boxes == 0 and new_pieces < 0):
             raise ValueError(f"Insufficient stock. Cannot have negative inventory.")
         
         # Update

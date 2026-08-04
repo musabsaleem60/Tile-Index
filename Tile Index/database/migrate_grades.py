@@ -1,7 +1,7 @@
 """
 Grade Migration Script
-Migrates existing grade data to the canonical client labels.
-Run this once to update existing database.
+Migrates existing grade data from G1/G2/G3 to new format
+Run this once to update existing database
 """
 
 import sqlite3
@@ -16,17 +16,11 @@ from database.init_db import get_db_path
 
 def migrate_grades_internal(cursor, conn):
     """Internal migration function called from init_db"""
-    # Check if legacy grade values exist in any table
+    # Check if old grade values exist in any table
     old_grades_exist = False
     for table in ['inventory', 'invoice_items', 'stock_transactions']:
         try:
-            cursor.execute(f"""
-                SELECT COUNT(*) FROM {table}
-                WHERE grade IN (
-                    'G1', 'G2', 'G3',
-                    'Grade 1 (Prime)', 'Grade 2 (Standard)', 'Grade 3 (Regular)'
-                )
-            """)
+            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE grade IN ('G1', 'G2', 'G3')")
             count = cursor.fetchone()[0]
             if count > 0:
                 old_grades_exist = True
@@ -42,23 +36,14 @@ def migrate_grades_internal(cursor, conn):
     cursor.execute("PRAGMA foreign_keys = OFF")
     
     try:
-        # Check if legacy grades exist
-        cursor.execute("""
-            SELECT COUNT(*) FROM inventory
-            WHERE grade IN ('G1', 'G2', 'G3', 'Grade 1 (Prime)', 'Grade 2 (Standard)', 'Grade 3 (Regular)')
-        """)
+        # Check if old grades exist
+        cursor.execute("SELECT COUNT(*) FROM inventory WHERE grade IN ('G1', 'G2', 'G3')")
         inv_count = cursor.fetchone()[0]
         
-        cursor.execute("""
-            SELECT COUNT(*) FROM invoice_items
-            WHERE grade IN ('G1', 'G2', 'G3', 'Grade 1 (Prime)', 'Grade 2 (Standard)', 'Grade 3 (Regular)')
-        """)
+        cursor.execute("SELECT COUNT(*) FROM invoice_items WHERE grade IN ('G1', 'G2', 'G3')")
         inv_item_count = cursor.fetchone()[0]
         
-        cursor.execute("""
-            SELECT COUNT(*) FROM stock_transactions
-            WHERE grade IN ('G1', 'G2', 'G3', 'Grade 1 (Prime)', 'Grade 2 (Standard)', 'Grade 3 (Regular)')
-        """)
+        cursor.execute("SELECT COUNT(*) FROM stock_transactions WHERE grade IN ('G1', 'G2', 'G3')")
         trans_count = cursor.fetchone()[0]
         
         total = inv_count + inv_item_count + trans_count
@@ -77,7 +62,7 @@ def migrate_grades_internal(cursor, conn):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 branch_id INTEGER NOT NULL,
                 product_id INTEGER NOT NULL,
-                grade TEXT NOT NULL CHECK(grade IN ('G1 Prime', 'G2 Standard', 'G3 Regular')),
+                grade TEXT NOT NULL CHECK(grade IN ('Grade 1 (Prime)', 'Grade 2 (Standard)', 'Grade 3 (Regular)')),
                 boxes INTEGER NOT NULL DEFAULT 0,
                 loose_pieces INTEGER NOT NULL DEFAULT 0,
                 rate_per_sqm REAL NOT NULL,
@@ -94,12 +79,9 @@ def migrate_grades_internal(cursor, conn):
             INSERT INTO inventory_new 
             SELECT id, branch_id, product_id,
                    CASE grade
-                       WHEN 'G1' THEN 'G1 Prime'
-                       WHEN 'G2' THEN 'G2 Standard'
-                       WHEN 'G3' THEN 'G3 Regular'
-                       WHEN 'Grade 1 (Prime)' THEN 'G1 Prime'
-                       WHEN 'Grade 2 (Standard)' THEN 'G2 Standard'
-                       WHEN 'Grade 3 (Regular)' THEN 'G3 Regular'
+                       WHEN 'G1' THEN 'Grade 1 (Prime)'
+                       WHEN 'G2' THEN 'Grade 2 (Standard)'
+                       WHEN 'G3' THEN 'Grade 3 (Regular)'
                        ELSE grade
                    END as grade,
                    boxes, loose_pieces, rate_per_sqm, rate_per_box, rate_per_piece, updated_at
@@ -117,7 +99,7 @@ def migrate_grades_internal(cursor, conn):
                 invoice_id INTEGER NOT NULL,
                 product_id INTEGER NOT NULL,
                 tile_size TEXT NOT NULL,
-                grade TEXT CHECK(grade IS NULL OR grade IN ('G1 Prime', 'G2 Standard', 'G3 Regular')),
+                grade TEXT NOT NULL CHECK(grade IN ('Grade 1 (Prime)', 'Grade 2 (Standard)', 'Grade 3 (Regular)')),
                 boxes INTEGER NOT NULL DEFAULT 0,
                 loose_pieces INTEGER NOT NULL DEFAULT 0,
                 rate_per_sqm REAL NOT NULL,
@@ -133,12 +115,9 @@ def migrate_grades_internal(cursor, conn):
             INSERT INTO invoice_items_new 
             SELECT id, invoice_id, product_id, tile_size,
                    CASE grade
-                       WHEN 'G1' THEN 'G1 Prime'
-                       WHEN 'G2' THEN 'G2 Standard'
-                       WHEN 'G3' THEN 'G3 Regular'
-                       WHEN 'Grade 1 (Prime)' THEN 'G1 Prime'
-                       WHEN 'Grade 2 (Standard)' THEN 'G2 Standard'
-                       WHEN 'Grade 3 (Regular)' THEN 'G3 Regular'
+                       WHEN 'G1' THEN 'Grade 1 (Prime)'
+                       WHEN 'G2' THEN 'Grade 2 (Standard)'
+                       WHEN 'G3' THEN 'Grade 3 (Regular)'
                        ELSE grade
                    END as grade,
                    boxes, loose_pieces, rate_per_sqm, rate_per_box, rate_per_piece, line_total
@@ -156,7 +135,7 @@ def migrate_grades_internal(cursor, conn):
                 user_id INTEGER NOT NULL,
                 branch_id INTEGER NOT NULL,
                 product_id INTEGER NOT NULL,
-                grade TEXT NOT NULL CHECK(grade IN ('G1 Prime', 'G2 Standard', 'G3 Regular')),
+                grade TEXT NOT NULL CHECK(grade IN ('Grade 1 (Prime)', 'Grade 2 (Standard)', 'Grade 3 (Regular)')),
                 transaction_type TEXT NOT NULL CHECK(transaction_type IN ('IN', 'OUT')),
                 boxes INTEGER NOT NULL DEFAULT 0,
                 loose_pieces INTEGER NOT NULL DEFAULT 0,
@@ -172,12 +151,9 @@ def migrate_grades_internal(cursor, conn):
             INSERT INTO stock_transactions_new 
             SELECT id, user_id, branch_id, product_id,
                    CASE grade
-                       WHEN 'G1' THEN 'G1 Prime'
-                       WHEN 'G2' THEN 'G2 Standard'
-                       WHEN 'G3' THEN 'G3 Regular'
-                       WHEN 'Grade 1 (Prime)' THEN 'G1 Prime'
-                       WHEN 'Grade 2 (Standard)' THEN 'G2 Standard'
-                       WHEN 'Grade 3 (Regular)' THEN 'G3 Regular'
+                       WHEN 'G1' THEN 'Grade 1 (Prime)'
+                       WHEN 'G2' THEN 'Grade 2 (Standard)'
+                       WHEN 'G3' THEN 'Grade 3 (Regular)'
                        ELSE grade
                    END as grade,
                    transaction_type, boxes, loose_pieces, transaction_date, notes
