@@ -4,18 +4,21 @@ Centralized grade definitions for the system
 """
 
 # Grade definitions
-GRADE_1 = "Grade 1 (Prime)"
-GRADE_2 = "Grade 2 (Standard)"
-GRADE_3 = "Grade 3 (Regular)"
+GRADE_1 = "G1 Prime"
+GRADE_2 = "G2 Standard"
+GRADE_3 = "G3 Regular"
 
 # List of all valid grades
 VALID_GRADES = [GRADE_1, GRADE_2, GRADE_3]
 
-# Grade mapping for backward compatibility (old -> new)
+# Grade mapping for backward compatibility (old -> canonical)
 GRADE_MAPPING = {
     'G1': GRADE_1,
     'G2': GRADE_2,
-    'G3': GRADE_3
+    'G3': GRADE_3,
+    'Grade 1 (Prime)': GRADE_1,
+    'Grade 2 (Standard)': GRADE_2,
+    'Grade 3 (Regular)': GRADE_3,
 }
 
 # Reverse mapping (new -> old) for display purposes if needed
