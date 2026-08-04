@@ -7,10 +7,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DESKTOP = PROJECT_ROOT / "Tile Index"
-BACKEND = PROJECT_ROOT / "backend"
-sys.path.insert(0, str(DESKTOP))
+ROOT = Path(__file__).resolve().parents[1]
+BACKEND = ROOT / "backend"
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(BACKEND))
 
 

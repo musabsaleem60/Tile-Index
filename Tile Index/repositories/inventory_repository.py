@@ -5,15 +5,8 @@ Data access layer for inventory
 
 from database.init_db import get_connection
 from models.inventory import Inventory
-from pathlib import Path
-import sys
 from desktop_client.remote_state import is_api_authenticated
 from desktop_client.session import api_client
-
-_ROOT_BACKEND = Path(__file__).resolve().parents[2] / "backend"
-if _ROOT_BACKEND.exists() and str(_ROOT_BACKEND) not in sys.path:
-    sys.path.append(str(_ROOT_BACKEND))
-
 from stock_math import deduct_verbatim_stock
 
 
