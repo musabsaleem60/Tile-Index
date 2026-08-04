@@ -4,6 +4,46 @@ Test script to verify all system components work correctly
 
 import sys
 import traceback
+import os
+import tempfile
+
+
+_TEST_DATA_DIR = None
+
+
+def assert_local_test_database():
+    database_url = os.environ.get("DATABASE_URL", "")
+    if not database_url:
+        return
+    normalized = database_url.lower()
+    local_markers = ("sqlite://", "localhost", "127.0.0.1", "::1")
+    if not any(marker in normalized for marker in local_markers):
+        raise RuntimeError(f"Refusing to run tests with non-local DATABASE_URL: {database_url}")
+
+
+def force_scratch_sqlite_database():
+    global _TEST_DATA_DIR
+    _TEST_DATA_DIR = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+    scratch_db = os.path.join(_TEST_DATA_DIR.name, "tile_index_test.db")
+
+    import database.init_db as init_db
+
+    def scratch_path():
+        return scratch_db
+
+    init_db.get_db_path = scratch_path
+
+    for module_name in (
+        "repositories.branch_repository",
+        "repositories.user_repository",
+        "repositories.product_repository",
+        "repositories.inventory_repository",
+        "repositories.stock_transaction_repository",
+        "repositories.sanitary_repository",
+    ):
+        module = sys.modules.get(module_name)
+        if module and hasattr(module, "get_connection"):
+            module.get_connection = init_db.get_connection
 
 def test_database():
     """Test database initialization"""
@@ -94,6 +134,9 @@ def test_branches():
 
 def main():
     """Run all tests"""
+    assert_local_test_database()
+    force_scratch_sqlite_database()
+
     print("=" * 60)
     print("Tile Index System - Component Test")
     print("=" * 60)
