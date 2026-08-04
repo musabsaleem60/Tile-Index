@@ -10,8 +10,15 @@ from services.activity_log_service import ActivityLogService
 from models.inventory import Inventory
 from models.stock_transaction import StockTransaction
 from datetime import datetime
+from pathlib import Path
+import sys
 from desktop_client.remote_state import is_api_authenticated
 from desktop_client.session import api_client
+
+_ROOT_BACKEND = Path(__file__).resolve().parents[2] / "backend"
+if _ROOT_BACKEND.exists() and str(_ROOT_BACKEND) not in sys.path:
+    sys.path.append(str(_ROOT_BACKEND))
+
 from stock_math import total_pieces
 
 
