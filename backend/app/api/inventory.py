@@ -14,7 +14,6 @@ from app.models.entities import (
 )
 from app.schemas.common import AccessoryInventoryOut, InventoryOut, SanitaryInventoryOut, SimpleQuantityRequest, StockInRequest
 from app.services.audit import write_audit_log
-from stock_math import deduct_verbatim_stock, total_pieces
 
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
@@ -50,14 +49,21 @@ def tile_stock_in(payload: StockInRequest, db: Session = Depends(get_db), curren
             grade=payload.grade,
             boxes=0,
             loose_pieces=0,
-            rate_per_sqm=0,
-            rate_per_box=0,
-            rate_per_piece=0,
+            rate_per_sqm=payload.rate_per_sqm,
+            rate_per_box=payload.rate_per_box,
+            rate_per_piece=payload.rate_per_piece,
         )
         db.add(inventory)
 
     inventory.boxes += payload.boxes
     inventory.loose_pieces += payload.loose_pieces
+    while inventory.loose_pieces >= product.pieces_per_box:
+        inventory.boxes += 1
+        inventory.loose_pieces -= product.pieces_per_box
+    inventory.rate_per_sqm = payload.rate_per_sqm
+    inventory.rate_per_box = payload.rate_per_box
+    inventory.rate_per_piece = payload.rate_per_piece
+
     db.add(StockTransaction(
         user_id=current_user.id,
         branch_id=payload.branch_id,
@@ -68,9 +74,7 @@ def tile_stock_in(payload: StockInRequest, db: Session = Depends(get_db), curren
         loose_pieces=payload.loose_pieces,
         notes=payload.notes,
     ))
-    audit_payload = payload.model_dump()
-    audit_payload["rate_fields_ignored"] = True
-    write_audit_log(db, current_user, "Stock IN", audit_payload, payload.branch_id)
+    write_audit_log(db, current_user, "Stock IN", payload.model_dump(), payload.branch_id)
     db.commit()
     db.refresh(inventory)
     return inventory
@@ -96,21 +100,14 @@ def tile_stock_out(payload: StockInRequest, db: Session = Depends(get_db), curre
     if not inventory:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No stock found")
 
-    available = total_pieces(inventory.boxes, inventory.loose_pieces, product.pieces_per_box)
-    requested = total_pieces(payload.boxes, payload.loose_pieces, product.pieces_per_box)
+    available = inventory.boxes * product.pieces_per_box + inventory.loose_pieces
+    requested = payload.boxes * product.pieces_per_box + payload.loose_pieces
     if requested > available:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient stock")
 
-    try:
-        inventory.boxes, inventory.loose_pieces = deduct_verbatim_stock(
-            inventory.boxes,
-            inventory.loose_pieces,
-            payload.boxes,
-            payload.loose_pieces,
-            product.pieces_per_box,
-        )
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient stock")
+    remaining = available - requested
+    inventory.boxes = remaining // product.pieces_per_box
+    inventory.loose_pieces = remaining % product.pieces_per_box
 
     db.add(StockTransaction(
         user_id=current_user.id,
@@ -122,9 +119,7 @@ def tile_stock_out(payload: StockInRequest, db: Session = Depends(get_db), curre
         loose_pieces=payload.loose_pieces,
         notes=payload.notes,
     ))
-    audit_payload = payload.model_dump()
-    audit_payload["rate_fields_ignored"] = True
-    write_audit_log(db, current_user, "Stock OUT", audit_payload, payload.branch_id)
+    write_audit_log(db, current_user, "Stock OUT", payload.model_dump(), payload.branch_id)
     db.commit()
     db.refresh(inventory)
     return inventory

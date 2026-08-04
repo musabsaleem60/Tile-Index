@@ -5,7 +5,6 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
-    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -22,19 +21,6 @@ class Branch(Base):
     name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
-class BranchAlias(Base):
-    __tablename__ = "branch_aliases"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), nullable=False)
-    alias_name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
-    source_name: Mapped[str | None] = mapped_column(String(120))
-    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    branch = relationship("Branch")
 
 
 class User(Base):
@@ -60,69 +46,13 @@ class Product(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(160), nullable=False)
-    item_code: Mapped[str | None] = mapped_column(String(40), unique=True)
-    normalized_product_name: Mapped[str | None] = mapped_column(String(160))
     tile_size: Mapped[str] = mapped_column(String(80), nullable=False)
     area_per_box: Mapped[float] = mapped_column(Float, nullable=False)
     pieces_per_box: Mapped[int] = mapped_column(Integer, nullable=False)
-    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
         UniqueConstraint("name", "tile_size", name="uq_products_name_size"),
-        UniqueConstraint("normalized_product_name", "tile_size", name="uq_products_normalized_name_size"),
-    )
-
-
-class TileSize(Base):
-    __tablename__ = "tile_sizes"
-
-    tile_size: Mapped[str] = mapped_column(String(80), primary_key=True)
-    pieces_per_box: Mapped[int] = mapped_column(Integer, nullable=False)
-    area_per_box: Mapped[float] = mapped_column(Float, nullable=False)
-    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-
-class TileRate(Base):
-    __tablename__ = "tile_rates"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    tile_size: Mapped[str] = mapped_column(ForeignKey("tile_sizes.tile_size", ondelete="RESTRICT"), nullable=False)
-    grade: Mapped[str] = mapped_column(String(80), nullable=False)
-    rate_per_meter: Mapped[float] = mapped_column(Float, nullable=False)
-    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-    size = relationship("TileSize")
-
-    __table_args__ = (
-        CheckConstraint("grade IN ('G1 Prime', 'G2 Standard', 'G3 Regular')", name="ck_tile_rates_grade"),
-        UniqueConstraint("tile_size", "grade", name="uq_tile_rates_size_grade"),
-    )
-
-
-class ProductRateOverride(Base):
-    __tablename__ = "product_rate_overrides"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
-    grade: Mapped[str] = mapped_column(String(80), nullable=False)
-    rate_per_meter: Mapped[float] = mapped_column(Float, nullable=False)
-    reason: Mapped[str | None] = mapped_column(Text)
-    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-    product = relationship("Product")
-    created_by = relationship("User")
-
-    __table_args__ = (
-        CheckConstraint("grade IN ('G1 Prime', 'G2 Standard', 'G3 Regular')", name="ck_product_rate_overrides_grade"),
-        UniqueConstraint("product_id", "grade", name="uq_product_rate_overrides_product_grade"),
     )
 
 
@@ -275,7 +205,6 @@ class StockTransaction(Base):
     __tablename__ = "stock_transactions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    import_batch_id: Mapped[int | None] = mapped_column(ForeignKey("import_batches.id", ondelete="SET NULL"))
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), nullable=False)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"), nullable=False)
@@ -285,62 +214,6 @@ class StockTransaction(Base):
     loose_pieces: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     transaction_date: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
-    source_row_number: Mapped[int | None] = mapped_column(Integer)
-
-
-class ImportBatch(Base):
-    __tablename__ = "import_batches"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    batch_number: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
-    import_type: Mapped[str] = mapped_column(String(40), nullable=False)
-    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    file_hash: Mapped[str] = mapped_column(String(128), nullable=False)
-    status: Mapped[str] = mapped_column(String(40), nullable=False)
-    exported_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
-    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    committed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
-    failed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
-    reverted_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
-    summary_json: Mapped[dict | None] = mapped_column(JSON)
-    error_json: Mapped[dict | None] = mapped_column(JSON)
-
-    created_by = relationship("User")
-
-    __table_args__ = (
-        CheckConstraint("import_type IN ('tiles')", name="ck_import_batches_type"),
-        CheckConstraint("status IN ('dry_run', 'committed', 'failed', 'reverted')", name="ck_import_batches_status"),
-    )
-
-
-class ImportBatchRow(Base):
-    __tablename__ = "import_batch_rows"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    batch_id: Mapped[int] = mapped_column(ForeignKey("import_batches.id", ondelete="CASCADE"), nullable=False)
-    sheet_name: Mapped[str] = mapped_column(String(120), nullable=False)
-    row_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    status: Mapped[str] = mapped_column(String(40), nullable=False)
-    operation: Mapped[str | None] = mapped_column(String(40))
-    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"))
-    item_code: Mapped[str | None] = mapped_column(String(40))
-    branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"))
-    grade: Mapped[str | None] = mapped_column(String(80))
-    message: Mapped[str | None] = mapped_column(Text)
-    before_json: Mapped[dict | None] = mapped_column(JSON)
-    after_json: Mapped[dict | None] = mapped_column(JSON)
-    created_transaction_id: Mapped[int | None] = mapped_column(ForeignKey("stock_transactions.id", ondelete="SET NULL"))
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    batch = relationship("ImportBatch")
-    product = relationship("Product", foreign_keys=[product_id])
-    branch = relationship("Branch")
-    created_transaction = relationship("StockTransaction")
-
-    __table_args__ = (
-        CheckConstraint("status IN ('created', 'updated', 'stock_in', 'stock_out', 'skipped', 'warning', 'error', 'blocked', 'merged')", name="ck_import_batch_rows_status"),
-    )
 
 
 class SanitaryStockTransaction(Base):
