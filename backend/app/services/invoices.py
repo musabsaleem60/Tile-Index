@@ -17,6 +17,7 @@ from app.models.entities import (
 )
 from app.schemas.common import InvoiceCreate
 from app.services.audit import write_audit_log
+from stock_math import deduct_verbatim_stock, total_pieces
 
 
 def create_invoice(db: Session, payload: InvoiceCreate, user: User) -> Invoice:
@@ -118,16 +119,23 @@ def _build_tile_item(db: Session, branch_id: int, requested_item, user: User) ->
     if not inventory:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No stock found for tile")
 
-    requested_pieces = requested_item.boxes * product.pieces_per_box + requested_item.loose_pieces
-    available_pieces = inventory.boxes * product.pieces_per_box + inventory.loose_pieces
+    requested_pieces = total_pieces(requested_item.boxes, requested_item.loose_pieces, product.pieces_per_box)
+    available_pieces = total_pieces(inventory.boxes, inventory.loose_pieces, product.pieces_per_box)
     if requested_pieces <= 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tile quantity is required")
     if requested_pieces > available_pieces:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient tile stock")
 
-    remaining_pieces = available_pieces - requested_pieces
-    inventory.boxes = remaining_pieces // product.pieces_per_box
-    inventory.loose_pieces = remaining_pieces % product.pieces_per_box
+    try:
+        inventory.boxes, inventory.loose_pieces = deduct_verbatim_stock(
+            inventory.boxes,
+            inventory.loose_pieces,
+            requested_item.boxes,
+            requested_item.loose_pieces,
+            product.pieces_per_box,
+        )
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient tile stock")
 
     line_total = requested_item.boxes * inventory.rate_per_box + requested_item.loose_pieces * inventory.rate_per_piece
 
