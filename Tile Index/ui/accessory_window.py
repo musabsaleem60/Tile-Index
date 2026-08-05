@@ -111,7 +111,7 @@ class AccessoryWindow:
         
         self.accessories_tree.column('S.No', width=50, anchor=tk.CENTER)
         self.accessories_tree.column('Category', width=80, anchor=tk.CENTER)
-        self.accessories_tree.column('Company', width=180, anchor=tk.W)
+        self.accessories_tree.column('Company', width=280, anchor=tk.W)
         self.accessories_tree.column('Price', width=100, anchor=tk.CENTER)
         
         tree_scroll = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.accessories_tree.yview)
@@ -198,7 +198,7 @@ class AccessoryWindow:
         
         self.stock_tree.column('S.No', width=50, anchor=tk.CENTER)
         self.stock_tree.column('Category', width=70, anchor=tk.CENTER)
-        self.stock_tree.column('Company', width=180, anchor=tk.W)
+        self.stock_tree.column('Company', width=280, anchor=tk.W)
         self.stock_tree.column('Price', width=80, anchor=tk.CENTER)
         self.stock_tree.column('Quantity', width=60, anchor=tk.CENTER)
         self.stock_tree.column('Total Value', width=100, anchor=tk.CENTER)
