@@ -13,6 +13,7 @@ from ui.invoice_search_window import InvoiceSearchWindow
 from ui.report_window import ReportWindow
 from services.auth_service import AuthenticationService
 from desktop_client.session import get_update_warning
+from desktop_client.updater import UpdateError, download_update, launch_installer, verify_signature
 
 
 class MainWindow:
@@ -27,6 +28,7 @@ class MainWindow:
         
         # Navigation stack
         self.view_stack = []
+        self.current_view = None
         
         # Initialize database
         try:
@@ -56,7 +58,21 @@ class MainWindow:
                 font=("Arial", 11, "bold"),
                 bg="#c0392b",
                 fg="white"
-            ).pack(fill=tk.X, padx=10, pady=9)
+            ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=10, pady=9)
+            if (
+                update_warning.get("download_url")
+                and update_warning.get("sha256")
+                and not update_warning.get("updates_disabled")
+            ):
+                tk.Button(
+                    warning_frame,
+                    text="Install Update",
+                    command=self.install_update,
+                    bg="#e67e22",
+                    fg="white",
+                    font=("Arial", 10, "bold"),
+                    cursor="hand2"
+                ).pack(side=tk.RIGHT, padx=10, pady=5)
 
         # Header
         header_frame = tk.Frame(self.root, bg="#2c3e50", height=80)
@@ -218,6 +234,7 @@ class MainWindow:
     def show_home(self):
         """Show home dashboard"""
         self.clear_content()
+        self.current_view = None
         self.home_scroll_container.pack(fill=tk.BOTH, expand=True)
     
     def switch_view(self, view_class, *args, **kwargs):
@@ -263,7 +280,7 @@ class MainWindow:
         scrollbar.pack(side="right", fill="y")
         
         # Initialize the view class into the scrollable frame
-        view_class(scrollable_frame, *args, **kwargs)
+        self.current_view = view_class(scrollable_frame, *args, **kwargs)
     
     def open_inventory(self):
         """Open inventory management within the same window"""
@@ -331,4 +348,33 @@ class MainWindow:
         self.current_user = user
         # Refresh UI if needed
         pass
+
+    def install_update(self):
+        update_warning = get_update_warning()
+        if not update_warning:
+            return
+        if isinstance(self.current_view, InvoiceWindow) and getattr(self.current_view, "invoice_items", None):
+            messagebox.showwarning(
+                "Finish Invoice First",
+                "Finish or clear the open invoice before installing an update."
+            )
+            return
+        if not messagebox.askyesno(
+            "Install Update",
+            "Update available. Install now?\n\nThe app will close after the update installer starts."
+        ):
+            return
+        try:
+            installer = download_update(update_warning)
+            verify_signature(
+                installer,
+                update_warning.get("signature_publisher"),
+                update_warning.get("signature_thumbprint"),
+            )
+            launch_installer(installer, update_warning)
+            self.root.destroy()
+        except UpdateError as exc:
+            messagebox.showerror("Update Failed", str(exc))
+        except Exception as exc:
+            messagebox.showerror("Update Failed", f"Could not install update: {exc}")
 

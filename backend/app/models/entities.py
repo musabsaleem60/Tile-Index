@@ -1,4 +1,4 @@
-from sqlalchemy import (
+﻿from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
@@ -54,6 +54,29 @@ class User(Base):
         CheckConstraint("role IN ('admin', 'employee')", name="ck_users_role"),
     )
 
+
+
+class DesktopClientStatus(Base):
+    __tablename__ = "desktop_client_statuses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    machine_id: Mapped[str] = mapped_column(String(80), unique=True, index=True, nullable=False)
+    hostname: Mapped[str | None] = mapped_column(String(160))
+    username: Mapped[str | None] = mapped_column(String(80))
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"))
+    app_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    latest_version: Mapped[str | None] = mapped_column(String(40))
+    min_desktop_version: Mapped[str | None] = mapped_column(String(40))
+    certificate_trusted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    update_available: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    updates_disabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    details: Mapped[dict | None] = mapped_column(JSON)
+    first_seen_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_seen_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User")
+    branch = relationship("Branch")
 
 class Product(Base):
     __tablename__ = "products"

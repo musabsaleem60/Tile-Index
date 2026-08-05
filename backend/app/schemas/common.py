@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -199,3 +199,36 @@ class UpdateInfo(BaseModel):
     min_desktop_version: str
     download_url: str
     release_notes: str
+    sha256: str = ""
+    file_size_bytes: int | None = None
+    signature_publisher: str = ""
+    signature_thumbprint: str = ""
+    mandatory: bool = False
+
+class DesktopStatusIn(BaseModel):
+    machine_id: str = Field(min_length=1, max_length=80)
+    hostname: str | None = Field(default=None, max_length=160)
+    app_version: str = Field(min_length=1, max_length=40)
+    latest_version: str | None = Field(default=None, max_length=40)
+    min_desktop_version: str | None = Field(default=None, max_length=40)
+    certificate_trusted: bool = False
+    update_available: bool = False
+    updates_disabled: bool = False
+    details: dict | None = None
+
+
+class DesktopStatusOut(ORMModel):
+    id: int
+    machine_id: str
+    hostname: str | None = None
+    username: str | None = None
+    user_id: int | None = None
+    branch_id: int | None = None
+    app_version: str
+    latest_version: str | None = None
+    min_desktop_version: str | None = None
+    certificate_trusted: bool
+    update_available: bool
+    updates_disabled: bool
+    first_seen_at: datetime | None = None
+    last_seen_at: datetime | None = None

@@ -1,4 +1,4 @@
-from functools import lru_cache
+﻿from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     min_desktop_version: str = "1.0.0"
     latest_desktop_download_url: str = ""
     latest_desktop_release_notes: str = ""
+    latest_desktop_sha256: str = ""
+    latest_desktop_file_size_bytes: int | None = None
+    latest_desktop_signature_publisher: str = "Tile Index Internal Code Signing"
+    latest_desktop_signature_thumbprint: str = ""
+    latest_desktop_mandatory: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

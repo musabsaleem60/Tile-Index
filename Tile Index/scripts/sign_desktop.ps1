@@ -1,7 +1,8 @@
 param(
     [string]$PackageDir = ".\dist\TileIndex",
+    [string]$FilePath,
     [string]$CertName = "Tile Index Internal Code Signing",
-    [switch]$TrustForCurrentUser = $true
+    [bool]$TrustForCurrentUser = $false
 )
 
 $ErrorActionPreference = "Stop"
@@ -9,9 +10,12 @@ $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $projectRoot
 
-$exePath = Join-Path $PackageDir "TileIndex.exe"
-if (-not (Test-Path $exePath)) {
-    throw "TileIndex.exe was not found at: $exePath"
+$targetPath = $FilePath
+if (-not $targetPath) {
+    $targetPath = Join-Path $PackageDir "TileIndex.exe"
+}
+if (-not (Test-Path $targetPath)) {
+    throw "File to sign was not found at: $targetPath"
 }
 
 $subject = "CN=$CertName"
@@ -39,9 +43,9 @@ if ($TrustForCurrentUser) {
     Import-Certificate -FilePath $certExportPath -CertStoreLocation "Cert:\CurrentUser\TrustedPublisher" | Out-Null
 }
 
-$signature = Set-AuthenticodeSignature -FilePath $exePath -Certificate $cert -HashAlgorithm SHA256
+$signature = Set-AuthenticodeSignature -FilePath $targetPath -Certificate $cert -HashAlgorithm SHA256
 
-Write-Host "Signed EXE: $exePath"
+Write-Host "Signed file: $targetPath"
 Write-Host "Signature status: $($signature.Status)"
 Write-Host "Certificate exported to: $certExportPath"
 Write-Host ""

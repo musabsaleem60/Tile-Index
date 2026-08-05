@@ -1,4 +1,4 @@
-def accessory_display_label(accessory) -> str:
+﻿def accessory_display_label(accessory) -> str:
     """Build the user-facing accessory label from structured fields."""
     category = getattr(accessory, "category", None)
     company = getattr(accessory, "company", None)
@@ -17,4 +17,4 @@ def accessory_display_label(accessory) -> str:
     else:
         parts = [company, product_name, colour, size]
 
-    return " — ".join(str(part) for part in parts if part) or getattr(accessory, "name", None) or "Accessory"
+    return " - ".join(str(part) for part in parts if part) or getattr(accessory, "name", None) or "Accessory"

@@ -7,8 +7,17 @@ import tkinter as tk
 from tkinter import messagebox
 from desktop_client.api_client import ApiClientError
 from desktop_client.config import API_BASE_URL, CHECK_UPDATES
+from desktop_client.machine_status import report_desktop_status
 from desktop_client.session import api_client, set_authenticated_session, set_update_warning
-from desktop_client.update_checker import check_for_update
+from desktop_client.update_checker import check_for_update, is_version_older
+from desktop_client.updater import (
+    UpdateError,
+    clear_update_state,
+    download_update,
+    launch_installer,
+    read_update_state,
+    verify_signature,
+)
 from models.user import User
 
 
@@ -28,8 +37,10 @@ class LoginWindow:
         self.current_user = None
         self.update_warning = None
         self.update_warning_label = None
+        self.update_button = None
         
         self.setup_ui()
+        self.check_previous_update_state()
         self.check_for_updates()
     
     def center_window(self):
@@ -77,6 +88,15 @@ class LoginWindow:
             justify=tk.CENTER,
             padx=8,
             pady=8
+        )
+        self.update_button = tk.Button(
+            content_frame,
+            text="Install Update",
+            command=self.install_update,
+            bg="#e67e22",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            cursor="hand2"
         )
         
         # Username
@@ -158,6 +178,10 @@ class LoginWindow:
             )
             user.api_token = response["access_token"]
             self.current_user = user
+            try:
+                report_desktop_status(api_client, self.update_warning)
+            except Exception:
+                pass
 
             self.parent.destroy()
             self.on_success_callback(user)
@@ -185,9 +209,62 @@ class LoginWindow:
         except Exception:
             pass
 
+    def check_previous_update_state(self):
+        state = read_update_state()
+        if not state or state.get("status") != "installer_started":
+            return
+        target_version = state.get("version")
+        try:
+            from desktop_client.config import APP_VERSION
+            if target_version and not is_version_older(APP_VERSION, target_version):
+                clear_update_state()
+                return
+        except Exception:
+            pass
+        messagebox.showwarning(
+            "Update Did Not Complete",
+            "The previous update did not complete. The app is still available, "
+            "and your configuration file was preserved. Please try the update again "
+            "or contact your administrator."
+        )
+
     def show_update_warning(self):
         if not self.update_warning_label or not self.update_warning:
             return
         self.update_warning_label.configure(text=self.update_warning.get("warning_message", ""))
         self.update_warning_label.pack(fill=tk.X, pady=(0, 15), before=self.username_label)
+        if (
+            self.update_warning.get("download_url")
+            and self.update_warning.get("sha256")
+            and not self.update_warning.get("updates_disabled")
+        ):
+            self.update_button.pack(fill=tk.X, pady=(0, 15), before=self.username_label)
+
+    def install_update(self):
+        if not self.update_warning:
+            return
+        if not messagebox.askyesno(
+            "Install Update",
+            "Update available. Install now?\n\nThe app will close after the update installer starts."
+        ):
+            return
+        try:
+            self.update_button.configure(state=tk.DISABLED, text="Downloading update...")
+            self.parent.update_idletasks()
+            installer = download_update(self.update_warning)
+            self.update_button.configure(text="Verifying update...")
+            self.parent.update_idletasks()
+            verify_signature(
+                installer,
+                self.update_warning.get("signature_publisher"),
+                self.update_warning.get("signature_thumbprint"),
+            )
+            launch_installer(installer, self.update_warning)
+            self.parent.destroy()
+        except UpdateError as exc:
+            self.update_button.configure(state=tk.NORMAL, text="Install Update")
+            messagebox.showerror("Update Failed", str(exc))
+        except Exception as exc:
+            self.update_button.configure(state=tk.NORMAL, text="Install Update")
+            messagebox.showerror("Update Failed", f"Could not install update: {exc}")
 
