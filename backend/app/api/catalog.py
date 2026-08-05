@@ -67,8 +67,23 @@ def delete_product(product_id: int, db: Session = Depends(get_db), current_user:
 
 
 @router.get("/accessories", response_model=list[AccessoryOut])
-def list_accessories(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    return db.scalars(select(Accessory).order_by(Accessory.category, Accessory.company)).all()
+def list_accessories(
+    include_inactive: bool = False,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    query = select(Accessory)
+    if not include_inactive:
+        query = query.where(Accessory.active.is_(True))
+    return db.scalars(
+        query.order_by(
+            Accessory.category,
+            Accessory.company.nullsfirst(),
+            Accessory.product_name.nullsfirst(),
+            Accessory.colour.nullsfirst(),
+            Accessory.size.nullsfirst(),
+        )
+    ).all()
 
 
 @router.post("/accessories", response_model=AccessoryOut, dependencies=[Depends(require_admin)])

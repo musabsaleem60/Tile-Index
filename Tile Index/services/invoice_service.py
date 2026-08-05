@@ -17,6 +17,7 @@ from models.invoice_item import InvoiceItem
 from datetime import datetime
 from desktop_client.remote_state import is_api_authenticated
 from desktop_client.session import api_client
+from utils.accessory_labels import accessory_display_label
 
 
 class InvoiceService:
@@ -162,7 +163,7 @@ class InvoiceService:
                 acc_inv = AccessoryService.get_inventory(branch_id, accessory_id)
                 if not acc_inv or acc_inv.quantity < quantity:
                     available = acc_inv.quantity if acc_inv else 0
-                    raise ValueError(f"Insufficient stock for accessory {accessory.name} ({accessory.company}). Available: {available}")
+                    raise ValueError(f"Insufficient stock for accessory {accessory_display_label(accessory)}. Available: {available}")
                 
                 # Calculate line total
                 line_total = quantity * accessory.unit_price

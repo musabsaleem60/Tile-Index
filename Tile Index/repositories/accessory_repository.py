@@ -7,6 +7,7 @@ from database.init_db import get_connection
 from models.accessory import Accessory, AccessoryInventory
 from desktop_client.remote_state import is_api_authenticated
 from desktop_client.session import api_client, get_cached, set_cached, invalidate_cache
+from utils.accessory_labels import accessory_display_label
 
 
 class AccessoryRepository:
@@ -20,17 +21,7 @@ class AccessoryRepository:
             if cached is not None:
                 return cached
             rows = api_client.get("/catalog/accessories")
-            return set_cached("accessories", [
-                Accessory(
-                    id=r["id"],
-                    name=r["name"],
-                    category=r["category"],
-                    company=r["company"],
-                    unit_price=r["unit_price"],
-                    created_at=r.get("created_at")
-                )
-                for r in rows
-            ])
+            return set_cached("accessories", [Accessory.from_dict(r) for r in rows])
 
         conn = get_connection()
         cursor = conn.cursor()
@@ -88,7 +79,7 @@ class AccessoryRepository:
             })
             invalidate_cache("accessories")
             return Accessory(id=data["id"], name=data["name"], category=data["category"],
-                             company=data["company"], unit_price=data["unit_price"],
+                             company=data.get("company"), unit_price=data["unit_price"],
                              created_at=data.get("created_at"))
 
         conn = get_connection()
@@ -114,7 +105,7 @@ class AccessoryRepository:
             })
             invalidate_cache("accessories")
             return Accessory(id=data["id"], name=data["name"], category=data["category"],
-                             company=data["company"], unit_price=data["unit_price"],
+                             company=data.get("company"), unit_price=data["unit_price"],
                              created_at=data.get("created_at"))
 
         conn = get_connection()
@@ -191,7 +182,7 @@ class AccessoryInventoryRepository:
                 if accessory:
                     inv.accessory_name = accessory.name
                     inv.accessory_category = accessory.category
-                    inv.accessory_company = accessory.company
+                    inv.accessory_company = accessory_display_label(accessory)
                     inv.accessory_unit_price = accessory.unit_price
                 results.append(inv)
             return results

@@ -11,6 +11,7 @@ from services.accessory_service import AccessoryService
 from services.auth_service import AuthenticationService
 from models.accessory import Accessory
 from utils.searchable_combobox import SearchableCombobox
+from utils.accessory_labels import accessory_display_label
 
 
 class AccessoryWindow:
@@ -105,12 +106,12 @@ class AccessoryWindow:
         
         self.accessories_tree.heading('S.No', text='S.No')
         self.accessories_tree.heading('Category', text='Category')
-        self.accessories_tree.heading('Company', text='Company/Details')
+        self.accessories_tree.heading('Company', text='Accessory')
         self.accessories_tree.heading('Price', text='Price (Rs.)')
         
         self.accessories_tree.column('S.No', width=50, anchor=tk.CENTER)
         self.accessories_tree.column('Category', width=80, anchor=tk.CENTER)
-        self.accessories_tree.column('Company', width=120, anchor=tk.W)
+        self.accessories_tree.column('Company', width=180, anchor=tk.W)
         self.accessories_tree.column('Price', width=100, anchor=tk.CENTER)
         
         tree_scroll = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.accessories_tree.yview)
@@ -190,14 +191,14 @@ class AccessoryWindow:
         
         self.stock_tree.heading('S.No', text='S.No')
         self.stock_tree.heading('Category', text='Category')
-        self.stock_tree.heading('Company', text='Company/Details')
+        self.stock_tree.heading('Company', text='Accessory')
         self.stock_tree.heading('Price', text='Price (Rs.)')
         self.stock_tree.heading('Quantity', text='Qty')
         self.stock_tree.heading('Total Value', text='Total Value')
         
         self.stock_tree.column('S.No', width=50, anchor=tk.CENTER)
         self.stock_tree.column('Category', width=70, anchor=tk.CENTER)
-        self.stock_tree.column('Company', width=100, anchor=tk.W)
+        self.stock_tree.column('Company', width=180, anchor=tk.W)
         self.stock_tree.column('Price', width=80, anchor=tk.CENTER)
         self.stock_tree.column('Quantity', width=60, anchor=tk.CENTER)
         self.stock_tree.column('Total Value', width=100, anchor=tk.CENTER)
@@ -234,9 +235,9 @@ class AccessoryWindow:
                 self.accessories_tree.insert('', tk.END, values=(
                     idx,
                     acc.category,
-                    acc.company,
+                    accessory_display_label(acc),
                     f"Rs. {acc.unit_price:.0f}"
-                ))
+                ), iid=str(acc.id))
         
         self.update_stock_dropdown()
     
@@ -244,7 +245,7 @@ class AccessoryWindow:
         """Update the stock accessory dropdown"""
         if hasattr(self, 'stock_accessory_combo'):
             all_accessories = AccessoryRepository.get_all()
-            values = [f"{a.category} - {a.company} (Rs. {a.unit_price:.0f})" for a in all_accessories]
+            values = [f"{a.category} - {accessory_display_label(a)} (Rs. {a.unit_price:.0f})" for a in all_accessories]
             self.stock_accessory_combo.set_completion_list(values)
             self._stock_accessories = all_accessories
     
@@ -252,13 +253,7 @@ class AccessoryWindow:
         """Handle accessory selection"""
         selection = self.accessories_tree.selection()
         if selection:
-            item = self.accessories_tree.item(selection[0])
-            values = item['values']
-            # Find matching accessory
-            for acc in self.accessories:
-                if acc.category == values[1] and acc.company == values[2]:
-                    self.selected_accessory_id = acc.id
-                    break
+            self.selected_accessory_id = int(selection[0])
     
     def on_branch_select(self, event):
         """Handle branch selection"""
@@ -343,7 +338,7 @@ class AccessoryWindow:
             # Find the accessory
             acc = None
             for a in self.accessories:
-                if a.category == values[1] and a.company == values[2]:
+                if a.id == int(selection[0]):
                     acc = a
                     break
             
@@ -353,7 +348,7 @@ class AccessoryWindow:
             # Fill form
             self.category_var.set(acc.category)
             self.company_entry.delete(0, tk.END)
-            self.company_entry.insert(0, acc.company)
+            self.company_entry.insert(0, acc.company or "")
             self.unit_price_entry.delete(0, tk.END)
             self.unit_price_entry.insert(0, str(int(acc.unit_price)))
             
@@ -376,22 +371,23 @@ class AccessoryWindow:
             
             acc = None
             for a in self.accessories:
-                if a.category == values[1] and a.company == values[2]:
+                if a.id == int(selection[0]):
                     acc = a
                     break
             
             if not acc:
                 raise ValueError("Accessory not found")
             
+            label = accessory_display_label(acc)
             confirm = messagebox.askyesno(
                 "Confirm Delete",
-                f"Are you sure you want to delete {acc.category} by {acc.company} (Rs. {acc.unit_price:.0f})?\n\n"
+                f"Are you sure you want to delete {acc.category} - {label} (Rs. {acc.unit_price:.0f})?\n\n"
                 f"This action cannot be undone."
             )
             
             if confirm:
                 AccessoryService.delete_accessory(acc.id)
-                messagebox.showinfo("Success", f"{acc.category} by {acc.company} deleted successfully!")
+                messagebox.showinfo("Success", f"{acc.category} - {label} deleted successfully!")
                 self.clear_form()
                 self.load_accessories()
                 self.refresh_stock()
@@ -439,7 +435,8 @@ class AccessoryWindow:
                 raise ValueError("You do not have access to this branch")
             
             AccessoryService.add_stock(self.selected_branch_id, accessory.id, quantity)
-            messagebox.showinfo("Success", f"Added {quantity} units of {accessory.category} ({accessory.company}) to stock!")
+            label = accessory_display_label(accessory)
+            messagebox.showinfo("Success", f"Added {quantity} units of {accessory.category} - {label} to stock!")
             
             self.stock_in_qty_entry.delete(0, tk.END)
             self.refresh_stock()
@@ -485,16 +482,17 @@ class AccessoryWindow:
             if quantity > current_qty:
                 raise ValueError(f"Insufficient stock. Available: {current_qty}, Requested: {quantity}")
             
+            label = accessory_display_label(accessory)
             confirm = messagebox.askyesno(
                 "Confirm Stock OUT",
-                f"Remove {quantity} units of {accessory.category} ({accessory.company})?"
+                f"Remove {quantity} units of {accessory.category} - {label}?"
             )
             
             if not confirm:
                 return
             
             AccessoryService.deduct_stock(self.selected_branch_id, accessory.id, quantity)
-            messagebox.showinfo("Success", f"Removed {quantity} units of {accessory.category} ({accessory.company}) from stock!")
+            messagebox.showinfo("Success", f"Removed {quantity} units of {accessory.category} - {label} from stock!")
             
             self.stock_out_qty_entry.delete(0, tk.END)
             self.refresh_stock()
@@ -522,7 +520,7 @@ class AccessoryWindow:
             self.stock_tree.insert('', tk.END, values=(
                 idx,
                 acc.category,
-                acc.company,
+                accessory_display_label(acc),
                 f"Rs. {acc.unit_price:.0f}",
                 qty,
                 f"Rs. {total_value:.0f}"

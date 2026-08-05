@@ -154,13 +154,18 @@ class Accessory(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     category: Mapped[str] = mapped_column(String(80), nullable=False)
-    company: Mapped[str] = mapped_column(String(160), nullable=False)
+    company: Mapped[str | None] = mapped_column(String(160))
     unit_price: Mapped[float] = mapped_column(Float, default=0, nullable=False)
+    category_id: Mapped[int | None] = mapped_column(ForeignKey("accessory_categories.id", ondelete="RESTRICT"))
+    product_name: Mapped[str | None] = mapped_column(String(160))
+    colour: Mapped[str | None] = mapped_column(String(80))
+    size: Mapped[str | None] = mapped_column(String(80))
+    weight: Mapped[str | None] = mapped_column(String(80))
+    product_type: Mapped[str | None] = mapped_column(String(160))
+    normalized_identity: Mapped[str | None] = mapped_column(String(220))
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    __table_args__ = (
-        UniqueConstraint("category", "company", name="uq_accessories_category_company"),
-    )
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class AccessoryInventory(Base):

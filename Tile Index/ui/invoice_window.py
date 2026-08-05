@@ -18,6 +18,7 @@ from utils.validators import validate_positive_number, validate_integer, validat
 from utils.invoice_printer import InvoicePrintWindow
 from utils.grade_constants import VALID_GRADES, GRADE_1
 from utils.searchable_combobox import SearchableCombobox
+from utils.accessory_labels import accessory_display_label
 
 
 class InvoiceWindow:
@@ -219,7 +220,7 @@ class InvoiceWindow:
             self.item_pieces_entry.grid()
         elif item_type == "Accessories":
             self.product_label.config(text="Accessory:")
-            self.product_combo.set_completion_list([f"{a.name} ({a.company}) - {a.category}" for a in self.accessories])
+            self.product_combo.set_completion_list([self.format_accessory(a) for a in self.accessories])
             self.grade_label.grid_remove()
             self.grade_combo.grid_remove()
             self.boxes_label.config(text="Quantity:")
@@ -289,7 +290,7 @@ class InvoiceWindow:
                 # Find accessory
                 accessory = None
                 for a in self.accessories:
-                    if f"{a.name} ({a.company}) - {a.category}" == item_str:
+                    if self.format_accessory(a) == item_str:
                         accessory = a
                         break
                 
@@ -387,7 +388,7 @@ class InvoiceWindow:
                 # Accessory logic
                 accessory = None
                 for a in self.accessories:
-                    if f"{a.name} ({a.company}) - {a.category}" == item_str:
+                    if self.format_accessory(a) == item_str:
                         accessory = a
                         break
                 
@@ -402,7 +403,7 @@ class InvoiceWindow:
                 acc_inv = AccessoryService.get_inventory(self.selected_branch_id, accessory.id)
                 available = acc_inv.quantity if acc_inv else 0
                 if quantity > available:
-                    raise ValueError(f"Insufficient stock for accessory {accessory.name}. Available: {available}")
+                    raise ValueError(f"Insufficient stock for accessory {accessory_display_label(accessory)}. Available: {available}")
                 
                 # Calculate line total
                 line_total = quantity * accessory.unit_price
@@ -411,7 +412,7 @@ class InvoiceWindow:
                 item_data = {
                     'type': 'Accessory',
                     'accessory_id': accessory.id,
-                    'product_name': f"{accessory.name} ({accessory.company})",
+                    'product_name': accessory_display_label(accessory),
                     'tile_size': accessory.category,
                     'grade': '-',
                     'boxes': quantity,
@@ -612,6 +613,10 @@ class InvoiceWindow:
         
         # Show message - invoice must be generated first
         messagebox.showinfo("Print Invoice", "Please generate the invoice first. After generation, the invoice will open in a print window automatically.\nYou can also search for existing invoices to print them.")
+
+    @staticmethod
+    def format_accessory(accessory):
+        return f"{accessory.category} - {accessory_display_label(accessory)}"
 
     @staticmethod
     def format_sanitary_product(product):

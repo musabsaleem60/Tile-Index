@@ -17,6 +17,7 @@ from app.models.entities import (
 )
 from app.schemas.common import InvoiceCreate
 from app.services.audit import write_audit_log
+from app.services.accessory_labels import accessory_display_label
 from stock_math import deduct_verbatim_stock, total_pieces
 
 
@@ -193,7 +194,7 @@ def _build_accessory_item(db: Session, branch_id: int, requested_item) -> Invoic
     return InvoiceItem(
         item_type="accessory",
         accessory_id=accessory.id,
-        description=f"{accessory.name} ({accessory.company})",
+        description=accessory_display_label(accessory),
         tile_size=accessory.category,
         grade="-",
         boxes=quantity,

@@ -11,6 +11,7 @@ from repositories.product_repository import ProductRepository
 from repositories.accessory_repository import AccessoryRepository
 from repositories.sanitary_repository import SanitaryProductRepository
 from services.invoice_service import InvoiceService
+from utils.accessory_labels import accessory_display_label
 
 
 class InvoicePrintWindow:
@@ -158,7 +159,7 @@ class InvoicePrintWindow:
             elif item.accessory_id:
                 accessory = self.accessories.get(item.accessory_id)
                 if accessory:
-                    product_name = f"{accessory.name} ({accessory.company})"
+                    product_name = accessory_display_label(accessory)
                     size = accessory.category
                 else:
                     product_name = "Unknown Accessory"

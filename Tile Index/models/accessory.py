@@ -15,13 +15,20 @@ class Accessory:
     VALID_CATEGORIES = [CATEGORY_GROUT, CATEGORY_BOND, CATEGORY_FLOOR_WASTE, CATEGORY_SPACER]
     
     def __init__(self, id=None, name=None, category=None, company=None,
-                 unit_price=0, created_at=None):
+                 unit_price=0, created_at=None, product_name=None, colour=None,
+                 size=None, weight=None, product_type=None, active=True):
         self.id = id
         self.name = name
         self.category = category  # 'Grout' or 'Bond'
         self.company = company
         self.unit_price = unit_price
         self.created_at = created_at
+        self.product_name = product_name
+        self.colour = colour
+        self.size = size
+        self.weight = weight
+        self.product_type = product_type
+        self.active = active
     
     def __repr__(self):
         return f"Accessory(id={self.id}, name='{self.name}', category='{self.category}', company='{self.company}', price={self.unit_price})"
@@ -34,7 +41,13 @@ class Accessory:
             'category': self.category,
             'company': self.company,
             'unit_price': self.unit_price,
-            'created_at': self.created_at
+            'created_at': self.created_at,
+            'product_name': self.product_name,
+            'colour': self.colour,
+            'size': self.size,
+            'weight': self.weight,
+            'product_type': self.product_type,
+            'active': self.active,
         }
     
     @classmethod
@@ -46,7 +59,13 @@ class Accessory:
             category=data.get('category'),
             company=data.get('company'),
             unit_price=data.get('unit_price', 0),
-            created_at=data.get('created_at')
+            created_at=data.get('created_at'),
+            product_name=data.get('product_name'),
+            colour=data.get('colour'),
+            size=data.get('size'),
+            weight=data.get('weight'),
+            product_type=data.get('product_type'),
+            active=data.get('active', True),
         )
 
 

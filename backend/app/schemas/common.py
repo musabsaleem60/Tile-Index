@@ -37,12 +37,18 @@ class ProductOut(ProductIn, ORMModel):
 class AccessoryIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     category: str = Field(min_length=1, max_length=80)
-    company: str = Field(min_length=1, max_length=160)
+    company: str | None = Field(default=None, max_length=160)
     unit_price: float = Field(ge=0)
+    product_name: str | None = Field(default=None, max_length=160)
+    colour: str | None = Field(default=None, max_length=80)
+    size: str | None = Field(default=None, max_length=80)
+    weight: str | None = Field(default=None, max_length=80)
+    product_type: str | None = Field(default=None, max_length=160)
 
 
 class AccessoryOut(AccessoryIn, ORMModel):
     id: int
+    active: bool = True
     created_at: datetime | None = None
 
 

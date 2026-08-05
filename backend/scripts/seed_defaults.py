@@ -64,11 +64,11 @@ def main():
                 is_active=True,
             ))
 
-        for name, category, company, price in ACCESSORIES:
-            existing = db.scalar(
-                select(Accessory).where(Accessory.category == category, Accessory.company == company)
-            )
-            if not existing:
+        # Accessory data is now managed from the client workbook. These old
+        # starter rows are only for a blank dev database; do not recreate them
+        # on production restarts after real structured accessories exist.
+        if not db.scalar(select(Accessory.id).limit(1)):
+            for name, category, company, price in ACCESSORIES:
                 db.add(Accessory(name=name, category=category, company=company, unit_price=price))
 
         for company, colors in SANITARY_COMPANIES:
