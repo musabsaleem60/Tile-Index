@@ -11,6 +11,7 @@ from repositories.branch_repository import BranchRepository
 from repositories.user_repository import UserRepository
 from services.activity_log_service import ActivityLogService
 from services.auth_service import AuthenticationService
+from utils.datetime_format import format_business_datetime
 
 
 class ActivityLogWindow:
@@ -186,14 +187,7 @@ class ActivityLogWindow:
             
             # Display activities
             for activity in activities:
-                action_date = activity.action_date
-                if isinstance(action_date, str):
-                    date_str = action_date[:19] if len(action_date) >= 19 else action_date
-                else:
-                    try:
-                        date_str = activity.action_date.strftime("%Y-%m-%d %H:%M:%S")
-                    except:
-                        date_str = str(action_date)[:19]
+                date_str = format_business_datetime(activity.action_date)
                 
                 branch_name = activity.branch_name or "N/A"
                 details_short = activity.action_details[:50] + "..." if activity.action_details and len(activity.action_details) > 50 else (activity.action_details or "")
@@ -280,14 +274,7 @@ class ActivityLogWindow:
             
             # Display activities
             for activity in activities:
-                action_date = activity.action_date
-                if isinstance(action_date, str):
-                    date_str = action_date[:19] if len(action_date) >= 19 else action_date
-                else:
-                    try:
-                        date_str = activity.action_date.strftime("%Y-%m-%d %H:%M:%S")
-                    except:
-                        date_str = str(action_date)[:19]
+                date_str = format_business_datetime(activity.action_date)
                 
                 branch_name = activity.branch_name or "N/A"
                 details_short = activity.action_details[:50] + "..." if activity.action_details and len(activity.action_details) > 50 else (activity.action_details or "")
@@ -341,7 +328,7 @@ class ActivityLogWindow:
                 
                 self.details_text.insert(tk.END, f"Activity ID: {activity.id}\n")
                 self.details_text.insert(tk.END, f"User: {activity.username} ({activity.user_role})\n")
-                self.details_text.insert(tk.END, f"Date/Time: {activity.action_date}\n")
+                self.details_text.insert(tk.END, f"Date/Time: {format_business_datetime(activity.action_date)}\n")
                 self.details_text.insert(tk.END, f"Branch: {activity.branch_name or 'N/A'}\n")
                 self.details_text.insert(tk.END, f"Action: {activity.action_type}\n\n")
                 self.details_text.insert(tk.END, "Details:\n")

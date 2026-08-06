@@ -2,7 +2,7 @@ import os
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from app.api import auth, catalog, inventory, invoices, reports, updates
 from app.core.config import get_settings
 from app.db.session import SessionLocal
@@ -27,6 +27,7 @@ if settings.cors_origins:
 def health():
     with SessionLocal() as db:
         tile_rate_count = db.scalar(select(func.count(TileRate.id))) or 0
+        alembic_version = db.execute(text("SELECT version_num FROM alembic_version")).scalar_one_or_none()
     if tile_rate_count == 0:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -42,6 +43,7 @@ def health():
         "status": "ok",
         "version": settings.app_version,
         "commit_sha": commit_sha,
+        "alembic_version": alembic_version,
         "tile_rates": tile_rate_count,
     }
 

@@ -5,6 +5,7 @@ Data access layer for stock transactions
 
 from database.init_db import get_connection
 from models.stock_transaction import StockTransaction
+from utils.datetime_format import format_business_datetime
 
 
 class StockTransactionRepository:
@@ -47,7 +48,7 @@ class StockTransactionRepository:
         
         return [StockTransaction(id=r[0], user_id=r[1], branch_id=r[2], product_id=r[3],
                                 grade=r[4], transaction_type=r[5], boxes=r[6],
-                                loose_pieces=r[7], transaction_date=r[8], notes=r[9]) for r in rows]
+                                loose_pieces=r[7], transaction_date=format_business_datetime(r[8]), notes=r[9]) for r in rows]
     
     @staticmethod
     def get_by_branch(branch_id, limit=100):
@@ -67,7 +68,7 @@ class StockTransactionRepository:
         
         return [StockTransaction(id=r[0], user_id=r[1], branch_id=r[2], product_id=r[3],
                                 grade=r[4], transaction_type=r[5], boxes=r[6],
-                                loose_pieces=r[7], transaction_date=r[8], notes=r[9]) for r in rows]
+                                loose_pieces=r[7], transaction_date=format_business_datetime(r[8]), notes=r[9]) for r in rows]
     
     @staticmethod
     def get_all(limit=100):
@@ -86,5 +87,5 @@ class StockTransactionRepository:
         
         return [StockTransaction(id=r[0], user_id=r[1], branch_id=r[2], product_id=r[3],
                                 grade=r[4], transaction_type=r[5], boxes=r[6],
-                                loose_pieces=r[7], transaction_date=r[8], notes=r[9]) for r in rows]
+                                loose_pieces=r[7], transaction_date=format_business_datetime(r[8]), notes=r[9]) for r in rows]
 

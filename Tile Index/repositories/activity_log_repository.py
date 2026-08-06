@@ -5,6 +5,7 @@ Data access layer for activity logs (audit trail)
 
 from database.init_db import get_connection
 from models.activity_log import ActivityLog
+from utils.datetime_format import business_date
 
 
 class ActivityLogRepository:
@@ -60,19 +61,24 @@ class ActivityLogRepository:
                 query += " AND branch_id = ?"
                 params.append(branch_id)
 
-            if date_from:
-                query += " AND DATE(action_date) >= DATE(?)"
-                params.append(date_from)
-
-            if date_to:
-                query += " AND DATE(action_date) <= DATE(?)"
-                params.append(date_to)
-
-            query += " ORDER BY action_date DESC LIMIT ?"
-            params.append(limit)
+            query += " ORDER BY action_date DESC"
 
             cursor.execute(query, params)
             rows = cursor.fetchall()
+            if date_from or date_to:
+                filtered_rows = []
+                for row in rows:
+                    action_day = business_date(row[8])
+                    if action_day is None:
+                        continue
+                    if date_from and action_day < date_from:
+                        continue
+                    if date_to and action_day > date_to:
+                        continue
+                    filtered_rows.append(row)
+                rows = filtered_rows
+
+            rows = rows[:limit]
 
             return [ActivityLog(id=r[0], user_id=r[1], username=r[2], user_role=r[3],
                               branch_id=r[4], branch_name=r[5], action_type=r[6],

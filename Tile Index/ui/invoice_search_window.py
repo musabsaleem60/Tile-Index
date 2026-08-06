@@ -8,6 +8,7 @@ from tkinter import ttk, messagebox, simpledialog
 from datetime import datetime, date
 from repositories.branch_repository import BranchRepository
 from services.invoice_service import InvoiceService
+from utils.datetime_format import format_business_datetime
 from utils.invoice_printer import InvoicePrintWindow
 from utils.searchable_combobox import SearchableCombobox
 
@@ -142,11 +143,7 @@ class InvoiceSearchWindow:
             branch_dict = {b.id: b.name for b in self.branches}
             
             for invoice in invoices:
-                invoice_date = invoice.invoice_date
-                if isinstance(invoice_date, str):
-                    date_str = invoice_date[:10] if len(invoice_date) >= 10 else invoice_date
-                else:
-                    date_str = invoice_date.strftime("%Y-%m-%d")
+                date_str = format_business_datetime(invoice.invoice_date, fmt="%Y-%m-%d")
                 
                 branch_name = branch_dict.get(invoice.branch_id, "N/A")
                 status_text = "VOID" if getattr(invoice, 'status', 'active') == 'void' else "Active"

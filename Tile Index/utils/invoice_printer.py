@@ -5,30 +5,13 @@ Generates printable invoice format in Pakistani style
 
 import tkinter as tk
 from tkinter import ttk
-from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 from repositories.branch_repository import BranchRepository
 from repositories.product_repository import ProductRepository
 from repositories.accessory_repository import AccessoryRepository
 from repositories.sanitary_repository import SanitaryProductRepository
 from services.invoice_service import InvoiceService
 from utils.accessory_labels import accessory_display_label
-
-
-BUSINESS_TZ = ZoneInfo("Asia/Karachi")
-
-
-def _format_invoice_datetime(value):
-    if isinstance(value, str):
-        try:
-            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except ValueError:
-            return value
-
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-
-    return value.astimezone(BUSINESS_TZ).strftime("%d-%m-%Y %H:%M:%S")
+from utils.datetime_format import format_business_datetime
 
 
 class InvoicePrintWindow:
@@ -129,7 +112,7 @@ class InvoicePrintWindow:
                 tk.Label(left_details, text=f"Void Reason: {self.invoice.void_reason}", 
                         font=("Arial", 10, "bold"), bg="white", fg="#c0392b", anchor=tk.W).pack(anchor=tk.W, pady=(3, 0))
         
-        date_str = _format_invoice_datetime(self.invoice.invoice_date)
+        date_str = format_business_datetime(self.invoice.invoice_date, fmt="%d-%m-%Y %H:%M:%S")
         
         tk.Label(left_details, text=f"Date: {date_str}", 
                 font=("Arial", 10), bg="white", anchor=tk.W).pack(anchor=tk.W, pady=(5, 0))
