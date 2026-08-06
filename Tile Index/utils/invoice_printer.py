@@ -19,8 +19,8 @@ class InvoicePrintWindow:
     
     def __init__(self, parent, invoice_id=None, invoice_data=None):
         self.parent = parent
-        self.parent.title("Invoice - Tile Index")
-        self.parent.geometry("800x1000")
+        self.set_window_title("Invoice - Tile Index")
+        self.set_window_geometry("800x1000")
         
         # Get invoice data
         if invoice_id:
@@ -40,6 +40,22 @@ class InvoicePrintWindow:
         self.sanitary_products = {p.id: p for p in SanitaryProductRepository.get_all()}
         
         self.setup_ui()
+
+    def set_window_title(self, title):
+        try:
+            window = self.parent.winfo_toplevel()
+            if hasattr(window, "title"):
+                window.title(title)
+        except Exception:
+            pass
+
+    def set_window_geometry(self, geometry):
+        try:
+            window = self.parent.winfo_toplevel()
+            if hasattr(window, "geometry"):
+                window.geometry(geometry)
+        except Exception:
+            pass
     
     def setup_ui(self):
         """Setup the invoice display UI"""
