@@ -3,6 +3,7 @@
 import customtkinter as ctk
 
 
+APP_TITLE = "Tile Index - Inventory & Billing System"
 APPEARANCE_MODE = "dark"
 COLOR_THEME = "blue"
 

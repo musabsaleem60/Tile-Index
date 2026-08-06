@@ -15,7 +15,7 @@ from ui.report_window import ReportWindow
 from services.auth_service import AuthenticationService
 from desktop_client.session import get_update_warning
 from desktop_client.updater import UpdateError, download_update, launch_installer, verify_signature
-from ui.theme import COLORS, FONTS, SIZES, SPACING, apply_theme
+from ui.theme import APP_TITLE, COLORS, FONTS, SIZES, SPACING, apply_theme
 
 
 class MainWindow:
@@ -25,7 +25,7 @@ class MainWindow:
         apply_theme()
         self.root = root
         self.current_user = current_user
-        self.root.title("Tile Index - Inventory & Billing System")
+        self.root.title(APP_TITLE)
         self.root.geometry(self.initial_window_geometry())
         self.root.minsize(900, 600)
         self.root.configure(bg=COLORS["app_bg"])
@@ -145,7 +145,7 @@ class MainWindow:
 
         title_label = ctk.CTkLabel(
             header_frame,
-            text="Tile Index - Inventory & Billing System",
+            text=APP_TITLE,
             font=FONTS["title"],
             text_color=COLORS["text"],
             height=SIZES["title_label_height"],
@@ -164,7 +164,7 @@ class MainWindow:
 
         status_label = ctk.CTkLabel(
             status_frame,
-            text="Ready | Tile Index - Inventory & Billing System",
+            text=f"Ready | {APP_TITLE}",
             font=FONTS["status"],
             text_color=COLORS["text_muted"],
             anchor=tk.W,
@@ -306,6 +306,7 @@ class MainWindow:
         """Show home dashboard"""
         self.clear_content()
         self.current_view = None
+        self.root.title(APP_TITLE)
         self.home_scroll_container.pack(fill=tk.BOTH, expand=True)
 
     def switch_view(self, view_class, *args, **kwargs):
