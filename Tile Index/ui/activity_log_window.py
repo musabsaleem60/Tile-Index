@@ -26,6 +26,15 @@ class ActivityLogWindow:
         self.setup_ui()
         # Load activities after UI is ready
         self.parent.after(100, self.load_all_activities)
+
+    def set_window_title(self, title):
+        """Update the containing window title when this view is not embedded."""
+        try:
+            window = self.parent.winfo_toplevel()
+            if hasattr(window, "title"):
+                window.title(title)
+        except Exception:
+            pass
     
     def setup_ui(self):
         """Setup the activity log UI"""
@@ -204,9 +213,9 @@ class ActivityLogWindow:
             # Update window title to show count
             count = len(activities)
             if count > 0:
-                self.parent.title(f"Activity Log - Tile Index ({count} entries)")
+                self.set_window_title(f"Activity Log - Tile Index ({count} entries)")
             else:
-                self.parent.title("Activity Log - Tile Index (No entries)")
+                self.set_window_title("Activity Log - Tile Index (No entries)")
         except Exception as e:
             # Show error only if it's a real problem
             import traceback
@@ -291,9 +300,9 @@ class ActivityLogWindow:
             # Update window title to show count
             count = len(activities)
             if count > 0:
-                self.parent.title(f"Activity Log - Tile Index ({count} entries)")
+                self.set_window_title(f"Activity Log - Tile Index ({count} entries)")
             else:
-                self.parent.title("Activity Log - Tile Index (No entries)")
+                self.set_window_title("Activity Log - Tile Index (No entries)")
             
             # Show message only if filters are applied and no results
             if count == 0 and (user_id or branch_id or action_type or (date_from and date_to)):
