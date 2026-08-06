@@ -24,7 +24,10 @@ class ReportService:
             if not date:
                 date = datetime.now().date()
             date_str = str(date)
-            invoices = InvoiceService.search_invoices(branch_id=branch_id, date_from=date_str, date_to=date_str)
+            invoices = [
+                inv for inv in InvoiceService.search_invoices(branch_id=branch_id, date_from=date_str, date_to=date_str)
+                if getattr(inv, 'status', 'active') == 'active'
+            ]
             return {
                 'date': date,
                 'branch_id': branch_id,
@@ -57,6 +60,7 @@ class ReportService:
                    i.subtotal, i.discount, i.grand_total, i.paid_amount, i.balance
             FROM invoices i
             WHERE i.branch_id = ? AND DATE(i.invoice_date) = ?
+              AND COALESCE(i.status, 'active') = 'active'
             ORDER BY i.invoice_date
         """, (branch_id, date))
         

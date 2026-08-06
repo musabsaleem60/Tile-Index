@@ -105,6 +105,12 @@ class InvoicePrintWindow:
         
         tk.Label(left_details, text=f"Invoice No: {self.invoice.invoice_number}", 
                 font=("Arial", 11, "bold"), bg="white", anchor=tk.W).pack(anchor=tk.W)
+        if getattr(self.invoice, 'status', 'active') == 'void':
+            tk.Label(left_details, text="STATUS: VOID", 
+                    font=("Arial", 14, "bold"), bg="white", fg="#c0392b", anchor=tk.W).pack(anchor=tk.W, pady=(5, 0))
+            if getattr(self.invoice, 'void_reason', None):
+                tk.Label(left_details, text=f"Void Reason: {self.invoice.void_reason}", 
+                        font=("Arial", 10, "bold"), bg="white", fg="#c0392b", anchor=tk.W).pack(anchor=tk.W, pady=(3, 0))
         
         invoice_date = self.invoice.invoice_date
         if isinstance(invoice_date, str):

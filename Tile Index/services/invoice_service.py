@@ -14,7 +14,8 @@ from repositories.sanitary_repository import SanitaryProductRepository
 from services.sanitary_service import SanitaryService
 from models.invoice import Invoice
 from models.invoice_item import InvoiceItem
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from desktop_client.remote_state import is_api_authenticated
 from desktop_client.session import api_client
 from utils.accessory_labels import accessory_display_label
@@ -274,6 +275,14 @@ class InvoiceService:
             return InvoiceService._invoice_from_api(api_client.get(f"/invoices/{invoice_id}"))
 
         return InvoiceRepository.get_by_id(invoice_id)
+
+    @staticmethod
+    def void_invoice(invoice_id, reason):
+        """Void an invoice through the API."""
+        if not is_api_authenticated():
+            raise ValueError("Invoice voiding requires the API connection")
+        data = api_client.post(f"/invoices/{invoice_id}/void", {"reason": reason})
+        return InvoiceService._invoice_from_api(data)
     
     @staticmethod
     def search_invoices(branch_id=None, invoice_number=None, customer_name=None, date_from=None, date_to=None):
@@ -288,9 +297,9 @@ class InvoiceService:
             if customer_name:
                 invoices = [inv for inv in invoices if customer_name.lower() in inv.customer_name.lower()]
             if date_from:
-                invoices = [inv for inv in invoices if str(inv.invoice_date)[:10] >= date_from]
+                invoices = [inv for inv in invoices if InvoiceService._business_date(inv.invoice_date) >= date_from]
             if date_to:
-                invoices = [inv for inv in invoices if str(inv.invoice_date)[:10] <= date_to]
+                invoices = [inv for inv in invoices if InvoiceService._business_date(inv.invoice_date) <= date_to]
             return invoices
 
         return InvoiceRepository.search(branch_id, invoice_number, customer_name, date_from, date_to)
@@ -311,6 +320,10 @@ class InvoiceService:
             paid_amount=data.get("paid_amount", 0),
             balance=data.get("balance", 0),
             user_id=data.get("user_id"),
+            status=data.get("status", "active"),
+            voided_at=data.get("voided_at"),
+            voided_by_user_id=data.get("voided_by_user_id"),
+            void_reason=data.get("void_reason"),
         )
         for item in data.get("items", []):
             invoice.items.append(InvoiceItem(
@@ -326,7 +339,17 @@ class InvoiceService:
                 rate_per_sqm=item.get("rate_per_sqm", 0),
                 rate_per_box=item.get("rate_per_box", item.get("unit_price", 0)),
                 rate_per_piece=item.get("rate_per_piece", 0),
-                line_total=item.get("line_total", 0)
+                line_total=item.get("line_total", 0),
+                boxes_from_boxes=item.get("boxes_from_boxes"),
+                pieces_from_loose=item.get("pieces_from_loose")
             ))
         return invoice
+
+    @staticmethod
+    def _business_date(value):
+        if isinstance(value, str):
+            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(ZoneInfo("Asia/Karachi")).date().isoformat()
 

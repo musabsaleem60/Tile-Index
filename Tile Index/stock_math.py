@@ -37,6 +37,23 @@ def deduct_verbatim_stock(current_boxes, current_loose_pieces, requested_boxes, 
     return boxes, loose_pieces
 
 
+def deduct_verbatim_stock_with_delta(current_boxes, current_loose_pieces, requested_boxes, requested_loose_pieces, pieces_per_box):
+    """Deduct stock and return the exact stored-count delta that was applied.
+
+    The returned delta is ``(boxes_removed, loose_pieces_removed)``. The loose
+    delta can be negative when a loose-piece sale opens a box and leaves surplus
+    loose pieces on the shelf; voiding applies the inverse of this delta.
+    """
+    new_boxes, new_loose_pieces = deduct_verbatim_stock(
+        current_boxes,
+        current_loose_pieces,
+        requested_boxes,
+        requested_loose_pieces,
+        pieces_per_box,
+    )
+    return new_boxes, new_loose_pieces, current_boxes - new_boxes, current_loose_pieces - new_loose_pieces
+
+
 def total_pieces(boxes, loose_pieces, pieces_per_box):
     """Return total pieces represented by stored box and loose counts."""
     return boxes * pieces_per_box + loose_pieces

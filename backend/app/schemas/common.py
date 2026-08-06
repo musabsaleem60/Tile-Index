@@ -176,6 +176,8 @@ class InvoiceItemOut(ORMModel):
     rate_per_piece: float
     unit_price: float
     line_total: float
+    boxes_from_boxes: int | None = None
+    pieces_from_loose: int | None = None
 
 
 class InvoiceOut(ORMModel):
@@ -191,7 +193,15 @@ class InvoiceOut(ORMModel):
     grand_total: float
     paid_amount: float
     balance: float
+    status: str = "active"
+    voided_at: datetime | None = None
+    voided_by_user_id: int | None = None
+    void_reason: str | None = None
     items: list[InvoiceItemOut] = []
+
+
+class InvoiceVoidRequest(BaseModel):
+    reason: str = Field(min_length=10, max_length=500)
 
 
 class UpdateInfo(BaseModel):

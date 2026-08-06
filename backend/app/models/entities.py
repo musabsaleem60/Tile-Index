@@ -75,7 +75,7 @@ class DesktopClientStatus(Base):
     first_seen_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_seen_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    user = relationship("User")
+    user = relationship("User", foreign_keys=[user_id])
     branch = relationship("Branch")
 
 class Product(Base):
@@ -257,14 +257,20 @@ class Invoice(Base):
     grand_total: Mapped[float] = mapped_column(Float, default=0, nullable=False)
     paid_amount: Mapped[float] = mapped_column(Float, default=0, nullable=False)
     balance: Mapped[float] = mapped_column(Float, default=0, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    voided_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
+    voided_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    void_reason: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     branch = relationship("Branch")
-    user = relationship("User")
+    user = relationship("User", foreign_keys=[user_id])
+    voided_by = relationship("User", foreign_keys=[voided_by_user_id])
     items = relationship("InvoiceItem", cascade="all, delete-orphan", back_populates="invoice")
 
     __table_args__ = (
         UniqueConstraint("branch_id", "invoice_number", name="uq_invoices_branch_number"),
+        CheckConstraint("status IN ('active', 'void')", name="ck_invoices_status"),
     )
 
 
@@ -288,6 +294,8 @@ class InvoiceItem(Base):
     rate_per_piece: Mapped[float] = mapped_column(Float, default=0, nullable=False)
     unit_price: Mapped[float] = mapped_column(Float, default=0, nullable=False)
     line_total: Mapped[float] = mapped_column(Float, nullable=False)
+    boxes_from_boxes: Mapped[int | None] = mapped_column(Integer)
+    pieces_from_loose: Mapped[int | None] = mapped_column(Integer)
 
     invoice = relationship("Invoice", back_populates="items")
     product = relationship("Product")
@@ -306,11 +314,15 @@ class StockTransaction(Base):
     import_batch_id: Mapped[int | None] = mapped_column(ForeignKey("import_batches.id", ondelete="SET NULL"))
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), nullable=False)
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"), nullable=False)
-    grade: Mapped[str] = mapped_column(String(80), nullable=False)
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"))
+    accessory_id: Mapped[int | None] = mapped_column(ForeignKey("accessories.id", ondelete="RESTRICT"))
+    sanitary_product_id: Mapped[int | None] = mapped_column(ForeignKey("sanitary_products.id", ondelete="RESTRICT"))
+    item_type: Mapped[str] = mapped_column(String(30), default="tile", nullable=False)
+    grade: Mapped[str | None] = mapped_column(String(80))
     transaction_type: Mapped[str] = mapped_column(String(10), nullable=False)
     boxes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     loose_pieces: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     transaction_date: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
     source_row_number: Mapped[int | None] = mapped_column(Integer)

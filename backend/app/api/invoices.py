@@ -4,8 +4,8 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.deps import ensure_branch_access, get_current_user
 from app.db.session import get_db
 from app.models.entities import Invoice, User
-from app.schemas.common import InvoiceCreate, InvoiceOut
-from app.services.invoices import create_invoice
+from app.schemas.common import InvoiceCreate, InvoiceOut, InvoiceVoidRequest
+from app.services.invoices import create_invoice, void_invoice
 
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
@@ -15,6 +15,19 @@ router = APIRouter(prefix="/invoices", tags=["invoices"])
 def create(payload: InvoiceCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     ensure_branch_access(current_user, payload.branch_id)
     invoice = create_invoice(db, payload, current_user)
+    db.commit()
+    db.refresh(invoice)
+    return invoice
+
+
+@router.post("/{invoice_id}/void", response_model=InvoiceOut)
+def void(
+    invoice_id: int,
+    payload: InvoiceVoidRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    invoice = void_invoice(db, invoice_id, payload.reason, current_user)
     db.commit()
     db.refresh(invoice)
     return invoice

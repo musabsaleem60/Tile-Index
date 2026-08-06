@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -18,7 +20,7 @@ from app.models.entities import (
 from app.schemas.common import InvoiceCreate
 from app.services.audit import write_audit_log
 from app.services.accessory_labels import accessory_display_label
-from stock_math import deduct_verbatim_stock, total_pieces
+from stock_math import deduct_verbatim_stock_with_delta, total_pieces
 
 
 def create_invoice(db: Session, payload: InvoiceCreate, user: User) -> Invoice:
@@ -94,7 +96,7 @@ def _build_invoice_item_and_update_stock(db: Session, branch_id: int, requested_
     if requested_item.item_type == "tile":
         return _build_tile_item(db, branch_id, requested_item, user)
     if requested_item.item_type == "accessory":
-        return _build_accessory_item(db, branch_id, requested_item)
+        return _build_accessory_item(db, branch_id, requested_item, user)
     if requested_item.item_type == "sanitary":
         return _build_sanitary_item(db, branch_id, requested_item, user)
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid item type")
@@ -128,7 +130,7 @@ def _build_tile_item(db: Session, branch_id: int, requested_item, user: User) ->
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient tile stock")
 
     try:
-        inventory.boxes, inventory.loose_pieces = deduct_verbatim_stock(
+        inventory.boxes, inventory.loose_pieces, boxes_from_boxes, pieces_from_loose = deduct_verbatim_stock_with_delta(
             inventory.boxes,
             inventory.loose_pieces,
             requested_item.boxes,
@@ -165,10 +167,12 @@ def _build_tile_item(db: Session, branch_id: int, requested_item, user: User) ->
         rate_per_piece=inventory.rate_per_piece,
         unit_price=0,
         line_total=line_total,
+        boxes_from_boxes=boxes_from_boxes,
+        pieces_from_loose=pieces_from_loose,
     )
 
 
-def _build_accessory_item(db: Session, branch_id: int, requested_item) -> InvoiceItem:
+def _build_accessory_item(db: Session, branch_id: int, requested_item, user: User) -> InvoiceItem:
     if not requested_item.accessory_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Accessory is required")
 
@@ -191,6 +195,15 @@ def _build_accessory_item(db: Session, branch_id: int, requested_item) -> Invoic
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient accessory stock")
 
     inventory.quantity -= quantity
+    db.add(StockTransaction(
+        user_id=user.id,
+        branch_id=branch_id,
+        accessory_id=accessory.id,
+        item_type="accessory",
+        transaction_type="OUT",
+        quantity=quantity,
+        notes="Invoice sale",
+    ))
     return InvoiceItem(
         item_type="accessory",
         accessory_id=accessory.id,
@@ -202,6 +215,8 @@ def _build_accessory_item(db: Session, branch_id: int, requested_item) -> Invoic
         rate_per_box=accessory.unit_price,
         unit_price=accessory.unit_price,
         line_total=quantity * accessory.unit_price,
+        boxes_from_boxes=0,
+        pieces_from_loose=quantity,
     )
 
 
@@ -248,4 +263,159 @@ def _build_sanitary_item(db: Session, branch_id: int, requested_item, user: User
         rate_per_box=product.sale_price,
         unit_price=product.sale_price,
         line_total=quantity * product.sale_price,
+        boxes_from_boxes=0,
+        pieces_from_loose=quantity,
     )
+
+
+def void_invoice(db: Session, invoice_id: int, reason: str, user: User) -> Invoice:
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can void invoices")
+
+    clean_reason = reason.strip()
+    if len(clean_reason) < 10:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Void reason must be at least 10 characters")
+
+    invoice = db.scalar(
+        select(Invoice)
+        .where(Invoice.id == invoice_id)
+        .options(selectinload(Invoice.items))
+        .with_for_update()
+    )
+    if not invoice:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
+    if invoice.status == "void":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Invoice is already void")
+
+    for item in invoice.items:
+        if item.boxes_from_boxes is None or item.pieces_from_loose is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This invoice cannot be voided because it was created before fulfilment tracking existed",
+            )
+        if item.item_type == "tile":
+            _restore_tile_item(db, invoice, item, user)
+        elif item.item_type == "accessory":
+            _restore_accessory_item(db, invoice, item, user)
+        elif item.item_type == "sanitary":
+            _restore_sanitary_item(db, invoice, item, user)
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported invoice item type: {item.item_type}")
+
+    invoice.status = "void"
+    invoice.voided_at = datetime.now(timezone.utc)
+    invoice.voided_by_user_id = user.id
+    invoice.void_reason = clean_reason
+    write_audit_log(
+        db,
+        user,
+        "Invoice Voided",
+        {
+            "invoice_number": invoice.invoice_number,
+            "reason": clean_reason,
+            "grand_total": invoice.grand_total,
+        },
+        invoice.branch_id,
+    )
+    db.flush()
+    db.refresh(invoice)
+    return invoice
+
+
+def _restore_tile_item(db: Session, invoice: Invoice, item: InvoiceItem, user: User) -> None:
+    inventory = db.scalar(
+        select(Inventory)
+        .where(
+            Inventory.branch_id == invoice.branch_id,
+            Inventory.product_id == item.product_id,
+            Inventory.grade == item.grade,
+        )
+        .with_for_update()
+    )
+    if not inventory:
+        inventory = Inventory(
+            branch_id=invoice.branch_id,
+            product_id=item.product_id,
+            grade=item.grade,
+            boxes=0,
+            loose_pieces=0,
+            rate_per_sqm=item.rate_per_sqm,
+            rate_per_box=item.rate_per_box,
+            rate_per_piece=item.rate_per_piece,
+        )
+        db.add(inventory)
+    inventory.boxes += item.boxes_from_boxes
+    inventory.loose_pieces += item.pieces_from_loose
+    if inventory.boxes < 0 or inventory.loose_pieces < 0:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cannot void invoice because tile stock changed incompatibly")
+    db.add(StockTransaction(
+        user_id=user.id,
+        branch_id=invoice.branch_id,
+        product_id=item.product_id,
+        item_type="tile",
+        grade=item.grade,
+        transaction_type="IN",
+        boxes=item.boxes_from_boxes,
+        loose_pieces=item.pieces_from_loose,
+        notes=f"Void invoice {invoice.invoice_number}",
+    ))
+
+
+def _restore_accessory_item(db: Session, invoice: Invoice, item: InvoiceItem, user: User) -> None:
+    inventory = db.scalar(
+        select(AccessoryInventory)
+        .where(
+            AccessoryInventory.branch_id == invoice.branch_id,
+            AccessoryInventory.accessory_id == item.accessory_id,
+        )
+        .with_for_update()
+    )
+    if not inventory:
+        inventory = AccessoryInventory(branch_id=invoice.branch_id, accessory_id=item.accessory_id, quantity=0)
+        db.add(inventory)
+    inventory.quantity += item.pieces_from_loose
+    if inventory.quantity < 0:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cannot void invoice because accessory stock changed incompatibly")
+    db.add(StockTransaction(
+        user_id=user.id,
+        branch_id=invoice.branch_id,
+        accessory_id=item.accessory_id,
+        item_type="accessory",
+        transaction_type="IN",
+        quantity=item.pieces_from_loose,
+        notes=f"Void invoice {invoice.invoice_number}",
+    ))
+
+
+def _restore_sanitary_item(db: Session, invoice: Invoice, item: InvoiceItem, user: User) -> None:
+    inventory = db.scalar(
+        select(SanitaryInventory)
+        .where(
+            SanitaryInventory.branch_id == invoice.branch_id,
+            SanitaryInventory.sanitary_product_id == item.sanitary_product_id,
+        )
+        .with_for_update()
+    )
+    if not inventory:
+        inventory = SanitaryInventory(branch_id=invoice.branch_id, sanitary_product_id=item.sanitary_product_id, quantity=0)
+        db.add(inventory)
+    inventory.quantity += item.pieces_from_loose
+    if inventory.quantity < 0:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cannot void invoice because sanitary stock changed incompatibly")
+    db.add(StockTransaction(
+        user_id=user.id,
+        branch_id=invoice.branch_id,
+        sanitary_product_id=item.sanitary_product_id,
+        item_type="sanitary",
+        transaction_type="IN",
+        quantity=item.pieces_from_loose,
+        notes=f"Void invoice {invoice.invoice_number}",
+    ))
+    db.add(SanitaryStockTransaction(
+        user_id=user.id,
+        branch_id=invoice.branch_id,
+        sanitary_product_id=item.sanitary_product_id,
+        transaction_type="IN",
+        quantity=item.pieces_from_loose,
+        notes=f"Void invoice {invoice.invoice_number}",
+    ))

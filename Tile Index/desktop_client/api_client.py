@@ -53,6 +53,15 @@ class ApiClient:
                 return json.loads(data) if data else None
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8")
+            try:
+                parsed = json.loads(detail)
+                parsed_detail = parsed.get("detail")
+                if parsed_detail:
+                    raise ApiClientError(str(parsed_detail)) from exc
+            except ApiClientError:
+                raise
+            except Exception:
+                pass
             raise ApiClientError(f"API error {exc.code}: {detail}") from exc
         except urllib.error.URLError as exc:
             reason = getattr(exc, "reason", exc)

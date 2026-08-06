@@ -4,7 +4,7 @@ Search and view existing invoices
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 from datetime import datetime, date
 from repositories.branch_repository import BranchRepository
 from services.invoice_service import InvoiceService
@@ -15,8 +15,9 @@ from utils.searchable_combobox import SearchableCombobox
 class InvoiceSearchWindow:
     """Invoice search and view window"""
     
-    def __init__(self, parent):
+    def __init__(self, parent, current_user=None):
         self.parent = parent
+        self.current_user = current_user
         
         self.branches = BranchRepository.get_all()
         self.setup_ui()
@@ -75,10 +76,10 @@ class InvoiceSearchWindow:
         results_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         # Treeview for results
-        columns = ('Invoice No', 'Date', 'Customer', 'Branch', 'Total', 'Paid', 'Balance', 'invoice_id')
+        columns = ('Invoice No', 'Status', 'Date', 'Customer', 'Branch', 'Total', 'Paid', 'Balance', 'invoice_id')
         self.results_tree = ttk.Treeview(results_frame, columns=columns, show='headings', height=15)
         
-        visible_cols = ('Invoice No', 'Date', 'Customer', 'Branch', 'Total', 'Paid', 'Balance')
+        visible_cols = ('Invoice No', 'Status', 'Date', 'Customer', 'Branch', 'Total', 'Paid', 'Balance')
         for col in visible_cols:
             self.results_tree.heading(col, text=col)
             self.results_tree.column(col, width=120, anchor=tk.CENTER)
@@ -89,6 +90,7 @@ class InvoiceSearchWindow:
         
         self.results_tree.column('Customer', width=150)
         self.results_tree.column('Branch', width=150)
+        self.results_tree.column('Status', width=80)
         
         scrollbar = ttk.Scrollbar(results_frame, orient=tk.VERTICAL, command=self.results_tree.yview)
         self.results_tree.configure(yscrollcommand=scrollbar.set)
@@ -103,6 +105,8 @@ class InvoiceSearchWindow:
         btn_frame.pack(pady=10)
         
         tk.Button(btn_frame, text="View/Print Invoice", command=self.view_invoice, bg="#3498db", fg="white", width=20).pack(side=tk.LEFT, padx=5)
+        if getattr(self.current_user, 'role', '') == 'admin':
+            tk.Button(btn_frame, text="Void Invoice", command=self.void_invoice, bg="#c0392b", fg="white", width=20).pack(side=tk.LEFT, padx=5)
     
     def search_invoices(self):
         """Search for invoices"""
@@ -145,9 +149,11 @@ class InvoiceSearchWindow:
                     date_str = invoice_date.strftime("%Y-%m-%d")
                 
                 branch_name = branch_dict.get(invoice.branch_id, "N/A")
+                status_text = "VOID" if getattr(invoice, 'status', 'active') == 'void' else "Active"
                 
                 item_id = self.results_tree.insert('', tk.END, values=(
                     invoice.invoice_number,
+                    status_text,
                     date_str,
                     invoice.customer_name,
                     branch_name,
@@ -156,6 +162,9 @@ class InvoiceSearchWindow:
                     f"Rs. {invoice.balance:.2f}",
                     str(invoice.id)  # Store invoice ID in hidden column
                 ))
+                if status_text == "VOID":
+                    self.results_tree.item(item_id, tags=("void",))
+            self.results_tree.tag_configure("void", foreground="#c0392b")
             
             if len(invoices) == 0:
                 messagebox.showinfo("Search Results", "No invoices found matching the criteria.")
@@ -188,4 +197,43 @@ class InvoiceSearchWindow:
             InvoicePrintWindow(print_window, invoice_id=invoice_id)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to open invoice: {str(e)}")
+
+    def void_invoice(self):
+        """Void selected invoice."""
+        selection = self.results_tree.selection()
+        if not selection:
+            messagebox.showwarning("Warning", "Please select an invoice to void")
+            return
+
+        item_id = selection[0]
+        invoice_id_str = self.results_tree.set(item_id, 'invoice_id')
+        invoice_number = self.results_tree.set(item_id, 'Invoice No')
+        status_text = self.results_tree.set(item_id, 'Status')
+        if status_text == "VOID":
+            messagebox.showinfo("Invoice Already Void", "This invoice is already marked VOID.")
+            return
+
+        reason = simpledialog.askstring(
+            "Void Invoice",
+            f"Enter reason for voiding invoice {invoice_number}.\nMinimum 10 characters:",
+            parent=self.parent,
+        )
+        if reason is None:
+            return
+        reason = reason.strip()
+        if len(reason) < 10:
+            messagebox.showerror("Reason Required", "Void reason must be at least 10 characters.")
+            return
+        if not messagebox.askyesno(
+            "Confirm Void",
+            f"Void invoice {invoice_number}?\n\nThis will restore stock and exclude the invoice from sales totals. This cannot be undone.",
+        ):
+            return
+
+        try:
+            InvoiceService.void_invoice(int(invoice_id_str), reason)
+            messagebox.showinfo("Invoice Voided", f"Invoice {invoice_number} has been marked VOID.")
+            self.search_invoices()
+        except Exception as e:
+            messagebox.showerror("Void Failed", str(e))
 

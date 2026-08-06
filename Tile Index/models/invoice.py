@@ -12,7 +12,8 @@ class Invoice:
     def __init__(self, id=None, branch_id=None, invoice_number=None,
                  customer_name=None, customer_contact=None, invoice_date=None,
                  subtotal=0, discount=0, grand_total=0, paid_amount=0,
-                 balance=0, created_at=None, user_id=None):
+                 balance=0, created_at=None, user_id=None, status="active",
+                 voided_at=None, voided_by_user_id=None, void_reason=None):
         self.id = id
         self.branch_id = branch_id
         self.invoice_number = invoice_number
@@ -26,6 +27,10 @@ class Invoice:
         self.balance = balance
         self.created_at = created_at
         self.user_id = user_id  # User who created the invoice
+        self.status = status or "active"
+        self.voided_at = voided_at
+        self.voided_by_user_id = voided_by_user_id
+        self.void_reason = void_reason
         self.items = []  # List of InvoiceItem objects
     
     def __repr__(self):
@@ -45,6 +50,10 @@ class Invoice:
             'grand_total': self.grand_total,
             'paid_amount': self.paid_amount,
             'balance': self.balance,
+            'status': self.status,
+            'voided_at': self.voided_at,
+            'voided_by_user_id': self.voided_by_user_id,
+            'void_reason': self.void_reason,
             'created_at': self.created_at
         }
     
@@ -63,6 +72,10 @@ class Invoice:
             grand_total=data.get('grand_total', 0),
             paid_amount=data.get('paid_amount', 0),
             balance=data.get('balance', 0),
-            created_at=data.get('created_at')
+            created_at=data.get('created_at'),
+            status=data.get('status', 'active'),
+            voided_at=data.get('voided_at'),
+            voided_by_user_id=data.get('voided_by_user_id'),
+            void_reason=data.get('void_reason')
         )
 

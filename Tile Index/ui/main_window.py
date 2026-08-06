@@ -167,7 +167,6 @@ class MainWindow:
         buttons = [
             ("📦 Inventory Management", "#3498db", self.open_inventory),
             ("🛠️ Accessories", "#8e44ad", self.open_accessories),
-            ("Sanitary Management", "#1abc9c", self.open_sanitary),
             ("🧾 Invoice & Billing", "#27ae60", self.open_invoice),
             ("🔍 Search Invoices", "#9b59b6", self.open_invoice_search)
         ]
@@ -307,7 +306,7 @@ class MainWindow:
     
     def open_invoice_search(self):
         """Open invoice search within the same window"""
-        self.switch_view(InvoiceSearchWindow)
+        self.switch_view(InvoiceSearchWindow, self.current_user)
     
     def open_user_management(self):
         """Open user management within the same window (Admin only)"""
