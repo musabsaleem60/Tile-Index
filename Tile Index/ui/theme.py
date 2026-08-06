@@ -53,6 +53,13 @@ SIZES = {
     "button_height": 68,
     "admin_button_width": 260,
     "admin_button_height": 62,
+    "header_height": 112,
+    "top_bar_height": 40,
+    "title_label_height": 42,
+    "section_label_height": 36,
+    "small_label_height": 24,
+    "status_height": 40,
+    "status_label_height": 26,
 }
 
 SPACING = {

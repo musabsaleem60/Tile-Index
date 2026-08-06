@@ -26,9 +26,10 @@ class MainWindow:
         self.root = root
         self.current_user = current_user
         self.root.title("Tile Index - Inventory & Billing System")
-        self.root.geometry("1400x850")
+        self.root.geometry(self.initial_window_geometry())
+        self.root.minsize(900, 600)
         self.root.configure(bg=COLORS["app_bg"])
-        self.root.state('zoomed')  # Maximize on Windows
+        self.root.after(100, self.maximize_window)
 
         # Navigation stack
         self.view_stack = []
@@ -45,6 +46,19 @@ class MainWindow:
 
         self.setup_ui()
         self.show_home()
+
+    def initial_window_geometry(self):
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        width = min(1400, max(900, screen_width - 80))
+        height = min(760, max(600, screen_height - 120))
+        return f"{width}x{height}+20+10"
+
+    def maximize_window(self):
+        try:
+            self.root.state('zoomed')  # Maximize on Windows
+        except Exception:
+            pass
 
     def setup_ui(self):
         """Setup the main UI"""
@@ -66,6 +80,7 @@ class MainWindow:
                 ),
                 font=FONTS["small_bold"],
                 text_color=COLORS["text"],
+                height=SIZES["small_label_height"],
             ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=10, pady=9)
             if (
                 update_warning.get("download_url")
@@ -85,21 +100,33 @@ class MainWindow:
                 ).pack(side=tk.RIGHT, padx=10, pady=5)
 
         # Header
-        header_frame = ctk.CTkFrame(self.root, fg_color=COLORS["surface"], corner_radius=0, height=92)
+        header_frame = ctk.CTkFrame(
+            self.root,
+            fg_color=COLORS["surface"],
+            corner_radius=0,
+            height=SIZES["header_height"],
+        )
         header_frame.pack(fill=tk.X)
         header_frame.pack_propagate(False)
 
         # Top bar with user info and logout
-        top_bar = ctk.CTkFrame(header_frame, fg_color=COLORS["surface_alt"], corner_radius=SIZES["corner_radius"])
+        top_bar = ctk.CTkFrame(
+            header_frame,
+            fg_color=COLORS["surface_alt"],
+            corner_radius=SIZES["corner_radius"],
+            height=SIZES["top_bar_height"],
+        )
         top_bar.pack(fill=tk.X, padx=14, pady=(8, 4))
+        top_bar.pack_propagate(False)
 
         user_info = ctk.CTkLabel(
             top_bar,
             text=f"Logged in as: {self.current_user.username} ({self.current_user.role.upper()})",
             font=FONTS["small_bold"],
             text_color=COLORS["text_muted"],
+            height=SIZES["small_label_height"],
         )
-        user_info.pack(side=tk.LEFT, padx=12, pady=5)
+        user_info.pack(side=tk.LEFT, padx=12, pady=8)
 
         logout_btn = ctk.CTkButton(
             top_bar,
@@ -121,8 +148,29 @@ class MainWindow:
             text="Tile Index - Inventory & Billing System",
             font=FONTS["title"],
             text_color=COLORS["text"],
+            height=SIZES["title_label_height"],
         )
-        title_label.pack(pady=(5, 10))
+        title_label.pack(pady=(4, 12))
+
+        # Status bar
+        status_frame = ctk.CTkFrame(
+            self.root,
+            fg_color=COLORS["surface"],
+            corner_radius=0,
+            height=SIZES["status_height"],
+        )
+        status_frame.pack(fill=tk.X, side=tk.BOTTOM)
+        status_frame.pack_propagate(False)
+
+        status_label = ctk.CTkLabel(
+            status_frame,
+            text="Ready | Tile Index - Inventory & Billing System",
+            font=FONTS["status"],
+            text_color=COLORS["text_muted"],
+            anchor=tk.W,
+            height=SIZES["status_label_height"],
+        )
+        status_label.pack(side=tk.LEFT, padx=10, pady=7)
 
         # Main content area (Container for all views)
         self.content_frame = ctk.CTkFrame(self.root, fg_color=COLORS["app_bg"], corner_radius=0)
@@ -157,7 +205,8 @@ class MainWindow:
             text="Dashboard",
             font=FONTS["section"],
             text_color=COLORS["text"],
-        ).pack(pady=(24, 10))
+            height=SIZES["section_label_height"],
+        ).pack(pady=(24, 12))
 
         # Menu buttons container
         menu_container = ctk.CTkFrame(self.home_frame, fg_color="transparent", corner_radius=0)
@@ -194,8 +243,9 @@ class MainWindow:
                 text="Administration",
                 font=FONTS["section"],
                 text_color=COLORS["warning"],
+                height=SIZES["section_label_height"],
             )
-            admin_label.pack(pady=(20, 10))
+            admin_label.pack(pady=(20, 12))
 
             admin_container = ctk.CTkFrame(self.home_frame, fg_color="transparent", corner_radius=0)
             admin_container.pack()
@@ -236,20 +286,6 @@ class MainWindow:
             height=32,
             corner_radius=SIZES["corner_radius"],
         ).pack(side=tk.LEFT, padx=10, pady=6)
-
-        # Status bar
-        status_frame = ctk.CTkFrame(self.root, fg_color=COLORS["surface"], corner_radius=0, height=32)
-        status_frame.pack(fill=tk.X, side=tk.BOTTOM)
-        status_frame.pack_propagate(False)
-
-        status_label = ctk.CTkLabel(
-            status_frame,
-            text="Ready | Tile Index - Inventory & Billing System",
-            font=FONTS["status"],
-            text_color=COLORS["text_muted"],
-            anchor=tk.W,
-        )
-        status_label.pack(side=tk.LEFT, padx=10, pady=5)
 
     def clear_content(self):
         """Clear current view in content frame"""
