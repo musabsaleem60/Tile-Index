@@ -14,7 +14,7 @@ Never put `DATABASE_URL` inside the desktop app.
 ## 2. Run Backend Locally
 
 ```powershell
-cd "E:\Projects\Tile Index\Tile Index\backend"
+cd "E:\Projects\Tile Index\backend"
 python -m pip install -r requirements.txt
 copy .env.example .env
 alembic upgrade head
@@ -43,10 +43,10 @@ Recommended Render settings:
 ```text
 Repository: Tile-Index
 Branch: main
-Root Directory: Tile Index/backend
-Runtime: Python
-Build Command: pip install -r requirements.txt
-Start Command: bash start.sh
+Root Directory: backend
+Runtime: Docker
+Dockerfile Path: backend/Dockerfile
+Health Check Path: /health
 ```
 
 Required Render environment variables:
@@ -76,7 +76,7 @@ https://your-render-service-url.onrender.com/docs
 After the database schema exists:
 
 ```powershell
-cd "E:\Projects\Tile Index\Tile Index\backend"
+cd "E:\Projects\Tile Index\backend"
 python -m scripts.sqlite_to_postgres "..\data\tile_index.db"
 ```
 
