@@ -5,6 +5,7 @@ User authentication screen
 
 import tkinter as tk
 from tkinter import messagebox
+import customtkinter as ctk
 from desktop_client.api_client import ApiClientError
 from desktop_client.config import API_BASE_URL, CHECK_UPDATES
 from desktop_client.machine_status import report_desktop_status
@@ -19,16 +20,19 @@ from desktop_client.updater import (
     verify_signature,
 )
 from models.user import User
+from ui.theme import COLORS, FONTS, SIZES, apply_theme
 
 
 class LoginWindow:
     """Login window for user authentication"""
     
     def __init__(self, parent, on_success_callback):
+        apply_theme()
         self.parent = parent
         self.parent.title("Login - Tile Index")
-        self.parent.geometry("400x300")
-        self.parent.resizable(False, False)
+        self.parent.geometry(f"{SIZES['login_width']}x{SIZES['login_height']}")
+        self.parent.minsize(420, 420)
+        self.parent.configure(bg=COLORS["app_bg"])
         
         # Center the window
         self.center_window()
@@ -55,100 +59,133 @@ class LoginWindow:
     def setup_ui(self):
         """Setup the login UI"""
         # Header
-        header_frame = tk.Frame(self.parent, bg="#2c3e50", height=80)
+        header_frame = ctk.CTkFrame(
+            self.parent,
+            fg_color=COLORS["surface"],
+            corner_radius=0,
+            height=SIZES["login_header_height"],
+        )
         header_frame.pack(fill=tk.X)
         header_frame.pack_propagate(False)
         
-        tk.Label(
+        ctk.CTkLabel(
             header_frame,
             text="Tile Index",
-            font=("Arial", 24, "bold"),
-            bg="#2c3e50",
-            fg="white"
-        ).pack(pady=15)
+            font=FONTS["title"],
+            text_color=COLORS["text"],
+            height=SIZES["title_label_height"],
+        ).pack(pady=(18, 4))
         
-        tk.Label(
+        ctk.CTkLabel(
             header_frame,
             text="Inventory & Billing System",
-            font=("Arial", 12),
-            bg="#2c3e50",
-            fg="#ecf0f1"
+            font=FONTS["body_bold"],
+            text_color=COLORS["text_muted"],
+            height=SIZES["small_label_height"],
         ).pack()
         
         # Main content
-        content_frame = tk.Frame(self.parent, bg="#ecf0f1")
-        content_frame.pack(fill=tk.BOTH, expand=True, padx=40, pady=30)
+        content_frame = ctk.CTkFrame(
+            self.parent,
+            fg_color=COLORS["app_bg"],
+            corner_radius=0,
+        )
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=40, pady=24)
 
-        self.update_warning_label = tk.Label(
+        self.update_warning_label = ctk.CTkLabel(
             content_frame,
-            font=("Arial", 10, "bold"),
-            bg="#c0392b",
-            fg="white",
+            font=FONTS["small_bold"],
+            fg_color=COLORS["danger"],
+            text_color=COLORS["text"],
             wraplength=320,
             justify=tk.CENTER,
             padx=8,
-            pady=8
+            height=56,
+            corner_radius=SIZES["corner_radius"],
         )
-        self.update_button = tk.Button(
+        self.update_button = ctk.CTkButton(
             content_frame,
             text="Install Update",
             command=self.install_update,
-            bg="#e67e22",
-            fg="white",
-            font=("Arial", 10, "bold"),
-            cursor="hand2"
+            fg_color=COLORS["primary"],
+            hover_color=COLORS["primary_hover"],
+            text_color=COLORS["text"],
+            font=FONTS["small_bold"],
+            height=34,
+            corner_radius=SIZES["corner_radius"],
+            cursor="hand2",
         )
         
         # Username
-        self.username_label = tk.Label(
+        self.username_label = ctk.CTkLabel(
             content_frame,
             text="Username:",
-            font=("Arial", 11),
-            bg="#ecf0f1"
+            font=FONTS["small_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["small_label_height"],
         )
-        self.username_label.pack(anchor=tk.W, pady=(10, 5))
+        self.username_label.pack(anchor=tk.W, pady=(4, 6))
         
-        self.username_entry = tk.Entry(content_frame, width=30, font=("Arial", 11))
-        self.username_entry.pack(pady=(0, 15))
+        self.username_entry = ctk.CTkEntry(
+            content_frame,
+            width=340,
+            height=SIZES["input_height"],
+            font=FONTS["small"],
+            fg_color=COLORS["surface"],
+            border_color=COLORS["border"],
+            text_color=COLORS["text"],
+        )
+        self.username_entry.pack(fill=tk.X, pady=(0, 14))
         self.username_entry.focus()
         self.username_entry.bind('<Return>', lambda e: self.password_entry.focus())
         
         # Password
-        tk.Label(
+        ctk.CTkLabel(
             content_frame,
             text="Password:",
-            font=("Arial", 11),
-            bg="#ecf0f1"
-        ).pack(anchor=tk.W, pady=(0, 5))
+            font=FONTS["small_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["small_label_height"],
+        ).pack(anchor=tk.W, pady=(0, 6))
         
-        self.password_entry = tk.Entry(content_frame, width=30, font=("Arial", 11), show="*")
-        self.password_entry.pack(pady=(0, 20))
+        self.password_entry = ctk.CTkEntry(
+            content_frame,
+            width=340,
+            height=SIZES["input_height"],
+            font=FONTS["small"],
+            fg_color=COLORS["surface"],
+            border_color=COLORS["border"],
+            text_color=COLORS["text"],
+            show="*",
+        )
+        self.password_entry.pack(fill=tk.X, pady=(0, 18))
         self.password_entry.bind('<Return>', lambda e: self.login())
         
         # Login button
-        login_btn = tk.Button(
+        login_btn = ctk.CTkButton(
             content_frame,
             text="Login",
             command=self.login,
-            bg="#3498db",
-            fg="white",
-            font=("Arial", 12, "bold"),
-            width=20,
-            height=2,
-            cursor="hand2"
+            fg_color=COLORS["primary"],
+            hover_color=COLORS["primary_hover"],
+            text_color=COLORS["text"],
+            font=FONTS["button"],
+            height=44,
+            corner_radius=SIZES["button_corner_radius"],
+            cursor="hand2",
         )
-        login_btn.pack(pady=10)
+        login_btn.pack(fill=tk.X, pady=(0, 14))
         
         # Default credentials hint (for first-time setup)
-        hint_frame = tk.Frame(content_frame, bg="#ecf0f1")
-        hint_frame.pack(pady=(10, 0))
+        hint_frame = ctk.CTkFrame(content_frame, fg_color="transparent", corner_radius=0)
+        hint_frame.pack(fill=tk.X)
         
-        tk.Label(
+        ctk.CTkLabel(
             hint_frame,
             text=f"API: {API_BASE_URL}",
-            font=("Arial", 9),
-            bg="#ecf0f1",
-            fg="#7f8c8d"
+            font=FONTS["status"],
+            text_color=COLORS["text_muted"],
+            height=SIZES["small_label_height"],
         ).pack()
     
     def login(self):

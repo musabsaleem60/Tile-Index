@@ -227,6 +227,8 @@ class MainWindow:
                 fg_color=color,
                 hover_color=hover,
                 text_color=COLORS["text"],
+                border_width=1 if color != COLORS["primary"] else 0,
+                border_color=COLORS["border"],
                 command=cmd,
                 font=FONTS["button"],
                 width=SIZES["button_width"],
@@ -241,10 +243,11 @@ class MainWindow:
             admin_label = ctk.CTkLabel(
                 self.home_frame,
                 text="Administration",
-                font=FONTS["section"],
-                text_color=COLORS["warning"],
+                font=FONTS["eyebrow"],
+                text_color=COLORS["text_muted"],
                 height=SIZES["section_label_height"],
             )
+            admin_label.configure(text="ADMINISTRATION")
             admin_label.pack(pady=(20, 12))
 
             admin_container = ctk.CTkFrame(self.home_frame, fg_color="transparent", corner_radius=0)
@@ -263,6 +266,8 @@ class MainWindow:
                     fg_color=color,
                     hover_color=hover,
                     text_color=COLORS["text"],
+                    border_width=1,
+                    border_color=COLORS["border"],
                     command=cmd,
                     font=FONTS["button"],
                     width=SIZES["admin_button_width"],
