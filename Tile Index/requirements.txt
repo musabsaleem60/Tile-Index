@@ -3,6 +3,7 @@
 
 # External UI dependencies
 customtkinter==6.0.0
+reportlab==4.4.5
 
 # tkinter - GUI (built-in)
 # sqlite3 - Database (built-in)
