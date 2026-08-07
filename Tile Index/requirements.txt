@@ -1,7 +1,10 @@
 # Tile Index - Desktop Inventory & Billing System
 # Python 3.8+
 
-# No external dependencies required - using built-in libraries only
+# External UI dependencies
+customtkinter==6.0.0
+reportlab==4.4.5
+
 # tkinter - GUI (built-in)
 # sqlite3 - Database (built-in)
 # datetime - Date handling (built-in)

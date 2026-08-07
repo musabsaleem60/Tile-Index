@@ -5,6 +5,7 @@ Manage products and inventory stock
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+import customtkinter as ctk
 from repositories.branch_repository import BranchRepository
 from repositories.product_repository import ProductRepository
 from services.inventory_service import InventoryService
@@ -14,6 +15,7 @@ from utils.validators import validate_positive_number, validate_integer, validat
 from utils.grade_constants import VALID_GRADES, GRADE_1
 from utils.searchable_combobox import SearchableCombobox
 from desktop_client.remote_state import is_api_authenticated
+from ui.theme import COLORS, FONTS, SIZES, SPACING
 
 
 class InventoryWindow:
@@ -48,90 +50,128 @@ class InventoryWindow:
     def setup_ui(self):
         """Setup the inventory UI"""
         # Header
-        header = tk.Label(
+        header = ctk.CTkLabel(
             self.parent,
             text="Inventory Management",
-            font=("Arial", 18, "bold"),
-            bg="#34495e",
-            fg="white",
-            pady=10
+            font=FONTS["section"],
+            fg_color=COLORS["surface"],
+            text_color=COLORS["text"],
+            height=48,
         )
         header.pack(fill=tk.X)
         
         # Main container
-        main_frame = tk.Frame(self.parent)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        main_frame = ctk.CTkFrame(self.parent, fg_color=COLORS["app_bg"], corner_radius=0)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=SPACING["page_x"], pady=SPACING["page_y"])
         
         # Left panel - Product Management
-        left_frame = tk.LabelFrame(main_frame, text="Product Management", font=("Arial", 12, "bold"), padx=10, pady=10)
+        left_frame = ctk.CTkFrame(
+            main_frame,
+            fg_color=COLORS["surface"],
+            corner_radius=SIZES["corner_radius"],
+            border_width=1,
+            border_color=COLORS["border"],
+        )
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        ctk.CTkLabel(
+            left_frame,
+            text="Product Management",
+            font=FONTS["body_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["section_label_height"],
+        ).grid(row=0, column=0, columnspan=2, sticky=tk.EW, padx=12, pady=(10, 8))
         
         # Product form
-        tk.Label(left_frame, text="Product Name:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.product_name_entry = tk.Entry(left_frame, width=30, font=("Arial", 10))
-        self.product_name_entry.grid(row=0, column=1, pady=5, padx=5)
+        self.form_label(left_frame, "Product Name:").grid(row=1, column=0, sticky=tk.W, pady=5, padx=(12, 0))
+        self.product_name_entry = self.form_entry(left_frame)
+        self.product_name_entry.grid(row=1, column=1, pady=5, padx=(5, 12), sticky=tk.EW)
         
-        tk.Label(left_frame, text="Tile Size:", font=("Arial", 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.tile_size_entry = tk.Entry(left_frame, width=30, font=("Arial", 10))
-        self.tile_size_entry.grid(row=1, column=1, pady=5, padx=5)
+        self.form_label(left_frame, "Tile Size:").grid(row=2, column=0, sticky=tk.W, pady=5, padx=(12, 0))
+        self.tile_size_entry = self.form_entry(left_frame)
+        self.tile_size_entry.grid(row=2, column=1, pady=5, padx=(5, 12), sticky=tk.EW)
         
-        tk.Label(left_frame, text="Area per Box (m²):", font=("Arial", 10)).grid(row=2, column=0, sticky=tk.W, pady=5)
-        self.area_per_box_entry = tk.Entry(left_frame, width=30, font=("Arial", 10))
-        self.area_per_box_entry.grid(row=2, column=1, pady=5, padx=5)
+        self.form_label(left_frame, "Area per Box (m²):").grid(row=3, column=0, sticky=tk.W, pady=5, padx=(12, 0))
+        self.area_per_box_entry = self.form_entry(left_frame)
+        self.area_per_box_entry.grid(row=3, column=1, pady=5, padx=(5, 12), sticky=tk.EW)
         
-        tk.Label(left_frame, text="Pieces per Box:", font=("Arial", 10)).grid(row=3, column=0, sticky=tk.W, pady=5)
-        self.pieces_per_box_entry = tk.Entry(left_frame, width=30, font=("Arial", 10))
-        self.pieces_per_box_entry.grid(row=3, column=1, pady=5, padx=5)
+        self.form_label(left_frame, "Pieces per Box:").grid(row=4, column=0, sticky=tk.W, pady=5, padx=(12, 0))
+        self.pieces_per_box_entry = self.form_entry(left_frame)
+        self.pieces_per_box_entry.grid(row=4, column=1, pady=5, padx=(5, 12), sticky=tk.EW)
         
         # Product buttons
-        product_btn_frame = tk.Frame(left_frame)
-        product_btn_frame.grid(row=4, column=0, columnspan=2, pady=10)
+        product_btn_frame = ctk.CTkFrame(left_frame, fg_color="transparent", corner_radius=0)
+        product_btn_frame.grid(row=5, column=0, columnspan=2, pady=10)
         
-        self.add_update_btn = tk.Button(product_btn_frame, text="Add Product", command=self.add_or_update_product, bg="#3498db", fg="white", width=15)
+        self.add_update_btn = self.action_button(product_btn_frame, "Add Product", self.add_or_update_product, width=140)
         self.add_update_btn.pack(side=tk.LEFT, padx=5)
-        tk.Button(product_btn_frame, text="Clear", command=self.clear_product_form, bg="#95a5a6", fg="white", width=15).pack(side=tk.LEFT, padx=5)
+        self.action_button(product_btn_frame, "Clear", self.clear_product_form, width=140, primary=False).pack(side=tk.LEFT, padx=5)
         
         # Products list
-        tk.Label(left_frame, text="Products List:", font=("Arial", 10, "bold")).grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
+        self.form_label(left_frame, "Products List:", bold=True).grid(row=6, column=0, columnspan=2, sticky=tk.W, pady=(10, 5), padx=(12, 0))
         
-        products_frame = tk.Frame(left_frame)
-        products_frame.grid(row=6, column=0, columnspan=2, sticky=tk.NSEW, pady=5)
+        products_frame = ctk.CTkFrame(left_frame, fg_color=COLORS["surface"], corner_radius=SIZES["corner_radius"], border_width=1, border_color=COLORS["border"])
+        products_frame.grid(row=7, column=0, columnspan=2, sticky=tk.NSEW, pady=5, padx=12)
         
-        products_scroll = tk.Scrollbar(products_frame)
+        products_scroll = ctk.CTkScrollbar(products_frame)
         products_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         
-        self.products_listbox = tk.Listbox(products_frame, yscrollcommand=products_scroll.set, height=12, font=("Arial", 9))
-        self.products_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        products_scroll.config(command=self.products_listbox.yview)
+        self.products_listbox = tk.Listbox(
+            products_frame,
+            yscrollcommand=products_scroll.set,
+            height=12,
+            font=FONTS["small"],
+            bg=COLORS["surface"],
+            fg=COLORS["text"],
+            selectbackground=COLORS["primary"],
+            selectforeground=COLORS["text"],
+            relief=tk.FLAT,
+            highlightthickness=0,
+            borderwidth=0,
+            activestyle="none",
+        )
+        self.products_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0), pady=10)
+        products_scroll.configure(command=self.products_listbox.yview)
         self.products_listbox.bind('<<ListboxSelect>>', self.on_product_select)
         
         # Edit and Delete buttons for products (Admin only)
-        product_action_frame = tk.Frame(left_frame)
-        product_action_frame.grid(row=7, column=0, columnspan=2, pady=5)
+        product_action_frame = ctk.CTkFrame(left_frame, fg_color="transparent", corner_radius=0)
+        product_action_frame.grid(row=8, column=0, columnspan=2, pady=5)
         
         if AuthenticationService.can_manage_products(self.current_user):
-            tk.Button(product_action_frame, text="Edit Product", command=self.edit_selected_product, bg="#f39c12", fg="white", width=15).pack(side=tk.LEFT, padx=5)
-            tk.Button(product_action_frame, text="Delete Product", command=self.delete_selected_product, bg="#e74c3c", fg="white", width=15).pack(side=tk.LEFT, padx=5)
+            self.action_button(product_action_frame, "Edit Product", self.edit_selected_product, width=140, primary=False).pack(side=tk.LEFT, padx=5)
+            self.action_button(product_action_frame, "Delete Product", self.delete_selected_product, width=140, primary=False).pack(side=tk.LEFT, padx=5)
         
         # Hide product management for employees
         if AuthenticationService.is_employee(self.current_user):
             # Hide product form fields
-            for row in range(8):
+            for row in range(9):
                 for widget in left_frame.grid_slaves(row=row):
                     widget.grid_remove()
-            tk.Label(left_frame, text="Product management is restricted to administrators.", 
-                    font=("Arial", 10), fg="red").grid(row=0, column=0, columnspan=2, pady=50)
+            self.form_label(left_frame, "Product management is restricted to administrators.", bold=True).grid(row=0, column=0, columnspan=2, pady=50)
         
         # Right panel - Stock Management
-        right_frame = tk.LabelFrame(main_frame, text="Stock Management", font=("Arial", 12, "bold"), padx=10, pady=10)
+        right_frame = ctk.CTkFrame(
+            main_frame,
+            fg_color=COLORS["surface"],
+            corner_radius=SIZES["corner_radius"],
+            border_width=1,
+            border_color=COLORS["border"],
+        )
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        ctk.CTkLabel(
+            right_frame,
+            text="Stock Management",
+            font=FONTS["body_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["section_label_height"],
+        ).grid(row=0, column=0, columnspan=2, sticky=tk.EW, padx=12, pady=(10, 8))
         
         # Branch selection
-        tk.Label(right_frame, text="Select Branch:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.form_label(right_frame, "Select Branch:", bold=True).grid(row=1, column=0, sticky=tk.W, pady=5, padx=(12, 0))
         self.branch_var = tk.StringVar()
-        self.branch_combo = SearchableCombobox(right_frame, textvariable=self.branch_var, width=27, state="normal", font=("Arial", 10))
+        self.branch_combo = SearchableCombobox(right_frame, textvariable=self.branch_var, width=SIZES["dropdown_width"], state="normal", font=FONTS["small"])
         self.branch_combo.set_completion_list([f"{b.name}" for b in self.branches])
-        self.branch_combo.grid(row=0, column=1, pady=5, padx=5, sticky=tk.W)
+        self.branch_combo.grid(row=1, column=1, pady=5, padx=(5, 12), sticky=tk.W)
         self.branch_combo.bind('<<ComboboxSelected>>', self.on_branch_select)
         
         # Disable branch selection for employees (they can only access their branch)
@@ -139,78 +179,162 @@ class InventoryWindow:
             self.branch_combo.config(state="disabled")
         
         # Product selection (for Stock IN/OUT)
-        tk.Label(right_frame, text="Select Product:", font=("Arial", 10, "bold")).grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.form_label(right_frame, "Select Product:", bold=True).grid(row=2, column=0, sticky=tk.W, pady=5, padx=(12, 0))
         self.stock_product_var = tk.StringVar()
-        self.stock_product_combo = SearchableCombobox(right_frame, textvariable=self.stock_product_var, width=45, state="normal", font=("Arial", 10))
-        self.stock_product_combo.grid(row=1, column=1, pady=5, padx=5, sticky=tk.W)
+        self.stock_product_combo = SearchableCombobox(right_frame, textvariable=self.stock_product_var, width=SIZES["dropdown_width"], state="normal", font=FONTS["small"])
+        self.stock_product_combo.grid(row=2, column=1, pady=5, padx=(5, 12), sticky=tk.W)
         self.stock_product_combo.bind('<<ComboboxSelected>>', self.on_stock_product_select)
         
         # Grade selection
-        tk.Label(right_frame, text="Grade:", font=("Arial", 10)).grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.form_label(right_frame, "Grade:").grid(row=3, column=0, sticky=tk.W, pady=5, padx=(12, 0))
         self.grade_var = tk.StringVar(value=GRADE_1)
-        grade_combo = ttk.Combobox(right_frame, textvariable=self.grade_var, width=27, state="readonly", font=("Arial", 10))
+        grade_combo = ttk.Combobox(right_frame, textvariable=self.grade_var, width=SIZES["dropdown_width"], state="readonly", font=FONTS["small"])
         grade_combo['values'] = VALID_GRADES
-        grade_combo.grid(row=2, column=1, pady=5, padx=5, sticky=tk.W)
+        grade_combo.grid(row=3, column=1, pady=5, padx=(5, 12), sticky=tk.W)
         grade_combo.bind('<<ComboboxSelected>>', lambda e: self.refresh_stock())
         
         # Stock IN form
-        stock_in_frame = tk.LabelFrame(right_frame, text="Stock IN (Add Stock)", font=("Arial", 10, "bold"), padx=5, pady=5)
-        stock_in_frame.grid(row=3, column=0, columnspan=2, sticky=tk.EW, pady=10)
+        stock_in_frame = self.create_subpanel(right_frame, "Stock IN (Add Stock)")
+        stock_in_frame.grid(row=4, column=0, columnspan=2, sticky=tk.EW, pady=10, padx=12)
         
-        tk.Label(stock_in_frame, text="Boxes:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=3)
-        self.stock_in_boxes_entry = tk.Entry(stock_in_frame, width=20, font=("Arial", 9))
-        self.stock_in_boxes_entry.grid(row=0, column=1, pady=3, padx=5)
+        self.form_label(stock_in_frame, "Boxes:").grid(row=1, column=0, sticky=tk.W, pady=3, padx=8)
+        self.stock_in_boxes_entry = self.form_entry(stock_in_frame, width=160)
+        self.stock_in_boxes_entry.grid(row=1, column=1, pady=3, padx=8)
         
-        tk.Label(stock_in_frame, text="Loose Pieces:", font=("Arial", 9)).grid(row=1, column=0, sticky=tk.W, pady=3)
-        self.stock_in_pieces_entry = tk.Entry(stock_in_frame, width=20, font=("Arial", 9))
-        self.stock_in_pieces_entry.grid(row=1, column=1, pady=3, padx=5)
+        self.form_label(stock_in_frame, "Loose Pieces:").grid(row=2, column=0, sticky=tk.W, pady=3, padx=8)
+        self.stock_in_pieces_entry = self.form_entry(stock_in_frame, width=160)
+        self.stock_in_pieces_entry.grid(row=2, column=1, pady=3, padx=8)
         
-        tk.Label(stock_in_frame, text="Rate per m² (Rs.):", font=("Arial", 9)).grid(row=2, column=0, sticky=tk.W, pady=3)
-        self.rate_sqm_entry = tk.Entry(stock_in_frame, width=20, font=("Arial", 9))
-        self.rate_sqm_entry.grid(row=2, column=1, pady=3, padx=5)
+        self.form_label(stock_in_frame, "Rate per m² (Rs.):").grid(row=2, column=0, sticky=tk.W, pady=3)
+        for widget in stock_in_frame.grid_slaves(row=2, column=0):
+            try:
+                if str(widget.cget("text")).startswith("Rate per"):
+                    widget.grid_forget()
+            except Exception:
+                pass
+        self.form_label(stock_in_frame, "Rate per m² (Rs.):").grid(row=3, column=0, sticky=tk.W, pady=3, padx=8)
+        self.rate_sqm_entry = self.form_entry(stock_in_frame, width=160)
+        self.rate_sqm_entry.grid(row=3, column=1, pady=3, padx=8)
         
-        tk.Label(stock_in_frame, text="Rate per Box (Rs.):", font=("Arial", 9)).grid(row=3, column=0, sticky=tk.W, pady=3)
-        self.rate_box_entry = tk.Entry(stock_in_frame, width=20, font=("Arial", 9))
-        self.rate_box_entry.grid(row=3, column=1, pady=3, padx=5)
+        self.form_label(stock_in_frame, "Rate per Box (Rs.):").grid(row=4, column=0, sticky=tk.W, pady=3, padx=8)
+        self.rate_box_entry = self.form_entry(stock_in_frame, width=160)
+        self.rate_box_entry.grid(row=4, column=1, pady=3, padx=8)
         
-        tk.Label(stock_in_frame, text="Rate per Piece (Rs.):", font=("Arial", 9)).grid(row=4, column=0, sticky=tk.W, pady=3)
-        self.rate_piece_entry = tk.Entry(stock_in_frame, width=20, font=("Arial", 9))
-        self.rate_piece_entry.grid(row=4, column=1, pady=3, padx=5)
+        self.form_label(stock_in_frame, "Rate per Piece (Rs.):").grid(row=5, column=0, sticky=tk.W, pady=3, padx=8)
+        self.rate_piece_entry = self.form_entry(stock_in_frame, width=160)
+        self.rate_piece_entry.grid(row=5, column=1, pady=3, padx=8)
         
-        tk.Button(stock_in_frame, text="Add Stock", command=self.add_stock, bg="#27ae60", fg="white", width=20).grid(row=5, column=0, columnspan=2, pady=10)
+        self.action_button(stock_in_frame, "Add Stock", self.add_stock, width=180).grid(row=6, column=0, columnspan=2, pady=10)
         
         # Stock OUT form
-        stock_out_frame = tk.LabelFrame(right_frame, text="Stock OUT (Remove Stock)", font=("Arial", 10, "bold"), padx=5, pady=5)
-        stock_out_frame.grid(row=4, column=0, columnspan=2, sticky=tk.EW, pady=10)
+        stock_out_frame = self.create_subpanel(right_frame, "Stock OUT (Remove Stock)")
+        stock_out_frame.grid(row=5, column=0, columnspan=2, sticky=tk.EW, pady=10, padx=12)
         
-        tk.Label(stock_out_frame, text="Boxes:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=3)
-        self.stock_out_boxes_entry = tk.Entry(stock_out_frame, width=20, font=("Arial", 9))
-        self.stock_out_boxes_entry.grid(row=0, column=1, pady=3, padx=5)
+        self.form_label(stock_out_frame, "Boxes:").grid(row=1, column=0, sticky=tk.W, pady=3, padx=8)
+        self.stock_out_boxes_entry = self.form_entry(stock_out_frame, width=160)
+        self.stock_out_boxes_entry.grid(row=1, column=1, pady=3, padx=8)
         
-        tk.Label(stock_out_frame, text="Loose Pieces:", font=("Arial", 9)).grid(row=1, column=0, sticky=tk.W, pady=3)
-        self.stock_out_pieces_entry = tk.Entry(stock_out_frame, width=20, font=("Arial", 9))
-        self.stock_out_pieces_entry.grid(row=1, column=1, pady=3, padx=5)
+        self.form_label(stock_out_frame, "Loose Pieces:").grid(row=2, column=0, sticky=tk.W, pady=3, padx=8)
+        self.stock_out_pieces_entry = self.form_entry(stock_out_frame, width=160)
+        self.stock_out_pieces_entry.grid(row=2, column=1, pady=3, padx=8)
         
-        tk.Label(stock_out_frame, text="Reason/Comment:", font=("Arial", 9)).grid(row=2, column=0, sticky=tk.W, pady=3)
-        self.stock_out_comment_entry = tk.Entry(stock_out_frame, width=20, font=("Arial", 9))
-        self.stock_out_comment_entry.grid(row=2, column=1, pady=3, padx=5)
+        self.form_label(stock_out_frame, "Reason/Comment:").grid(row=3, column=0, sticky=tk.W, pady=3, padx=8)
+        self.stock_out_comment_entry = self.form_entry(stock_out_frame, width=160)
+        self.stock_out_comment_entry.grid(row=3, column=1, pady=3, padx=8)
         self.stock_out_comment_entry.insert(0, "Customer return / Other reason")
         
-        tk.Button(stock_out_frame, text="Remove Stock", command=self.remove_stock, bg="#e74c3c", fg="white", width=20).grid(row=3, column=0, columnspan=2, pady=10)
+        self.action_button(stock_out_frame, "Remove Stock", self.remove_stock, width=180, primary=False).grid(row=4, column=0, columnspan=2, pady=10)
         
         # Current Stock Display
-        stock_display_frame = tk.LabelFrame(right_frame, text="Current Stock", font=("Arial", 10, "bold"), padx=5, pady=5)
-        stock_display_frame.grid(row=5, column=0, columnspan=2, sticky=tk.EW, pady=10)
+        stock_display_frame = self.create_subpanel(right_frame, "Current Stock")
+        stock_display_frame.grid(row=6, column=0, columnspan=2, sticky=tk.EW, pady=10, padx=12)
         
-        self.stock_display_text = tk.Text(stock_display_frame, height=8, width=40, font=("Arial", 9), state=tk.DISABLED)
-        self.stock_display_text.pack(fill=tk.BOTH, expand=True)
+        self.stock_display_text = tk.Text(
+            stock_display_frame,
+            height=8,
+            width=40,
+            font=FONTS["small"],
+            state=tk.DISABLED,
+            bg=COLORS["surface"],
+            fg=COLORS["text"],
+            insertbackground=COLORS["text"],
+            relief=tk.FLAT,
+            highlightthickness=1,
+            highlightbackground=COLORS["border"],
+            padx=8,
+            pady=8,
+        )
+        self.stock_display_text.grid(row=1, column=0, columnspan=2, sticky=tk.NSEW, padx=8, pady=(4, 8))
+        stock_display_frame.grid_rowconfigure(1, weight=1)
+        stock_display_frame.grid_columnconfigure(0, weight=1)
         
-        tk.Button(right_frame, text="Refresh Stock", command=self.refresh_stock, bg="#3498db", fg="white", width=20).grid(row=6, column=0, columnspan=2, pady=5)
+        self.action_button(right_frame, "Refresh Stock", self.refresh_stock, width=180).grid(row=7, column=0, columnspan=2, pady=5)
         
         # Configure grid weights
-        left_frame.grid_rowconfigure(6, weight=1)
+        left_frame.grid_rowconfigure(7, weight=1)
         left_frame.grid_columnconfigure(1, weight=1)
         right_frame.grid_columnconfigure(1, weight=1)
+
+    def create_subpanel(self, parent, title):
+        """Create a compact themed section while keeping child layout unchanged."""
+        panel = ctk.CTkFrame(
+            parent,
+            fg_color=COLORS["card"],
+            corner_radius=SIZES["corner_radius"],
+            border_width=1,
+            border_color=COLORS["border"],
+        )
+        ctk.CTkLabel(
+            panel,
+            text=title,
+            font=FONTS["small_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["small_label_height"],
+        ).grid(row=0, column=0, columnspan=2, sticky=tk.EW, padx=8, pady=(8, 4))
+        panel.grid_columnconfigure(0, weight=1)
+        panel.grid_columnconfigure(1, weight=1)
+        return panel
+
+    def form_label(self, parent, text, bold=False):
+        """Create a themed form label with enough height for the font."""
+        return ctk.CTkLabel(
+            parent,
+            text=text,
+            font=FONTS["small_bold"] if bold else FONTS["small"],
+            text_color=COLORS["text"],
+            height=SIZES["small_label_height"],
+            anchor=tk.W,
+        )
+
+    def form_entry(self, parent, width=240):
+        """Create a themed entry that keeps normal Entry get/delete/insert behavior."""
+        return ctk.CTkEntry(
+            parent,
+            width=width,
+            height=SIZES["input_height"],
+            font=FONTS["small"],
+            fg_color=COLORS["app_bg"],
+            border_color=COLORS["border"],
+            text_color=COLORS["text"],
+        )
+
+    def action_button(self, parent, text, command, width=150, primary=True):
+        """Create a themed action button with the existing command callback."""
+        return ctk.CTkButton(
+            parent,
+            text=text,
+            command=command,
+            width=width,
+            height=34,
+            fg_color=COLORS["primary"] if primary else COLORS["card"],
+            hover_color=COLORS["primary_hover"] if primary else COLORS["card_hover"],
+            text_color=COLORS["text"],
+            font=FONTS["small_bold"],
+            border_width=0 if primary else 1,
+            border_color=COLORS["border"],
+            corner_radius=SIZES["corner_radius"],
+            cursor="hand2",
+        )
     
     def load_products(self):
         """Load products into listbox and stock product dropdown"""
@@ -276,7 +400,7 @@ class InventoryWindow:
                 ProductRepository.update(product, user=self.current_user)
                 messagebox.showinfo("Success", f"Product '{name}' updated successfully!")
                 self.editing_product_id = None
-                self.add_update_btn.config(text="Add Product")
+                self.add_update_btn.configure(text="Add Product", fg_color=COLORS["primary"])
             else:
                 # Create new product
                 product = ProductRepository.create(
@@ -322,7 +446,7 @@ class InventoryWindow:
             
             # Set editing mode
             self.editing_product_id = product.id
-            self.add_update_btn.config(text="Update Product", bg="#f39c12")
+            self.add_update_btn.configure(text="Update Product", fg_color=COLORS["primary"])
             
             # Select the product in the listbox
             self.selected_product_id = product.id
@@ -380,7 +504,7 @@ class InventoryWindow:
                 messagebox.showinfo("Success", f"Product '{product.name}' deleted successfully!")
                 self.clear_product_form()
                 self.editing_product_id = None
-                self.add_update_btn.config(text="Add Product", bg="#3498db")
+                self.add_update_btn.configure(text="Add Product", fg_color=COLORS["primary"])
                 self.selected_product_id = None
                 self.load_products()
                 self.refresh_stock()
@@ -395,7 +519,7 @@ class InventoryWindow:
         self.area_per_box_entry.delete(0, tk.END)
         self.pieces_per_box_entry.delete(0, tk.END)
         self.editing_product_id = None
-        self.add_update_btn.config(text="Add Product", bg="#3498db")
+        self.add_update_btn.configure(text="Add Product", fg_color=COLORS["primary"])
     
     def add_stock(self):
         """Add stock to inventory"""

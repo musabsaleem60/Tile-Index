@@ -5,10 +5,12 @@ View various reports
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+import customtkinter as ctk
 from datetime import datetime, date
 from repositories.branch_repository import BranchRepository
 from services.report_service import ReportService
 from utils.searchable_combobox import SearchableCombobox
+from ui.theme import COLORS, FONTS, SIZES, SPACING
 
 
 class ReportWindow:
@@ -24,84 +26,154 @@ class ReportWindow:
     
     def setup_ui(self):
         """Setup the reports UI"""
-        # Header
-        header = tk.Label(
+        header = ctk.CTkLabel(
             self.parent,
             text="Reports",
-            font=("Arial", 18, "bold"),
-            bg="#e67e22",
-            fg="white",
-            pady=10
+            font=FONTS["section"],
+            fg_color=COLORS["surface"],
+            text_color=COLORS["text"],
+            height=48,
         )
         header.pack(fill=tk.X)
-        
-        # Main container
-        main_frame = tk.Frame(self.parent)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # Left panel - Report Selection
-        left_frame = tk.LabelFrame(main_frame, text="Report Options", font=("Arial", 12, "bold"), padx=10, pady=10)
+
+        main_frame = ctk.CTkFrame(self.parent, fg_color=COLORS["app_bg"], corner_radius=0)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=SPACING["page_x"], pady=SPACING["page_y"])
+
+        left_frame = self.panel(main_frame, "Report Options")
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=False, padx=(0, 5))
-        
-        # Branch selection
-        tk.Label(left_frame, text="Select Branch:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W, pady=5)
+
+        self.form_label(left_frame, "Select Branch:", bold=True).grid(row=1, column=0, sticky=tk.W, pady=5, padx=(12, 8))
         self.branch_var = tk.StringVar()
-        self.branch_combo = SearchableCombobox(left_frame, textvariable=self.branch_var, width=25, state="normal", font=("Arial", 10))
+        self.branch_combo = SearchableCombobox(left_frame, textvariable=self.branch_var, width=SIZES["compact_dropdown_width"], state="normal", font=FONTS["small"])
         self.branch_combo.set_completion_list(["All Branches"] + [f"{b.name}" for b in self.branches])
-        self.branch_combo.grid(row=0, column=1, pady=5, padx=5, sticky=tk.W)
+        self.branch_combo.grid(row=1, column=1, pady=5, padx=(0, 12), sticky=tk.W)
         self.branch_combo.bind('<<ComboboxSelected>>', self.on_branch_select)
-        
-        # Report type selection
-        tk.Label(left_frame, text="Report Type:", font=("Arial", 10, "bold")).grid(row=1, column=0, sticky=tk.W, pady=10)
+
+        self.form_label(left_frame, "Report Type:", bold=True).grid(row=2, column=0, sticky=tk.W, pady=(12, 6), padx=(12, 8))
         self.report_type_var = tk.StringVar(value="Daily Sales")
-        
+
         report_types = ["Daily Sales", "Branch Stock", "Complete Business Stock"]
         for idx, rtype in enumerate(report_types):
-            tk.Radiobutton(
+            ctk.CTkRadioButton(
                 left_frame,
                 text=rtype,
                 variable=self.report_type_var,
                 value=rtype,
-                font=("Arial", 10),
-                command=self.on_report_type_change
-            ).grid(row=2+idx, column=0, columnspan=2, sticky=tk.W, pady=3)
-        
-        # Date selection for daily sales
-        self.date_frame = tk.Frame(left_frame)
-        self.date_frame.grid(row=5, column=0, columnspan=2, pady=10, sticky=tk.EW)
-        
-        tk.Label(self.date_frame, text="Date:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.date_entry = tk.Entry(self.date_frame, width=20, font=("Arial", 10))
-        self.date_entry.grid(row=0, column=1, pady=5, padx=5)
+                font=FONTS["small"],
+                text_color=COLORS["text"],
+                fg_color=COLORS["primary"],
+                hover_color=COLORS["primary_hover"],
+                border_color=COLORS["border"],
+                command=self.on_report_type_change,
+            ).grid(row=3+idx, column=0, columnspan=2, sticky=tk.W, pady=5, padx=12)
+
+        self.date_frame = ctk.CTkFrame(left_frame, fg_color="transparent", corner_radius=0)
+        self.date_frame.grid(row=6, column=0, columnspan=2, pady=10, padx=12, sticky=tk.EW)
+
+        self.form_label(self.date_frame, "Date:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.date_entry = self.form_entry(self.date_frame, width=170)
+        self.date_entry.grid(row=0, column=1, pady=5, padx=8, sticky=tk.W)
         self.date_entry.insert(0, date.today().strftime("%Y-%m-%d"))
-        
-        # Branch selection note for Complete Business Stock
-        self.branch_note_label = tk.Label(left_frame, text="", font=("Arial", 9), fg="blue", wraplength=200)
-        self.branch_note_label.grid(row=6, column=0, columnspan=2, pady=5)
-        
-        # Generate button
-        tk.Button(left_frame, text="Generate Report", command=self.generate_report, bg="#3498db", fg="white", width=20, font=("Arial", 10, "bold")).grid(row=6, column=0, columnspan=2, pady=15)
-        
-        # Right panel - Report Display
-        right_frame = tk.LabelFrame(main_frame, text="Report", font=("Arial", 12, "bold"), padx=10, pady=10)
+
+        self.branch_note_label = ctk.CTkLabel(
+            left_frame,
+            text="",
+            font=FONTS["status"],
+            text_color=COLORS["text_muted"],
+            wraplength=230,
+            height=SIZES["status_label_height"],
+        )
+        self.branch_note_label.grid(row=7, column=0, columnspan=2, pady=5, padx=12)
+
+        self.action_button(left_frame, "Generate Report", self.generate_report, width=180).grid(row=8, column=0, columnspan=2, pady=15)
+
+        right_frame = self.panel(main_frame, "Report")
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
-        
-        # Text widget with scrollbar
-        text_frame = tk.Frame(right_frame)
-        text_frame.pack(fill=tk.BOTH, expand=True)
-        
-        self.report_text = tk.Text(text_frame, wrap=tk.WORD, font=("Courier", 10), state=tk.DISABLED)
-        scrollbar = tk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.report_text.yview)
+
+        text_frame = ctk.CTkFrame(right_frame, fg_color=COLORS["surface"], corner_radius=SIZES["corner_radius"], border_width=1, border_color=COLORS["border"])
+        text_frame.grid(row=1, column=0, columnspan=2, sticky=tk.NSEW, padx=12, pady=(0, 10))
+        text_frame.grid_rowconfigure(0, weight=1)
+        text_frame.grid_columnconfigure(0, weight=1)
+
+        self.report_text = tk.Text(
+            text_frame,
+            wrap=tk.WORD,
+            font=("Consolas", 10),
+            state=tk.DISABLED,
+            bg=COLORS["app_bg"],
+            fg=COLORS["text"],
+            insertbackground=COLORS["text"],
+            selectbackground=COLORS["primary"],
+            selectforeground=COLORS["text"],
+            relief=tk.FLAT,
+            borderwidth=0,
+            padx=12,
+            pady=10,
+        )
+        scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.report_text.yview)
         self.report_text.configure(yscrollcommand=scrollbar.set)
-        
-        self.report_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        # Print button
-        tk.Button(right_frame, text="Print Report", command=self.print_report, bg="#27ae60", fg="white", width=20).pack(pady=5)
-        
-        # Configure grid
+
+        self.report_text.grid(row=0, column=0, sticky=tk.NSEW, padx=(1, 0), pady=1)
+        scrollbar.grid(row=0, column=1, sticky=tk.NS, pady=1)
+
+        self.action_button(right_frame, "Print Report", self.print_report, width=160).grid(row=2, column=0, columnspan=2, pady=(0, 12))
+
         left_frame.grid_columnconfigure(1, weight=1)
+        right_frame.grid_columnconfigure(0, weight=1)
+        right_frame.grid_rowconfigure(1, weight=1)
+
+    def panel(self, parent, title):
+        panel = ctk.CTkFrame(
+            parent,
+            fg_color=COLORS["surface"],
+            corner_radius=SIZES["corner_radius"],
+            border_width=1,
+            border_color=COLORS["border"],
+        )
+        ctk.CTkLabel(
+            panel,
+            text=title,
+            font=FONTS["body_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["section_label_height"],
+        ).grid(row=0, column=0, columnspan=2, sticky=tk.EW, padx=12, pady=(10, 8))
+        return panel
+
+    def form_label(self, parent, text, bold=False):
+        return ctk.CTkLabel(
+            parent,
+            text=text,
+            font=FONTS["small_bold"] if bold else FONTS["small"],
+            text_color=COLORS["text"],
+            height=SIZES["small_label_height"],
+            anchor=tk.W,
+        )
+
+    def form_entry(self, parent, width=200):
+        return ctk.CTkEntry(
+            parent,
+            width=width,
+            height=SIZES["input_height"],
+            font=FONTS["small"],
+            fg_color=COLORS["app_bg"],
+            border_color=COLORS["border"],
+            text_color=COLORS["text"],
+        )
+
+    def action_button(self, parent, text, command, width=160):
+        return ctk.CTkButton(
+            parent,
+            text=text,
+            command=command,
+            width=width,
+            height=34,
+            fg_color=COLORS["primary"],
+            hover_color=COLORS["primary_hover"],
+            text_color=COLORS["text"],
+            font=FONTS["small_bold"],
+            corner_radius=SIZES["corner_radius"],
+            cursor="hand2",
+        )
     
     def on_branch_select(self, event):
         """Handle branch selection"""
@@ -121,13 +193,13 @@ class ReportWindow:
         # Show/hide date frame based on report type
         if report_type == "Daily Sales":
             self.date_frame.grid()
-            self.branch_note_label.config(text="")
+            self.branch_note_label.configure(text="")
         else:
             self.date_frame.grid_remove()
             if report_type == "Complete Business Stock":
-                self.branch_note_label.config(text="Note: This report shows stock for ALL branches")
+                self.branch_note_label.configure(text="Note: This report shows stock for ALL branches")
             else:
-                self.branch_note_label.config(text="")
+                self.branch_note_label.configure(text="")
     
     def generate_report(self):
         """Generate the selected report"""

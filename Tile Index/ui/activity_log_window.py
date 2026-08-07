@@ -5,6 +5,7 @@ Admin-only window for viewing user activity audit logs
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+import customtkinter as ctk
 from datetime import datetime, date
 from repositories.activity_log_repository import ActivityLogRepository
 from repositories.branch_repository import BranchRepository
@@ -12,6 +13,7 @@ from repositories.user_repository import UserRepository
 from services.activity_log_service import ActivityLogService
 from services.auth_service import AuthenticationService
 from utils.datetime_format import format_business_datetime
+from ui.theme import COLORS, FONTS, SIZES, SPACING
 
 
 class ActivityLogWindow:
@@ -38,43 +40,37 @@ class ActivityLogWindow:
     
     def setup_ui(self):
         """Setup the activity log UI"""
-        # Header
-        header = tk.Label(
+        header = ctk.CTkLabel(
             self.parent,
             text="Activity Log / Audit Trail",
-            font=("Arial", 18, "bold"),
-            bg="#8e44ad",
-            fg="white",
-            pady=10
+            font=FONTS["section"],
+            fg_color=COLORS["surface"],
+            text_color=COLORS["text"],
+            height=48,
         )
         header.pack(fill=tk.X)
-        
-        # Main container
-        main_frame = tk.Frame(self.parent)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # Left panel - Filters
-        left_frame = tk.LabelFrame(main_frame, text="Filters", font=("Arial", 12, "bold"), padx=10, pady=10)
+
+        main_frame = ctk.CTkFrame(self.parent, fg_color=COLORS["app_bg"], corner_radius=0)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=SPACING["page_x"], pady=SPACING["page_y"])
+
+        left_frame = self.panel(main_frame, "Filters")
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=False, padx=(0, 5))
-        
-        # User filter
-        tk.Label(left_frame, text="User:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, pady=5)
+
+        self.form_label(left_frame, "User:").grid(row=1, column=0, sticky=tk.W, pady=5, padx=(12, 8))
         self.user_var = tk.StringVar(value="All Users")
-        user_combo = ttk.Combobox(left_frame, textvariable=self.user_var, width=25, state="readonly", font=("Arial", 10))
+        user_combo = ttk.Combobox(left_frame, textvariable=self.user_var, width=SIZES["compact_dropdown_width"], state="readonly", font=FONTS["small"])
         user_combo['values'] = ["All Users"] + [f"{u.username} ({u.role})" for u in self.users]
-        user_combo.grid(row=0, column=1, pady=5, padx=5, sticky=tk.W)
-        
-        # Branch filter
-        tk.Label(left_frame, text="Branch:", font=("Arial", 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
+        user_combo.grid(row=1, column=1, pady=5, padx=(0, 12), sticky=tk.W)
+
+        self.form_label(left_frame, "Branch:").grid(row=2, column=0, sticky=tk.W, pady=5, padx=(12, 8))
         self.branch_var = tk.StringVar(value="All Branches")
-        branch_combo = ttk.Combobox(left_frame, textvariable=self.branch_var, width=25, state="readonly", font=("Arial", 10))
+        branch_combo = ttk.Combobox(left_frame, textvariable=self.branch_var, width=SIZES["compact_dropdown_width"], state="readonly", font=FONTS["small"])
         branch_combo['values'] = ["All Branches"] + [f"{b.name}" for b in self.branches]
-        branch_combo.grid(row=1, column=1, pady=5, padx=5, sticky=tk.W)
-        
-        # Action type filter
-        tk.Label(left_frame, text="Action Type:", font=("Arial", 10)).grid(row=2, column=0, sticky=tk.W, pady=5)
+        branch_combo.grid(row=2, column=1, pady=5, padx=(0, 12), sticky=tk.W)
+
+        self.form_label(left_frame, "Action Type:").grid(row=3, column=0, sticky=tk.W, pady=5, padx=(12, 8))
         self.action_type_var = tk.StringVar(value="All Actions")
-        action_combo = ttk.Combobox(left_frame, textvariable=self.action_type_var, width=25, state="readonly", font=("Arial", 10))
+        action_combo = ttk.Combobox(left_frame, textvariable=self.action_type_var, width=SIZES["compact_dropdown_width"], state="readonly", font=FONTS["small"])
         action_types = [
             "All Actions",
             ActivityLogService.ACTION_STOCK_IN,
@@ -92,64 +88,148 @@ class ActivityLogWindow:
             ActivityLogService.ACTION_LOGOUT
         ]
         action_combo['values'] = action_types
-        action_combo.grid(row=2, column=1, pady=5, padx=5, sticky=tk.W)
-        
-        # Date from
-        tk.Label(left_frame, text="Date From:", font=("Arial", 10)).grid(row=3, column=0, sticky=tk.W, pady=5)
-        self.date_from_entry = tk.Entry(left_frame, width=25, font=("Arial", 10))
-        self.date_from_entry.grid(row=3, column=1, pady=5, padx=5)
+        action_combo.grid(row=3, column=1, pady=5, padx=(0, 12), sticky=tk.W)
+
+        self.form_label(left_frame, "Date From:").grid(row=4, column=0, sticky=tk.W, pady=5, padx=(12, 8))
+        self.date_from_entry = self.form_entry(left_frame, width=210)
+        self.date_from_entry.grid(row=4, column=1, pady=5, padx=(0, 12), sticky=tk.W)
         # Set default to first day of current month
         first_day = date.today().replace(day=1)
         self.date_from_entry.insert(0, first_day.strftime("%Y-%m-%d"))
-        
-        # Date to
-        tk.Label(left_frame, text="Date To:", font=("Arial", 10)).grid(row=4, column=0, sticky=tk.W, pady=5)
-        self.date_to_entry = tk.Entry(left_frame, width=25, font=("Arial", 10))
-        self.date_to_entry.grid(row=4, column=1, pady=5, padx=5)
+
+        self.form_label(left_frame, "Date To:").grid(row=5, column=0, sticky=tk.W, pady=5, padx=(12, 8))
+        self.date_to_entry = self.form_entry(left_frame, width=210)
+        self.date_to_entry.grid(row=5, column=1, pady=5, padx=(0, 12), sticky=tk.W)
         self.date_to_entry.insert(0, date.today().strftime("%Y-%m-%d"))
-        
-        # Search button
-        tk.Button(left_frame, text="Search", command=self.search_activities, bg="#3498db", fg="white", width=20, font=("Arial", 10, "bold")).grid(row=5, column=0, columnspan=2, pady=15)
-        
-        # Clear filters button
-        tk.Button(left_frame, text="Clear Filters", command=self.clear_filters, bg="#95a5a6", fg="white", width=20).grid(row=6, column=0, columnspan=2, pady=5)
-        
-        # Right panel - Activity Log Display
-        right_frame = tk.LabelFrame(main_frame, text="Activity Log", font=("Arial", 12, "bold"), padx=10, pady=10)
+
+        self.action_button(left_frame, "Search", self.search_activities, width=170).grid(row=6, column=0, columnspan=2, pady=(15, 5))
+        self.action_button(left_frame, "Clear Filters", self.clear_filters, width=170, primary=False).grid(row=7, column=0, columnspan=2, pady=(5, 12))
+
+        right_frame = self.panel(main_frame, "Activity Log")
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
-        
-        # Treeview for activities
+        right_frame.grid_rowconfigure(1, weight=1)
+        right_frame.grid_columnconfigure(0, weight=1)
+
         columns = ('Date/Time', 'User', 'Role', 'Branch', 'Action', 'Details')
         self.activities_tree = ttk.Treeview(right_frame, columns=columns, show='headings', height=25)
-        
+
+        column_widths = {
+            'Date/Time': 150,
+            'User': 120,
+            'Role': 80,
+            'Branch': 150,
+            'Action': 150,
+            'Details': 320,
+        }
         for col in columns:
             self.activities_tree.heading(col, text=col)
-            self.activities_tree.column(col, width=150, anchor=tk.W)
-        
-        self.activities_tree.column('Date/Time', width=150)
-        self.activities_tree.column('User', width=120)
-        self.activities_tree.column('Role', width=80)
-        self.activities_tree.column('Branch', width=150)
-        self.activities_tree.column('Action', width=150)
-        self.activities_tree.column('Details', width=300)
-        
+            self.activities_tree.column(col, width=column_widths[col], anchor=tk.W)
+
         scrollbar = ttk.Scrollbar(right_frame, orient=tk.VERTICAL, command=self.activities_tree.yview)
-        self.activities_tree.configure(yscrollcommand=scrollbar.set)
-        
-        self.activities_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
+        xscrollbar = ttk.Scrollbar(right_frame, orient=tk.HORIZONTAL, command=self.activities_tree.xview)
+        self.activities_tree.configure(yscrollcommand=scrollbar.set, xscrollcommand=xscrollbar.set)
+
+        self.activities_tree.grid(row=1, column=0, sticky=tk.NSEW, padx=(12, 0), pady=(0, 0))
+        scrollbar.grid(row=1, column=1, sticky=tk.NS, padx=(0, 12), pady=(0, 0))
+        xscrollbar.grid(row=2, column=0, sticky=tk.EW, padx=(12, 0), pady=(0, 8))
+
         self.activities_tree.bind('<<TreeviewSelect>>', self.on_activity_select)
-        
-        # Details text area
-        details_frame = tk.LabelFrame(right_frame, text="Activity Details", font=("Arial", 10, "bold"), padx=5, pady=5)
-        details_frame.pack(fill=tk.X, pady=5)
-        
-        self.details_text = tk.Text(details_frame, height=5, font=("Courier", 9), state=tk.DISABLED, wrap=tk.WORD)
-        self.details_text.pack(fill=tk.BOTH, expand=True)
-        
-        # Export button
-        tk.Button(right_frame, text="Export Log", command=self.export_log, bg="#27ae60", fg="white", width=20).pack(pady=5)
+
+        details_frame = self.subpanel(right_frame, "Activity Details")
+        details_frame.grid(row=3, column=0, columnspan=2, sticky=tk.EW, padx=12, pady=(0, 8))
+        details_frame.grid_columnconfigure(0, weight=1)
+
+        self.details_text = tk.Text(
+            details_frame,
+            height=5,
+            font=("Consolas", 9),
+            state=tk.DISABLED,
+            wrap=tk.WORD,
+            bg=COLORS["app_bg"],
+            fg=COLORS["text"],
+            insertbackground=COLORS["text"],
+            selectbackground=COLORS["primary"],
+            selectforeground=COLORS["text"],
+            relief=tk.FLAT,
+            borderwidth=0,
+            padx=10,
+            pady=8,
+        )
+        self.details_text.grid(row=1, column=0, sticky=tk.EW, padx=8, pady=(0, 8))
+
+        self.action_button(right_frame, "Export Log", self.export_log, width=170).grid(row=4, column=0, columnspan=2, pady=(0, 12))
+
+    def panel(self, parent, title):
+        panel = ctk.CTkFrame(
+            parent,
+            fg_color=COLORS["surface"],
+            corner_radius=SIZES["corner_radius"],
+            border_width=1,
+            border_color=COLORS["border"],
+        )
+        ctk.CTkLabel(
+            panel,
+            text=title,
+            font=FONTS["body_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["section_label_height"],
+        ).grid(row=0, column=0, columnspan=2, sticky=tk.EW, padx=12, pady=(10, 8))
+        return panel
+
+    def subpanel(self, parent, title):
+        panel = ctk.CTkFrame(
+            parent,
+            fg_color=COLORS["card"],
+            corner_radius=SIZES["corner_radius"],
+            border_width=1,
+            border_color=COLORS["border"],
+        )
+        ctk.CTkLabel(
+            panel,
+            text=title,
+            font=FONTS["small_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["small_label_height"],
+        ).grid(row=0, column=0, columnspan=2, sticky=tk.EW, padx=8, pady=(8, 4))
+        return panel
+
+    def form_label(self, parent, text):
+        return ctk.CTkLabel(
+            parent,
+            text=text,
+            font=FONTS["small"],
+            text_color=COLORS["text"],
+            height=SIZES["small_label_height"],
+            anchor=tk.W,
+        )
+
+    def form_entry(self, parent, width=200):
+        return ctk.CTkEntry(
+            parent,
+            width=width,
+            height=SIZES["input_height"],
+            font=FONTS["small"],
+            fg_color=COLORS["app_bg"],
+            border_color=COLORS["border"],
+            text_color=COLORS["text"],
+        )
+
+    def action_button(self, parent, text, command, width=150, primary=True):
+        return ctk.CTkButton(
+            parent,
+            text=text,
+            command=command,
+            width=width,
+            height=34,
+            fg_color=COLORS["primary"] if primary else COLORS["card"],
+            hover_color=COLORS["primary_hover"] if primary else COLORS["card_hover"],
+            text_color=COLORS["text"],
+            font=FONTS["small_bold"],
+            border_width=0 if primary else 1,
+            border_color=COLORS["border"],
+            corner_radius=SIZES["corner_radius"],
+            cursor="hand2",
+        )
     
     def load_all_activities(self):
         """Load all activities without popup messages"""

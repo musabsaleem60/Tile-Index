@@ -3,8 +3,17 @@ Invoice Printer Utility
 Generates printable invoice format in Pakistani style
 """
 
+import os
+import re
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
+
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
 from repositories.branch_repository import BranchRepository
 from repositories.product_repository import ProductRepository
 from repositories.accessory_repository import AccessoryRepository
@@ -85,7 +94,7 @@ class InvoicePrintWindow:
         btn_frame = tk.Frame(self.parent)
         btn_frame.pack(pady=10)
         
-        tk.Button(btn_frame, text="Print", command=lambda: self.print_invoice(canvas), 
+        tk.Button(btn_frame, text="Print Invoice", command=self.print_invoice,
                  bg="#3498db", fg="white", width=15, font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
         tk.Button(btn_frame, text="Close", command=self.parent.destroy, 
                  bg="#95a5a6", fg="white", width=15).pack(side=tk.LEFT, padx=5)
@@ -270,12 +279,269 @@ class InvoicePrintWindow:
         tk.Label(parent, text="Tile Index - Quality Tiles, Trusted Service", 
                 font=("Arial", 9), bg="white", fg="#95a5a6").pack()
     
-    def print_invoice(self, canvas):
-        """Print the invoice"""
+    def print_invoice(self):
+        """Generate a PDF invoice and open it with the default PDF viewer."""
         try:
-            # Create a new window for printing
-            canvas.postscript(file="invoice.ps", colormode='color')
-            messagebox.showinfo("Print", "Invoice saved as invoice.ps\nYou can print this file or use system print dialog.")
+            pdf_path = self.generate_invoice_pdf()
+            try:
+                os.startfile(pdf_path)
+            except Exception as e:
+                messagebox.showwarning(
+                    "Invoice PDF Created",
+                    "The invoice PDF was created, but Windows could not open a PDF viewer.\n\n"
+                    f"File path:\n{pdf_path}\n\nError: {str(e)}"
+                )
         except Exception as e:
-            messagebox.showerror("Print Error", f"Failed to generate print file: {str(e)}")
+            messagebox.showerror("Print Error", f"Failed to generate invoice PDF: {str(e)}")
+
+    def generate_invoice_pdf(self):
+        """Create a black-on-white PDF invoice and return the file path."""
+        pdf_path = self.next_invoice_pdf_path()
+        doc = SimpleDocTemplate(
+            pdf_path,
+            pagesize=landscape(A4),
+            rightMargin=10 * mm,
+            leftMargin=10 * mm,
+            topMargin=10 * mm,
+            bottomMargin=10 * mm,
+            title=f"Invoice {self.invoice.invoice_number}",
+        )
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "InvoiceTitle",
+            parent=styles["Title"],
+            fontName="Helvetica-Bold",
+            fontSize=18,
+            leading=22,
+            textColor=colors.black,
+            alignment=1,
+            spaceAfter=4,
+        )
+        subtitle_style = ParagraphStyle(
+            "InvoiceSubtitle",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=10,
+            leading=12,
+            textColor=colors.black,
+            alignment=1,
+        )
+        normal = ParagraphStyle(
+            "InvoiceNormal",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=8,
+            leading=10,
+            textColor=colors.black,
+        )
+        normal_bold = ParagraphStyle(
+            "InvoiceNormalBold",
+            parent=normal,
+            fontName="Helvetica-Bold",
+        )
+        void_style = ParagraphStyle(
+            "InvoiceVoid",
+            parent=normal_bold,
+            fontSize=13,
+            leading=16,
+            textColor=colors.black,
+        )
+
+        story = [
+            Paragraph("TILE INDEX", title_style),
+            Paragraph("Tiles Trading Company", subtitle_style),
+            Paragraph("Pakistan", subtitle_style),
+        ]
+        if self.branch:
+            story.append(Paragraph(self.escape_text(self.branch.name), subtitle_style))
+        story.append(Spacer(1, 8))
+
+        invoice_date = format_business_datetime(self.invoice.invoice_date, fmt="%d-%m-%Y %H:%M:%S")
+        details_left = [
+            Paragraph(f"<b>Invoice No:</b> {self.escape_text(self.invoice.invoice_number)}", normal),
+            Paragraph(f"<b>Date:</b> {self.escape_text(invoice_date)}", normal),
+        ]
+        if getattr(self.invoice, "status", "active") == "void":
+            details_left.insert(1, Paragraph("STATUS: VOID", void_style))
+            if getattr(self.invoice, "void_reason", None):
+                details_left.insert(2, Paragraph(f"<b>Void Reason:</b> {self.escape_text(self.invoice.void_reason)}", normal))
+
+        details_right = [
+            Paragraph("<b>Customer Details</b>", normal),
+            Paragraph(f"<b>Name:</b> {self.escape_text(self.invoice.customer_name)}", normal),
+        ]
+        if self.invoice.customer_contact:
+            details_right.append(Paragraph(f"<b>Contact:</b> {self.escape_text(self.invoice.customer_contact)}", normal))
+
+        details_table = Table([[details_left, details_right]], colWidths=[130 * mm, 130 * mm])
+        details_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.black),
+            ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.black),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.extend([details_table, Spacer(1, 8)])
+
+        table_data = [[
+            Paragraph("<b>S.No</b>", normal_bold),
+            Paragraph("<b>Item</b>", normal_bold),
+            Paragraph("<b>Size</b>", normal_bold),
+            Paragraph("<b>Grade</b>", normal_bold),
+            Paragraph("<b>Boxes</b>", normal_bold),
+            Paragraph("<b>Pieces</b>", normal_bold),
+            Paragraph("<b>Rate/m2</b>", normal_bold),
+            Paragraph("<b>Rate/Box</b>", normal_bold),
+            Paragraph("<b>Rate/Piece</b>", normal_bold),
+            Paragraph("<b>Total</b>", normal_bold),
+        ]]
+
+        for idx, item in enumerate(self.invoice.items, 1):
+            table_data.append([
+                str(idx),
+                Paragraph(self.escape_text(self.item_label(item)), normal),
+                Paragraph(self.escape_text(self.item_size(item)), normal),
+                Paragraph(self.escape_text(item.grade or "-"), normal),
+                self.quantity_text(item.boxes),
+                self.quantity_text(item.loose_pieces) if item.product_id else "-",
+                self.money_text(item.rate_per_sqm) if item.product_id else "-",
+                self.money_text(item.rate_per_box),
+                self.money_text(item.rate_per_piece) if item.product_id else "-",
+                self.money_text(item.line_total),
+            ])
+
+        items_table = Table(
+            table_data,
+            colWidths=[12 * mm, 60 * mm, 22 * mm, 24 * mm, 18 * mm, 18 * mm, 25 * mm, 25 * mm, 27 * mm, 28 * mm],
+            repeatRows=1,
+        )
+        items_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.white),
+            ("TEXTCOLOR", (0, 0), (-1, -1), colors.black),
+            ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("LEADING", (0, 0), (-1, -1), 9),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("ALIGN", (0, 0), (0, -1), "CENTER"),
+            ("ALIGN", (4, 1), (-1, -1), "RIGHT"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 3),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.extend([items_table, Spacer(1, 10)])
+
+        totals_rows = [
+            ["Sub Total", self.money_text(self.invoice.subtotal)],
+        ]
+        if self.invoice.discount > 0:
+            totals_rows.append(["Discount", self.money_text(self.invoice.discount)])
+        totals_rows.extend([
+            ["Grand Total", self.money_text(self.invoice.grand_total)],
+            ["Paid Amount", self.money_text(self.invoice.paid_amount)],
+            ["Balance", self.money_text(self.invoice.balance)],
+        ])
+        totals_table = Table(totals_rows, colWidths=[45 * mm, 35 * mm], hAlign="RIGHT")
+        totals_table.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+            ("TEXTCOLOR", (0, 0), (-1, -1), colors.black),
+            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTNAME", (0, 2 if self.invoice.discount > 0 else 1), (-1, 2 if self.invoice.discount > 0 else 1), "Helvetica-Bold"),
+            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.extend([totals_table, Spacer(1, 12)])
+
+        story.append(Paragraph("Thank you for your business!", subtitle_style))
+        story.append(Paragraph("Tile Index - Quality Tiles, Trusted Service", subtitle_style))
+
+        doc.build(story)
+        return pdf_path
+
+    def invoice_pdf_dir(self):
+        base_dir = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+        path = os.path.join(base_dir, "TileIndex", "invoices")
+        os.makedirs(path, exist_ok=True)
+        return path
+
+    def next_invoice_pdf_path(self):
+        invoice_number = self.safe_filename(self.invoice.invoice_number or "invoice")
+        base = f"invoice_{invoice_number}.pdf"
+        folder = self.invoice_pdf_dir()
+        candidate = os.path.join(folder, base)
+        if not os.path.exists(candidate):
+            return candidate
+
+        stem, ext = os.path.splitext(base)
+        counter = 2
+        while True:
+            candidate = os.path.join(folder, f"{stem}_{counter}{ext}")
+            if not os.path.exists(candidate):
+                return candidate
+            counter += 1
+
+    @staticmethod
+    def safe_filename(value):
+        return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value)).strip("_") or "invoice"
+
+    @staticmethod
+    def escape_text(value):
+        return (
+            str(value or "")
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        )
+
+    @staticmethod
+    def money_text(value):
+        try:
+            return f"Rs. {float(value or 0):.2f}"
+        except (TypeError, ValueError):
+            return "Rs. 0.00"
+
+    @staticmethod
+    def quantity_text(value):
+        try:
+            number = float(value or 0)
+        except (TypeError, ValueError):
+            return "0"
+        if number.is_integer():
+            return str(int(number))
+        return str(number)
+
+    def item_label(self, item):
+        if item.product_id:
+            product = self.products.get(item.product_id)
+            return product.name if product else "Unknown Tile"
+        if item.accessory_id:
+            accessory = self.accessories.get(item.accessory_id)
+            return accessory_display_label(accessory) if accessory else "Unknown Accessory"
+        if item.sanitary_product_id:
+            sanitary_product = self.sanitary_products.get(item.sanitary_product_id)
+            if sanitary_product:
+                return f"{sanitary_product.company_name} - {sanitary_product.product_category}"
+            return "Unknown Sanitary Product"
+        return "Unknown Item"
+
+    def item_size(self, item):
+        if item.product_id:
+            return item.tile_size or "-"
+        if item.accessory_id:
+            accessory = self.accessories.get(item.accessory_id)
+            return accessory.category if accessory else "-"
+        if item.sanitary_product_id:
+            sanitary_product = self.sanitary_products.get(item.sanitary_product_id)
+            return sanitary_product.color if sanitary_product else "-"
+        return "-"
 
