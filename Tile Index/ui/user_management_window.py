@@ -5,10 +5,12 @@ Admin-only window for managing users
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+import customtkinter as ctk
 from repositories.user_repository import UserRepository
 from repositories.branch_repository import BranchRepository
 from models.user import User
 from services.auth_service import AuthenticationService
+from ui.theme import COLORS, FONTS, SIZES, SPACING
 
 
 class UserManagementWindow:
@@ -27,91 +29,169 @@ class UserManagementWindow:
     
     def setup_ui(self):
         """Setup the user management UI"""
-        # Header
-        header = tk.Label(
+        header = ctk.CTkLabel(
             self.parent,
             text="User Management",
-            font=("Arial", 18, "bold"),
-            bg="#16a085",
-            fg="white",
-            pady=10
+            font=FONTS["section"],
+            fg_color=COLORS["surface"],
+            text_color=COLORS["text"],
+            height=48,
         )
         header.pack(fill=tk.X)
-        
-        # Main container
-        main_frame = tk.Frame(self.parent)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # Left panel - User Form
-        left_frame = tk.LabelFrame(main_frame, text="Add/Edit User", font=("Arial", 12, "bold"), padx=10, pady=10)
+
+        main_frame = ctk.CTkFrame(self.parent, fg_color=COLORS["app_bg"], corner_radius=0)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=SPACING["page_x"], pady=SPACING["page_y"])
+
+        left_frame = self.panel(main_frame, "Add/Edit User")
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=False, padx=(0, 5))
-        
-        # Username
-        tk.Label(left_frame, text="Username:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.username_entry = tk.Entry(left_frame, width=25, font=("Arial", 10))
-        self.username_entry.grid(row=0, column=1, pady=5, padx=5)
-        
-        # Password
-        tk.Label(left_frame, text="Password:", font=("Arial", 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.password_entry = tk.Entry(left_frame, width=25, font=("Arial", 10), show="*")
-        self.password_entry.grid(row=1, column=1, pady=5, padx=5)
-        tk.Label(left_frame, text="(Leave blank to keep current)", font=("Arial", 8), fg="gray").grid(row=2, column=1, sticky=tk.W, padx=5)
-        
-        # Role
-        tk.Label(left_frame, text="Role:", font=("Arial", 10)).grid(row=3, column=0, sticky=tk.W, pady=5)
+
+        self.form_label(left_frame, "Username:").grid(row=1, column=0, sticky=tk.W, pady=5, padx=(12, 8))
+        self.username_entry = self.form_entry(left_frame, width=230)
+        self.username_entry.grid(row=1, column=1, pady=5, padx=(0, 12), sticky=tk.W)
+
+        self.form_label(left_frame, "Password:").grid(row=2, column=0, sticky=tk.W, pady=5, padx=(12, 8))
+        self.password_entry = self.form_entry(left_frame, width=230, show="*")
+        self.password_entry.grid(row=2, column=1, pady=5, padx=(0, 12), sticky=tk.W)
+        ctk.CTkLabel(
+            left_frame,
+            text="(Leave blank to keep current)",
+            font=FONTS["status"],
+            text_color=COLORS["text_muted"],
+            height=SIZES["small_label_height"],
+        ).grid(row=3, column=1, sticky=tk.W, padx=(0, 12))
+
+        self.form_label(left_frame, "Role:").grid(row=4, column=0, sticky=tk.W, pady=5, padx=(12, 8))
         self.role_var = tk.StringVar(value="employee")
-        role_combo = ttk.Combobox(left_frame, textvariable=self.role_var, width=22, state="readonly", font=("Arial", 10))
+        role_combo = ttk.Combobox(left_frame, textvariable=self.role_var, width=SIZES["compact_dropdown_width"], state="readonly", font=FONTS["small"])
         role_combo['values'] = ['admin', 'employee']
-        role_combo.grid(row=3, column=1, pady=5, padx=5, sticky=tk.W)
+        role_combo.grid(row=4, column=1, pady=5, padx=(0, 12), sticky=tk.W)
         role_combo.bind('<<ComboboxSelected>>', self.on_role_change)
-        
-        # Branch (for employees)
-        tk.Label(left_frame, text="Branch:", font=("Arial", 10)).grid(row=4, column=0, sticky=tk.W, pady=5)
+
+        self.form_label(left_frame, "Branch:").grid(row=5, column=0, sticky=tk.W, pady=5, padx=(12, 8))
         self.branch_var = tk.StringVar()
-        self.branch_combo = ttk.Combobox(left_frame, textvariable=self.branch_var, width=22, state="readonly", font=("Arial", 10))
+        self.branch_combo = ttk.Combobox(left_frame, textvariable=self.branch_var, width=SIZES["compact_dropdown_width"], state="readonly", font=FONTS["small"])
         self.branch_combo['values'] = [f"{b.name}" for b in self.branches]
-        self.branch_combo.grid(row=4, column=1, pady=5, padx=5, sticky=tk.W)
+        self.branch_combo.grid(row=5, column=1, pady=5, padx=(0, 12), sticky=tk.W)
         self.on_role_change()  # Initialize branch visibility
-        
-        # Active status
+
         self.is_active_var = tk.BooleanVar(value=True)
-        tk.Checkbutton(left_frame, text="Active", variable=self.is_active_var, font=("Arial", 10)).grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=5, padx=5)
-        
-        # Buttons
-        btn_frame = tk.Frame(left_frame)
-        btn_frame.grid(row=6, column=0, columnspan=2, pady=15)
-        
-        self.add_update_btn = tk.Button(btn_frame, text="Add User", command=self.add_or_update_user, bg="#3498db", fg="white", width=15)
+        ctk.CTkCheckBox(
+            left_frame,
+            text="Active",
+            variable=self.is_active_var,
+            font=FONTS["small"],
+            text_color=COLORS["text"],
+            fg_color=COLORS["primary"],
+            hover_color=COLORS["primary_hover"],
+            border_color=COLORS["border"],
+        ).grid(row=6, column=0, columnspan=2, sticky=tk.W, pady=8, padx=12)
+
+        btn_frame = ctk.CTkFrame(left_frame, fg_color="transparent", corner_radius=0)
+        btn_frame.grid(row=7, column=0, columnspan=2, pady=15)
+
+        self.add_update_btn = self.action_button(btn_frame, "Add User", self.add_or_update_user, width=130)
         self.add_update_btn.pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Clear", command=self.clear_form, bg="#95a5a6", fg="white", width=15).pack(side=tk.LEFT, padx=5)
-        
-        # Right panel - Users List
-        right_frame = tk.LabelFrame(main_frame, text="Users List", font=("Arial", 12, "bold"), padx=10, pady=10)
+        self.action_button(btn_frame, "Clear", self.clear_form, width=120, primary=False).pack(side=tk.LEFT, padx=5)
+
+        right_frame = self.panel(main_frame, "Users List")
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
-        
-        # Treeview
+        right_frame.grid_rowconfigure(1, weight=1)
+        right_frame.grid_columnconfigure(0, weight=1)
+
         columns = ('Username', 'Role', 'Branch', 'Status')
         self.users_tree = ttk.Treeview(right_frame, columns=columns, show='headings', height=20)
-        
+
+        column_widths = {
+            'Username': 180,
+            'Role': 120,
+            'Branch': 220,
+            'Status': 120,
+        }
         for col in columns:
             self.users_tree.heading(col, text=col)
-            self.users_tree.column(col, width=150, anchor=tk.CENTER)
-        
+            self.users_tree.column(col, width=column_widths[col], anchor=tk.CENTER)
+
         scrollbar = ttk.Scrollbar(right_frame, orient=tk.VERTICAL, command=self.users_tree.yview)
         self.users_tree.configure(yscrollcommand=scrollbar.set)
-        
-        self.users_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
+
+        self.users_tree.grid(row=1, column=0, sticky=tk.NSEW, padx=(12, 0), pady=(0, 8))
+        scrollbar.grid(row=1, column=1, sticky=tk.NS, padx=(0, 12), pady=(0, 8))
+
         self.users_tree.bind('<<TreeviewSelect>>', self.on_user_select)
-        
-        # Action buttons
-        action_frame = tk.Frame(right_frame)
-        action_frame.pack(pady=5)
-        
-        tk.Button(action_frame, text="Edit User", command=self.edit_selected_user, bg="#f39c12", fg="white", width=15).pack(side=tk.LEFT, padx=5)
-        tk.Button(action_frame, text="Deactivate/Activate", command=self.toggle_user_status, bg="#e67e22", fg="white", width=18).pack(side=tk.LEFT, padx=5)
-        tk.Button(action_frame, text="Change Password", command=self.change_password, bg="#9b59b6", fg="white", width=15).pack(side=tk.LEFT, padx=5)
+
+        action_frame = ctk.CTkFrame(right_frame, fg_color="transparent", corner_radius=0)
+        action_frame.grid(row=2, column=0, columnspan=2, pady=(4, 12))
+
+        self.action_button(action_frame, "Edit User", self.edit_selected_user, width=130).pack(side=tk.LEFT, padx=5)
+        self.action_button(action_frame, "Deactivate/Activate", self.toggle_user_status, width=180, warning=True).pack(side=tk.LEFT, padx=5)
+        self.action_button(action_frame, "Change Password", self.change_password, width=160).pack(side=tk.LEFT, padx=5)
+
+        left_frame.grid_columnconfigure(1, weight=1)
+
+    def panel(self, parent, title):
+        panel = ctk.CTkFrame(
+            parent,
+            fg_color=COLORS["surface"],
+            corner_radius=SIZES["corner_radius"],
+            border_width=1,
+            border_color=COLORS["border"],
+        )
+        ctk.CTkLabel(
+            panel,
+            text=title,
+            font=FONTS["body_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["section_label_height"],
+        ).grid(row=0, column=0, columnspan=2, sticky=tk.EW, padx=12, pady=(10, 8))
+        return panel
+
+    def form_label(self, parent, text):
+        return ctk.CTkLabel(
+            parent,
+            text=text,
+            font=FONTS["small"],
+            text_color=COLORS["text"],
+            height=SIZES["small_label_height"],
+            anchor=tk.W,
+        )
+
+    def form_entry(self, parent, width=220, show=None):
+        return ctk.CTkEntry(
+            parent,
+            width=width,
+            height=SIZES["input_height"],
+            font=FONTS["small"],
+            fg_color=COLORS["app_bg"],
+            border_color=COLORS["border"],
+            text_color=COLORS["text"],
+            show=show,
+        )
+
+    def action_button(self, parent, text, command, width=140, primary=True, warning=False):
+        if warning:
+            fg_color = COLORS["warning"]
+            hover_color = COLORS["warning_hover"]
+        elif primary:
+            fg_color = COLORS["primary"]
+            hover_color = COLORS["primary_hover"]
+        else:
+            fg_color = COLORS["card"]
+            hover_color = COLORS["card_hover"]
+        return ctk.CTkButton(
+            parent,
+            text=text,
+            command=command,
+            width=width,
+            height=34,
+            fg_color=fg_color,
+            hover_color=hover_color,
+            text_color=COLORS["text"],
+            font=FONTS["small_bold"],
+            border_width=0 if primary or warning else 1,
+            border_color=COLORS["border"],
+            corner_radius=SIZES["corner_radius"],
+            cursor="hand2",
+        )
     
     def on_role_change(self, event=None):
         """Show/hide branch selection based on role"""
@@ -246,7 +326,7 @@ class UserManagementWindow:
             self.is_active_var.set(user.is_active)
             
             self.editing_user_id = user.id
-            self.add_update_btn.config(text="Update User", bg="#f39c12")
+            self.add_update_btn.configure(text="Update User", fg_color=COLORS["warning"], hover_color=COLORS["warning_hover"])
             
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load user: {str(e)}")
@@ -296,10 +376,11 @@ class UserManagementWindow:
             return
         
         # Create password dialog
-        dialog = tk.Toplevel(self.parent)
+        dialog = ctk.CTkToplevel(self.parent)
         dialog.title("Change Password")
         dialog.geometry("350x150")
         dialog.resizable(False, False)
+        dialog.configure(fg_color=COLORS["app_bg"])
         
         # Center dialog
         dialog.update_idletasks()
@@ -307,14 +388,26 @@ class UserManagementWindow:
         y = (dialog.winfo_screenheight() // 2) - (75)
         dialog.geometry(f'350x150+{x}+{y}')
         
-        tk.Label(dialog, text="New Password:", font=("Arial", 10)).pack(pady=10)
-        password_entry = tk.Entry(dialog, width=30, font=("Arial", 10), show="*")
-        password_entry.pack(pady=5)
+        ctk.CTkLabel(
+            dialog,
+            text="New Password:",
+            font=FONTS["small_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["small_label_height"],
+        ).pack(pady=(12, 4))
+        password_entry = self.form_entry(dialog, width=260, show="*")
+        password_entry.pack(pady=4)
         password_entry.focus()
-        
-        tk.Label(dialog, text="Confirm Password:", font=("Arial", 10)).pack(pady=5)
-        confirm_entry = tk.Entry(dialog, width=30, font=("Arial", 10), show="*")
-        confirm_entry.pack(pady=5)
+
+        ctk.CTkLabel(
+            dialog,
+            text="Confirm Password:",
+            font=FONTS["small_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["small_label_height"],
+        ).pack(pady=(6, 4))
+        confirm_entry = self.form_entry(dialog, width=260, show="*")
+        confirm_entry.pack(pady=4)
         
         def save_password():
             new_password = password_entry.get()
@@ -342,7 +435,7 @@ class UserManagementWindow:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to change password: {str(e)}")
         
-        tk.Button(dialog, text="Change Password", command=save_password, bg="#3498db", fg="white", width=20).pack(pady=10)
+        self.action_button(dialog, "Change Password", save_password, width=180).pack(pady=10)
         confirm_entry.bind('<Return>', lambda e: save_password())
     
     def clear_form(self):
@@ -353,6 +446,6 @@ class UserManagementWindow:
         self.branch_var.set("")
         self.is_active_var.set(True)
         self.editing_user_id = None
-        self.add_update_btn.config(text="Add User", bg="#3498db")
+        self.add_update_btn.configure(text="Add User", fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"])
         self.on_role_change()
 
