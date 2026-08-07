@@ -69,14 +69,15 @@ class InvoiceWindow:
         main_frame.pack(fill=tk.BOTH, expand=True, padx=SPACING["page_x"], pady=SPACING["page_y"])
         
         # Left panel - Invoice Details
-        left_frame = ctk.CTkFrame(
+        left_frame = ctk.CTkScrollableFrame(
             main_frame,
+            width=560,
             fg_color=COLORS["surface"],
             corner_radius=SIZES["corner_radius"],
             border_width=1,
             border_color=COLORS["border"],
         )
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=False, padx=(0, 5))
+        left_frame.pack(side=tk.LEFT, fill=tk.Y, expand=False, padx=(0, 5))
         ctk.CTkLabel(
             left_frame,
             text="Invoice Details",
@@ -221,20 +222,32 @@ class InvoiceWindow:
         columns = ('S.No', 'Product', 'Size', 'Grade', 'Boxes', 'Pieces', 'Rate/Box', 'Rate/Piece', 'Total')
         table_frame = ctk.CTkFrame(right_frame, fg_color=COLORS["surface"], corner_radius=SIZES["corner_radius"], border_width=1, border_color=COLORS["border"])
         table_frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 8))
+        table_frame.grid_rowconfigure(0, weight=1)
+        table_frame.grid_columnconfigure(0, weight=1)
         self.items_tree = ttk.Treeview(table_frame, columns=columns, show='headings', height=20)
-        
+
+        column_widths = {
+            'S.No': 55,
+            'Product': 210,
+            'Size': 75,
+            'Grade': 90,
+            'Boxes': 70,
+            'Pieces': 70,
+            'Rate/Box': 85,
+            'Rate/Piece': 90,
+            'Total': 95,
+        }
         for col in columns:
             self.items_tree.heading(col, text=col)
-            self.items_tree.column(col, width=100, anchor=tk.CENTER)
-        
-        self.items_tree.column('Product', width=150)
-        self.items_tree.column('Total', width=120)
+            self.items_tree.column(col, width=column_widths[col], minwidth=column_widths[col], anchor=tk.CENTER, stretch=False)
         
         scrollbar = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=self.items_tree.yview)
-        self.items_tree.configure(yscrollcommand=scrollbar.set)
+        xscrollbar = ttk.Scrollbar(table_frame, orient=tk.HORIZONTAL, command=self.items_tree.xview)
+        self.items_tree.configure(yscrollcommand=scrollbar.set, xscrollcommand=xscrollbar.set)
         
-        self.items_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(1, 0), pady=1)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.items_tree.grid(row=0, column=0, sticky=tk.NSEW, padx=(1, 0), pady=(1, 0))
+        scrollbar.grid(row=0, column=1, sticky=tk.NS, pady=(1, 0))
+        xscrollbar.grid(row=1, column=0, sticky=tk.EW, padx=(1, 0), pady=(0, 1))
         
         # Delete item button
         self.action_button(right_frame, "Remove Selected Item", self.remove_item, width=180, primary=False).pack(pady=(0, 12))
