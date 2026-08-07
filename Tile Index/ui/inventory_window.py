@@ -169,7 +169,7 @@ class InventoryWindow:
         # Branch selection
         self.form_label(right_frame, "Select Branch:", bold=True).grid(row=1, column=0, sticky=tk.W, pady=5, padx=(12, 0))
         self.branch_var = tk.StringVar()
-        self.branch_combo = SearchableCombobox(right_frame, textvariable=self.branch_var, width=27, state="normal", font=FONTS["small"])
+        self.branch_combo = SearchableCombobox(right_frame, textvariable=self.branch_var, width=SIZES["dropdown_width"], state="normal", font=FONTS["small"])
         self.branch_combo.set_completion_list([f"{b.name}" for b in self.branches])
         self.branch_combo.grid(row=1, column=1, pady=5, padx=(5, 12), sticky=tk.W)
         self.branch_combo.bind('<<ComboboxSelected>>', self.on_branch_select)
@@ -181,14 +181,14 @@ class InventoryWindow:
         # Product selection (for Stock IN/OUT)
         self.form_label(right_frame, "Select Product:", bold=True).grid(row=2, column=0, sticky=tk.W, pady=5, padx=(12, 0))
         self.stock_product_var = tk.StringVar()
-        self.stock_product_combo = SearchableCombobox(right_frame, textvariable=self.stock_product_var, width=45, state="normal", font=FONTS["small"])
+        self.stock_product_combo = SearchableCombobox(right_frame, textvariable=self.stock_product_var, width=SIZES["dropdown_width"], state="normal", font=FONTS["small"])
         self.stock_product_combo.grid(row=2, column=1, pady=5, padx=(5, 12), sticky=tk.W)
         self.stock_product_combo.bind('<<ComboboxSelected>>', self.on_stock_product_select)
         
         # Grade selection
         self.form_label(right_frame, "Grade:").grid(row=3, column=0, sticky=tk.W, pady=5, padx=(12, 0))
         self.grade_var = tk.StringVar(value=GRADE_1)
-        grade_combo = ttk.Combobox(right_frame, textvariable=self.grade_var, width=27, state="readonly", font=FONTS["small"])
+        grade_combo = ttk.Combobox(right_frame, textvariable=self.grade_var, width=SIZES["dropdown_width"], state="readonly", font=FONTS["small"])
         grade_combo['values'] = VALID_GRADES
         grade_combo.grid(row=3, column=1, pady=5, padx=(5, 12), sticky=tk.W)
         grade_combo.bind('<<ComboboxSelected>>', lambda e: self.refresh_stock())

@@ -5,6 +5,7 @@ Create and manage invoices
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+import customtkinter as ctk
 from datetime import datetime
 from repositories.branch_repository import BranchRepository
 from repositories.product_repository import ProductRepository
@@ -19,6 +20,7 @@ from utils.invoice_printer import InvoicePrintWindow
 from utils.grade_constants import VALID_GRADES, GRADE_1
 from utils.searchable_combobox import SearchableCombobox
 from utils.accessory_labels import accessory_display_label
+from ui.theme import COLORS, FONTS, SIZES, SPACING
 
 
 class InvoiceWindow:
@@ -52,30 +54,43 @@ class InvoiceWindow:
     def setup_ui(self):
         """Setup the invoice UI"""
         # Header
-        header = tk.Label(
+        header = ctk.CTkLabel(
             self.parent,
             text="Invoice & Billing",
-            font=("Arial", 18, "bold"),
-            bg="#27ae60",
-            fg="white",
-            pady=10
+            font=FONTS["section"],
+            fg_color=COLORS["surface"],
+            text_color=COLORS["text"],
+            height=48,
         )
         header.pack(fill=tk.X)
         
         # Main container
-        main_frame = tk.Frame(self.parent)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        main_frame = ctk.CTkFrame(self.parent, fg_color=COLORS["app_bg"], corner_radius=0)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=SPACING["page_x"], pady=SPACING["page_y"])
         
         # Left panel - Invoice Details
-        left_frame = tk.LabelFrame(main_frame, text="Invoice Details", font=("Arial", 12, "bold"), padx=10, pady=10)
+        left_frame = ctk.CTkFrame(
+            main_frame,
+            fg_color=COLORS["surface"],
+            corner_radius=SIZES["corner_radius"],
+            border_width=1,
+            border_color=COLORS["border"],
+        )
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=False, padx=(0, 5))
+        ctk.CTkLabel(
+            left_frame,
+            text="Invoice Details",
+            font=FONTS["body_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["section_label_height"],
+        ).grid(row=0, column=0, columnspan=2, sticky=tk.EW, padx=12, pady=(10, 8))
         
         # Branch selection
-        tk.Label(left_frame, text="Branch:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.form_label(left_frame, "Branch:", bold=True).grid(row=1, column=0, sticky=tk.W, pady=5, padx=(12, 0))
         self.branch_var = tk.StringVar()
-        self.branch_combo = SearchableCombobox(left_frame, textvariable=self.branch_var, width=25, state="normal", font=("Arial", 10))
+        self.branch_combo = SearchableCombobox(left_frame, textvariable=self.branch_var, width=SIZES["dropdown_width"], state="normal", font=FONTS["small"])
         self.branch_combo.set_completion_list([f"{b.name}" for b in self.branches])
-        self.branch_combo.grid(row=0, column=1, pady=5, padx=5, sticky=tk.W)
+        self.branch_combo.grid(row=1, column=1, pady=5, padx=(5, 12), sticky=tk.W)
         self.branch_combo.bind('<<ComboboxSelected>>', self.on_branch_select)
         
         # Disable branch selection for employees
@@ -84,107 +99,129 @@ class InvoiceWindow:
             self.branch_combo.config(state="disabled")
         
         # Customer details
-        tk.Label(left_frame, text="Customer Name:", font=("Arial", 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.customer_name_entry = tk.Entry(left_frame, width=30, font=("Arial", 10))
-        self.customer_name_entry.grid(row=1, column=1, pady=5, padx=5)
+        self.form_label(left_frame, "Customer Name:").grid(row=2, column=0, sticky=tk.W, pady=5, padx=(12, 0))
+        self.customer_name_entry = self.form_entry(left_frame)
+        self.customer_name_entry.grid(row=2, column=1, pady=5, padx=(5, 12), sticky=tk.EW)
         
-        tk.Label(left_frame, text="Contact (Optional):", font=("Arial", 10)).grid(row=2, column=0, sticky=tk.W, pady=5)
-        self.customer_contact_entry = tk.Entry(left_frame, width=30, font=("Arial", 10))
-        self.customer_contact_entry.grid(row=2, column=1, pady=5, padx=5)
+        self.form_label(left_frame, "Contact (Optional):").grid(row=3, column=0, sticky=tk.W, pady=5, padx=(12, 0))
+        self.customer_contact_entry = self.form_entry(left_frame)
+        self.customer_contact_entry.grid(row=3, column=1, pady=5, padx=(5, 12), sticky=tk.EW)
         
         # Date
-        tk.Label(left_frame, text="Date:", font=("Arial", 10)).grid(row=3, column=0, sticky=tk.W, pady=5)
+        self.form_label(left_frame, "Date:").grid(row=4, column=0, sticky=tk.W, pady=5, padx=(12, 0))
         date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        tk.Label(left_frame, text=date_str, font=("Arial", 10), fg="gray").grid(row=3, column=1, sticky=tk.W, pady=5, padx=5)
+        self.form_label(left_frame, date_str, muted=True).grid(row=4, column=1, sticky=tk.W, pady=5, padx=(5, 12))
         
         # Add Item section
-        item_frame = tk.LabelFrame(left_frame, text="Add Item", font=("Arial", 10, "bold"), padx=5, pady=5)
-        item_frame.grid(row=4, column=0, columnspan=2, sticky=tk.EW, pady=10)
+        item_frame = self.create_subpanel(left_frame, "Add Item")
+        item_frame.grid(row=5, column=0, columnspan=2, sticky=tk.EW, pady=10, padx=12)
         
-        tk.Label(item_frame, text="Item Type:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=3)
+        self.form_label(item_frame, "Item Type:").grid(row=1, column=0, sticky=tk.W, pady=3, padx=8)
         self.item_type_var = tk.StringVar(value="Tiles")
-        item_type_combo = ttk.Combobox(item_frame, textvariable=self.item_type_var, width=22, state="readonly", font=("Arial", 9))
+        item_type_combo = ttk.Combobox(item_frame, textvariable=self.item_type_var, width=SIZES["dropdown_width"], state="readonly", font=FONTS["small"])
         item_type_combo['values'] = ("Tiles", "Accessories", "Sanitary")
-        item_type_combo.grid(row=0, column=1, pady=3, padx=5, sticky=tk.W)
+        item_type_combo.grid(row=1, column=1, pady=3, padx=8, sticky=tk.W)
         item_type_combo.bind('<<ComboboxSelected>>', self.on_item_type_change)
         
-        self.product_label = tk.Label(item_frame, text="Product:", font=("Arial", 9))
-        self.product_label.grid(row=1, column=0, sticky=tk.W, pady=3)
+        self.product_label = self.form_label(item_frame, "Product:")
+        self.product_label.grid(row=2, column=0, sticky=tk.W, pady=3, padx=8)
         self.product_var = tk.StringVar()
-        self.product_combo = SearchableCombobox(item_frame, textvariable=self.product_var, width=45, state="normal", font=("Arial", 9))
+        self.product_combo = SearchableCombobox(item_frame, textvariable=self.product_var, width=SIZES["dropdown_width"], state="normal", font=FONTS["small"])
         self.product_combo.set_completion_list([f"{p.name} - {p.tile_size}" for p in self.products])
-        self.product_combo.grid(row=1, column=1, pady=3, padx=5, sticky=tk.W)
+        self.product_combo.grid(row=2, column=1, pady=3, padx=8, sticky=tk.W)
         self.product_combo.bind('<<ComboboxSelected>>', self.on_product_select)
         
-        self.grade_label = tk.Label(item_frame, text="Grade:", font=("Arial", 9))
-        self.grade_label.grid(row=2, column=0, sticky=tk.W, pady=3)
+        self.grade_label = self.form_label(item_frame, "Grade:")
+        self.grade_label.grid(row=3, column=0, sticky=tk.W, pady=3, padx=8)
         self.grade_var = tk.StringVar(value=GRADE_1)
-        self.grade_combo = ttk.Combobox(item_frame, textvariable=self.grade_var, width=22, state="readonly", font=("Arial", 9))
+        self.grade_combo = ttk.Combobox(item_frame, textvariable=self.grade_var, width=SIZES["dropdown_width"], state="readonly", font=FONTS["small"])
         self.grade_combo['values'] = VALID_GRADES
-        self.grade_combo.grid(row=2, column=1, pady=3, padx=5, sticky=tk.W)
+        self.grade_combo.grid(row=3, column=1, pady=3, padx=8, sticky=tk.W)
         self.grade_combo.bind('<<ComboboxSelected>>', self.on_grade_select)
         
-        self.boxes_label = tk.Label(item_frame, text="Boxes:", font=("Arial", 9))
-        self.boxes_label.grid(row=3, column=0, sticky=tk.W, pady=3)
-        self.item_boxes_entry = tk.Entry(item_frame, width=25, font=("Arial", 9))
-        self.item_boxes_entry.grid(row=3, column=1, pady=3, padx=5)
+        self.boxes_label = self.form_label(item_frame, "Boxes:")
+        self.boxes_label.grid(row=4, column=0, sticky=tk.W, pady=3, padx=8)
+        self.item_boxes_entry = self.form_entry(item_frame, width=160)
+        self.item_boxes_entry.grid(row=4, column=1, pady=3, padx=8)
         self.item_boxes_entry.insert(0, "0")
         
-        self.pieces_label = tk.Label(item_frame, text="Loose Pieces:", font=("Arial", 9))
-        self.pieces_label.grid(row=4, column=0, sticky=tk.W, pady=3)
-        self.item_pieces_entry = tk.Entry(item_frame, width=25, font=("Arial", 9))
-        self.item_pieces_entry.grid(row=4, column=1, pady=3, padx=5)
+        self.pieces_label = self.form_label(item_frame, "Loose Pieces:")
+        self.pieces_label.grid(row=5, column=0, sticky=tk.W, pady=3, padx=8)
+        self.item_pieces_entry = self.form_entry(item_frame, width=160)
+        self.item_pieces_entry.grid(row=5, column=1, pady=3, padx=8)
         self.item_pieces_entry.insert(0, "0")
         
         # Stock info display
-        self.stock_info_label = tk.Label(item_frame, text="", font=("Arial", 8), fg="blue", wraplength=200)
-        self.stock_info_label.grid(row=5, column=0, columnspan=2, pady=5)
+        self.stock_info_label = ctk.CTkLabel(
+            item_frame,
+            text="",
+            font=FONTS["status"],
+            text_color=COLORS["primary"],
+            wraplength=300,
+            height=SIZES["small_label_height"],
+        )
+        self.stock_info_label.grid(row=6, column=0, columnspan=2, pady=5)
         
-        tk.Button(item_frame, text="Add to Invoice", command=self.add_item, bg="#3498db", fg="white", width=20).grid(row=6, column=0, columnspan=2, pady=10)
+        self.action_button(item_frame, "Add to Invoice", self.add_item, width=180).grid(row=7, column=0, columnspan=2, pady=10)
         
         # Totals section
-        totals_frame = tk.LabelFrame(left_frame, text="Totals", font=("Arial", 10, "bold"), padx=5, pady=5)
-        totals_frame.grid(row=5, column=0, columnspan=2, sticky=tk.EW, pady=10)
+        totals_frame = self.create_subpanel(left_frame, "Totals")
+        totals_frame.grid(row=6, column=0, columnspan=2, sticky=tk.EW, pady=10, padx=12)
         
-        tk.Label(totals_frame, text="Sub Total:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, pady=3)
-        self.subtotal_label = tk.Label(totals_frame, text="Rs. 0.00", font=("Arial", 10, "bold"), fg="green")
-        self.subtotal_label.grid(row=0, column=1, sticky=tk.E, pady=3, padx=5)
+        self.form_label(totals_frame, "Sub Total:").grid(row=1, column=0, sticky=tk.W, pady=3, padx=8)
+        self.subtotal_label = self.value_label(totals_frame, "Rs. 0.00", COLORS["primary"])
+        self.subtotal_label.grid(row=1, column=1, sticky=tk.E, pady=3, padx=8)
         
-        tk.Label(totals_frame, text="Discount:", font=("Arial", 10)).grid(row=1, column=0, sticky=tk.W, pady=3)
-        self.discount_entry = tk.Entry(totals_frame, width=15, font=("Arial", 10))
-        self.discount_entry.grid(row=1, column=1, pady=3, padx=5)
+        self.form_label(totals_frame, "Discount:").grid(row=2, column=0, sticky=tk.W, pady=3, padx=8)
+        self.discount_entry = self.form_entry(totals_frame, width=160)
+        self.discount_entry.grid(row=2, column=1, pady=3, padx=8)
         self.discount_entry.insert(0, "0")
         self.discount_entry.bind('<KeyRelease>', self.update_totals)
         
-        tk.Label(totals_frame, text="Grand Total:", font=("Arial", 11, "bold")).grid(row=2, column=0, sticky=tk.W, pady=5)
-        self.grand_total_label = tk.Label(totals_frame, text="Rs. 0.00", font=("Arial", 12, "bold"), fg="darkgreen")
-        self.grand_total_label.grid(row=2, column=1, sticky=tk.E, pady=5, padx=5)
+        self.form_label(totals_frame, "Grand Total:", bold=True).grid(row=3, column=0, sticky=tk.W, pady=5, padx=8)
+        self.grand_total_label = self.value_label(totals_frame, "Rs. 0.00", COLORS["primary"], bold=True)
+        self.grand_total_label.grid(row=3, column=1, sticky=tk.E, pady=5, padx=8)
         
-        tk.Label(totals_frame, text="Paid Amount:", font=("Arial", 10)).grid(row=3, column=0, sticky=tk.W, pady=3)
-        self.paid_entry = tk.Entry(totals_frame, width=15, font=("Arial", 10))
-        self.paid_entry.grid(row=3, column=1, pady=3, padx=5)
+        self.form_label(totals_frame, "Paid Amount:").grid(row=4, column=0, sticky=tk.W, pady=3, padx=8)
+        self.paid_entry = self.form_entry(totals_frame, width=160)
+        self.paid_entry.grid(row=4, column=1, pady=3, padx=8)
         self.paid_entry.insert(0, "0")
         self.paid_entry.bind('<KeyRelease>', self.update_totals)
         
-        tk.Label(totals_frame, text="Balance:", font=("Arial", 10)).grid(row=4, column=0, sticky=tk.W, pady=3)
-        self.balance_label = tk.Label(totals_frame, text="Rs. 0.00", font=("Arial", 10, "bold"), fg="red")
-        self.balance_label.grid(row=4, column=1, sticky=tk.E, pady=3, padx=5)
+        self.form_label(totals_frame, "Balance:").grid(row=5, column=0, sticky=tk.W, pady=3, padx=8)
+        self.balance_label = self.value_label(totals_frame, "Rs. 0.00", COLORS["danger"])
+        self.balance_label.grid(row=5, column=1, sticky=tk.E, pady=3, padx=8)
         
         # Action buttons
-        btn_frame = tk.Frame(left_frame)
-        btn_frame.grid(row=6, column=0, columnspan=2, pady=10)
+        btn_frame = ctk.CTkFrame(left_frame, fg_color="transparent", corner_radius=0)
+        btn_frame.grid(row=7, column=0, columnspan=2, pady=10)
         
-        tk.Button(btn_frame, text="Generate Invoice", command=self.generate_invoice, bg="#27ae60", fg="white", width=15, font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Clear All", command=self.clear_invoice, bg="#e74c3c", fg="white", width=15).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Print Invoice", command=self.print_invoice, bg="#3498db", fg="white", width=15).pack(side=tk.LEFT, padx=5)
+        self.action_button(btn_frame, "Generate Invoice", self.generate_invoice, width=140).pack(side=tk.LEFT, padx=5)
+        self.action_button(btn_frame, "Clear All", self.clear_invoice, width=120, primary=False).pack(side=tk.LEFT, padx=5)
+        self.action_button(btn_frame, "Print Invoice", self.print_invoice, width=120).pack(side=tk.LEFT, padx=5)
         
         # Right panel - Invoice Items Table
-        right_frame = tk.LabelFrame(main_frame, text="Invoice Items", font=("Arial", 12, "bold"), padx=10, pady=10)
+        right_frame = ctk.CTkFrame(
+            main_frame,
+            fg_color=COLORS["surface"],
+            corner_radius=SIZES["corner_radius"],
+            border_width=1,
+            border_color=COLORS["border"],
+        )
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        ctk.CTkLabel(
+            right_frame,
+            text="Invoice Items",
+            font=FONTS["body_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["section_label_height"],
+        ).pack(fill=tk.X, padx=12, pady=(10, 8))
         
         # Treeview for items
         columns = ('S.No', 'Product', 'Size', 'Grade', 'Boxes', 'Pieces', 'Rate/Box', 'Rate/Piece', 'Total')
-        self.items_tree = ttk.Treeview(right_frame, columns=columns, show='headings', height=20)
+        table_frame = ctk.CTkFrame(right_frame, fg_color=COLORS["surface"], corner_radius=SIZES["corner_radius"], border_width=1, border_color=COLORS["border"])
+        table_frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 8))
+        self.items_tree = ttk.Treeview(table_frame, columns=columns, show='headings', height=20)
         
         for col in columns:
             self.items_tree.heading(col, text=col)
@@ -193,17 +230,83 @@ class InvoiceWindow:
         self.items_tree.column('Product', width=150)
         self.items_tree.column('Total', width=120)
         
-        scrollbar = ttk.Scrollbar(right_frame, orient=tk.VERTICAL, command=self.items_tree.yview)
+        scrollbar = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=self.items_tree.yview)
         self.items_tree.configure(yscrollcommand=scrollbar.set)
         
-        self.items_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.items_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(1, 0), pady=1)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         # Delete item button
-        tk.Button(right_frame, text="Remove Selected Item", command=self.remove_item, bg="#e74c3c", fg="white", width=20).pack(pady=5)
+        self.action_button(right_frame, "Remove Selected Item", self.remove_item, width=180, primary=False).pack(pady=(0, 12))
         
         # Configure grid
         left_frame.grid_columnconfigure(1, weight=1)
+
+    def create_subpanel(self, parent, title):
+        panel = ctk.CTkFrame(
+            parent,
+            fg_color=COLORS["card"],
+            corner_radius=SIZES["corner_radius"],
+            border_width=1,
+            border_color=COLORS["border"],
+        )
+        ctk.CTkLabel(
+            panel,
+            text=title,
+            font=FONTS["small_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["small_label_height"],
+        ).grid(row=0, column=0, columnspan=2, sticky=tk.EW, padx=8, pady=(8, 4))
+        panel.grid_columnconfigure(1, weight=1)
+        return panel
+
+    def form_label(self, parent, text, bold=False, muted=False):
+        return ctk.CTkLabel(
+            parent,
+            text=text,
+            font=FONTS["small_bold"] if bold else FONTS["small"],
+            text_color=COLORS["text_muted"] if muted else COLORS["text"],
+            height=SIZES["small_label_height"],
+            anchor=tk.W,
+        )
+
+    def value_label(self, parent, text, color, bold=False):
+        return ctk.CTkLabel(
+            parent,
+            text=text,
+            font=FONTS["body_bold"] if bold else FONTS["small_bold"],
+            text_color=color,
+            height=SIZES["small_label_height"],
+            anchor=tk.E,
+        )
+
+    def form_entry(self, parent, width=240):
+        return ctk.CTkEntry(
+            parent,
+            width=width,
+            height=SIZES["input_height"],
+            font=FONTS["small"],
+            fg_color=COLORS["app_bg"],
+            border_color=COLORS["border"],
+            text_color=COLORS["text"],
+        )
+
+    def action_button(self, parent, text, command, width=150, primary=True):
+        return ctk.CTkButton(
+            parent,
+            text=text,
+            command=command,
+            width=width,
+            height=34,
+            fg_color=COLORS["primary"] if primary else COLORS["card"],
+            hover_color=COLORS["primary_hover"] if primary else COLORS["card_hover"],
+            text_color=COLORS["text"],
+            font=FONTS["small_bold"],
+            border_width=0 if primary else 1,
+            border_color=COLORS["border"],
+            corner_radius=SIZES["corner_radius"],
+            cursor="hand2",
+        )
     
     def on_item_type_change(self, event):
         """Handle item type change"""
@@ -211,27 +314,27 @@ class InvoiceWindow:
         self.product_var.set("")
         
         if item_type == "Tiles":
-            self.product_label.config(text="Product:")
+            self.product_label.configure(text="Product:")
             self.product_combo.set_completion_list([f"{p.name} - {p.tile_size}" for p in self.products])
             self.grade_label.grid()
             self.grade_combo.grid()
-            self.boxes_label.config(text="Boxes:")
+            self.boxes_label.configure(text="Boxes:")
             self.pieces_label.grid()
             self.item_pieces_entry.grid()
         elif item_type == "Accessories":
-            self.product_label.config(text="Accessory:")
+            self.product_label.configure(text="Accessory:")
             self.product_combo.set_completion_list([self.format_accessory(a) for a in self.accessories])
             self.grade_label.grid_remove()
             self.grade_combo.grid_remove()
-            self.boxes_label.config(text="Quantity:")
+            self.boxes_label.configure(text="Quantity:")
             self.pieces_label.grid_remove()
             self.item_pieces_entry.grid_remove()
         else:
-            self.product_label.config(text="Sanitary:")
+            self.product_label.configure(text="Sanitary:")
             self.product_combo.set_completion_list([self.format_sanitary_product(p) for p in self.sanitary_products])
             self.grade_label.grid_remove()
             self.grade_combo.grid_remove()
-            self.boxes_label.config(text="Quantity:")
+            self.boxes_label.configure(text="Quantity:")
             self.pieces_label.grid_remove()
             self.item_pieces_entry.grid_remove()
             
@@ -261,7 +364,7 @@ class InvoiceWindow:
             item_str = self.product_var.get()
             
             if not item_str or not self.selected_branch_id:
-                self.stock_info_label.config(text="")
+                self.stock_info_label.configure(text="")
                 return
             
             if item_type == "Tiles":
@@ -273,19 +376,20 @@ class InvoiceWindow:
                         break
                 
                 if not product:
-                    self.stock_info_label.config(text="")
+                    self.stock_info_label.configure(text="")
                     return
                 
                 grade = self.grade_var.get()
                 inv = InventoryService.get_inventory(self.selected_branch_id, product.id, grade)
                 
                 if inv:
-                    self.stock_info_label.config(
+                    self.stock_info_label.configure(
                         text=f"Available: {inv.boxes} boxes + {inv.loose_pieces} pieces\n"
-                             f"Rate/Box: Rs. {inv.rate_per_box:.2f} | Rate/Piece: Rs. {inv.rate_per_piece:.2f}"
+                             f"Rate/Box: Rs. {inv.rate_per_box:.2f} | Rate/Piece: Rs. {inv.rate_per_piece:.2f}",
+                        text_color=COLORS["primary"]
                     )
                 else:
-                    self.stock_info_label.config(text="No stock available for this grade", fg="red")
+                    self.stock_info_label.configure(text="No stock available for this grade", text_color=COLORS["danger"])
             elif item_type == "Accessories":
                 # Find accessory
                 accessory = None
@@ -295,16 +399,16 @@ class InvoiceWindow:
                         break
                 
                 if not accessory:
-                    self.stock_info_label.config(text="")
+                    self.stock_info_label.configure(text="")
                     return
                 
                 acc_inv = AccessoryService.get_inventory(self.selected_branch_id, accessory.id)
                 available = acc_inv.quantity if acc_inv else 0
                 
-                self.stock_info_label.config(
+                self.stock_info_label.configure(
                     text=f"Available: {available} items\n"
                          f"Unit Price: Rs. {accessory.unit_price:.2f}",
-                    fg="blue"
+                    text_color=COLORS["primary"]
                 )
             else:
                 sanitary_product = None
@@ -314,19 +418,19 @@ class InvoiceWindow:
                         break
 
                 if not sanitary_product:
-                    self.stock_info_label.config(text="")
+                    self.stock_info_label.configure(text="")
                     return
 
                 sanitary_inv = SanitaryService.get_inventory(self.selected_branch_id, sanitary_product.id)
                 available = sanitary_inv.quantity if sanitary_inv else 0
 
-                self.stock_info_label.config(
+                self.stock_info_label.configure(
                     text=f"Available: {available} items\n"
                          f"Sale Price: Rs. {sanitary_product.sale_price:.2f}",
-                    fg="blue"
+                    text_color=COLORS["primary"]
                 )
         except:
-            self.stock_info_label.config(text="")
+            self.stock_info_label.configure(text="")
     
     def add_item(self):
         """Add item to invoice"""
@@ -523,9 +627,9 @@ class InvoiceWindow:
         grand_total = subtotal - discount
         balance = grand_total - paid
         
-        self.subtotal_label.config(text=f"Rs. {subtotal:.2f}")
-        self.grand_total_label.config(text=f"Rs. {grand_total:.2f}")
-        self.balance_label.config(text=f"Rs. {balance:.2f}")
+        self.subtotal_label.configure(text=f"Rs. {subtotal:.2f}")
+        self.grand_total_label.configure(text=f"Rs. {grand_total:.2f}")
+        self.balance_label.configure(text=f"Rs. {balance:.2f}")
     
     def generate_invoice(self):
         """Generate and save invoice"""

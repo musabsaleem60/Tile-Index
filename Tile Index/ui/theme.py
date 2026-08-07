@@ -70,6 +70,8 @@ SIZES = {
     "login_height": 440,
     "login_header_height": 118,
     "input_height": 36,
+    "dropdown_width": 45,
+    "compact_dropdown_width": 30,
 }
 
 SPACING = {
@@ -105,7 +107,10 @@ def apply_ttk_theme():
         darkcolor=COLORS["border"],
         selectbackground=COLORS["primary"],
         selectforeground=COLORS["text"],
+        buttonbackground=COLORS["surface"],
         padding=(8, 4),
+        relief="flat",
+        arrowsize=14,
     )
     style.map(
         "TCombobox",
@@ -123,8 +128,26 @@ def apply_ttk_theme():
         ],
         background=[
             ("readonly", COLORS["surface"]),
+            ("focus", COLORS["surface"]),
             ("active", COLORS["card_hover"]),
             ("disabled", COLORS["surface_alt"]),
+        ],
+        buttonbackground=[
+            ("readonly", COLORS["surface"]),
+            ("focus", COLORS["surface"]),
+            ("active", COLORS["card_hover"]),
+            ("disabled", COLORS["surface_alt"]),
+        ],
+        arrowcolor=[
+            ("readonly", COLORS["text_muted"]),
+            ("focus", COLORS["text"]),
+            ("active", COLORS["text"]),
+            ("disabled", COLORS["text_muted"]),
+        ],
+        bordercolor=[
+            ("focus", COLORS["primary"]),
+            ("active", COLORS["border"]),
+            ("disabled", COLORS["border"]),
         ],
     )
     try:
