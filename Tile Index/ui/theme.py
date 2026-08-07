@@ -1,5 +1,6 @@
 """Shared presentation values for the desktop UI."""
 
+import tkinter as tk
 from tkinter import ttk
 
 import customtkinter as ctk
@@ -81,6 +82,8 @@ SPACING = {
     "button_pad_y": 14,
 }
 
+_TTK_IMAGES = []
+
 
 def apply_theme():
     ctk.set_appearance_mode(APPEARANCE_MODE)
@@ -95,6 +98,8 @@ def apply_ttk_theme():
         style.theme_use("clam")
     except Exception:
         pass
+
+    _install_combobox_arrow(style)
 
     style.configure(
         "TCombobox",
@@ -189,3 +194,67 @@ def apply_ttk_theme():
         background=[("active", COLORS["card_hover"])],
         foreground=[("active", COLORS["text"])],
     )
+
+
+def _make_combobox_arrow(width=24, height=30, bg=None, border=None, arrow=None):
+    image = tk.PhotoImage(width=width, height=height)
+    bg = bg or COLORS["surface"]
+    border = border or COLORS["border"]
+    arrow = arrow or COLORS["text_muted"]
+    image.put(bg, to=(0, 0, width, height))
+    image.put(border, to=(0, 0, 1, height))
+
+    mid_x = width // 2
+    mid_y = height // 2 + 1
+    rows = [
+        (mid_y - 3, mid_x - 5, mid_x + 5),
+        (mid_y - 2, mid_x - 4, mid_x + 4),
+        (mid_y - 1, mid_x - 3, mid_x + 3),
+        (mid_y, mid_x - 2, mid_x + 2),
+        (mid_y + 1, mid_x - 1, mid_x + 1),
+        (mid_y + 2, mid_x, mid_x),
+    ]
+    for y, x1, x2 in rows:
+        image.put(arrow, to=(x1, y, x2 + 1, y + 1))
+    _TTK_IMAGES.append(image)
+    return image
+
+
+def _install_combobox_arrow(style):
+    """Replace the native combobox arrow button with a dark image element."""
+    normal = _make_combobox_arrow(bg=COLORS["surface"], border=COLORS["border"], arrow=COLORS["text_muted"])
+    active = _make_combobox_arrow(bg=COLORS["card_hover"], border=COLORS["border"], arrow=COLORS["text"])
+    disabled = _make_combobox_arrow(bg=COLORS["surface_alt"], border=COLORS["border"], arrow=COLORS["text_muted"])
+    try:
+        style.element_create(
+            "DarkCombobox.downarrow",
+            "image",
+            normal,
+            ("active", active),
+            ("focus", active),
+            ("disabled", disabled),
+            sticky=tk.NSEW,
+        )
+        style.layout(
+            "TCombobox",
+            [
+                (
+                    "Combobox.field",
+                    {
+                        "sticky": tk.NSEW,
+                        "children": [
+                            (
+                                "Combobox.padding",
+                                {
+                                    "sticky": tk.NSEW,
+                                    "children": [("Combobox.textarea", {"sticky": tk.NSEW})],
+                                },
+                            ),
+                            ("DarkCombobox.downarrow", {"side": tk.RIGHT, "sticky": tk.NS}),
+                        ],
+                    },
+                )
+            ],
+        )
+    except tk.TclError:
+        pass
