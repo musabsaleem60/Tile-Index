@@ -5,12 +5,14 @@ Search and view existing invoices
 
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
+import customtkinter as ctk
 from datetime import datetime, date
 from repositories.branch_repository import BranchRepository
 from services.invoice_service import InvoiceService
 from utils.datetime_format import format_business_datetime
 from utils.invoice_printer import InvoicePrintWindow
 from utils.searchable_combobox import SearchableCombobox
+from ui.theme import COLORS, FONTS, SIZES, SPACING
 
 
 class InvoiceSearchWindow:
@@ -26,88 +28,156 @@ class InvoiceSearchWindow:
     def setup_ui(self):
         """Setup the search UI"""
         # Header
-        header = tk.Label(
+        header = ctk.CTkLabel(
             self.parent,
             text="Search & View Invoices",
-            font=("Arial", 18, "bold"),
-            bg="#3498db",
-            fg="white",
-            pady=10
+            font=FONTS["section"],
+            fg_color=COLORS["surface"],
+            text_color=COLORS["text"],
+            height=48,
         )
         header.pack(fill=tk.X)
-        
+
+        page = ctk.CTkFrame(self.parent, fg_color=COLORS["app_bg"], corner_radius=0)
+        page.pack(fill=tk.BOTH, expand=True, padx=SPACING["page_x"], pady=SPACING["page_y"])
+
         # Search frame
-        search_frame = tk.LabelFrame(self.parent, text="Search Criteria", font=("Arial", 12, "bold"), padx=10, pady=10)
-        search_frame.pack(fill=tk.X, padx=10, pady=10)
-        
+        search_frame = self.panel(page, "Search Criteria")
+        search_frame.pack(fill=tk.X, pady=(0, 12))
+        for col in (1, 3):
+            search_frame.grid_columnconfigure(col, weight=1)
+
         # Branch
-        tk.Label(search_frame, text="Branch:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, pady=5, padx=5)
+        self.form_label(search_frame, "Branch:").grid(row=1, column=0, sticky=tk.W, pady=5, padx=8)
         self.branch_var = tk.StringVar()
-        self.branch_combo = SearchableCombobox(search_frame, textvariable=self.branch_var, width=25, state="normal", font=("Arial", 10))
+        self.branch_combo = SearchableCombobox(search_frame, textvariable=self.branch_var, width=SIZES["compact_dropdown_width"], state="normal", font=FONTS["small"])
         self.branch_combo.set_completion_list(["All Branches"] + [f"{b.name}" for b in self.branches])
-        self.branch_combo.grid(row=0, column=1, pady=5, padx=5, sticky=tk.W)
-        
+        self.branch_combo.grid(row=1, column=1, pady=5, padx=8, sticky=tk.W)
+
         # Invoice number
-        tk.Label(search_frame, text="Invoice Number:", font=("Arial", 10)).grid(row=0, column=2, sticky=tk.W, pady=5, padx=5)
-        self.invoice_number_entry = tk.Entry(search_frame, width=20, font=("Arial", 10))
-        self.invoice_number_entry.grid(row=0, column=3, pady=5, padx=5)
-        
+        self.form_label(search_frame, "Invoice Number:").grid(row=1, column=2, sticky=tk.W, pady=5, padx=8)
+        self.invoice_number_entry = self.form_entry(search_frame, width=190)
+        self.invoice_number_entry.grid(row=1, column=3, pady=5, padx=8, sticky=tk.W)
+
         # Customer name
-        tk.Label(search_frame, text="Customer Name:", font=("Arial", 10)).grid(row=1, column=0, sticky=tk.W, pady=5, padx=5)
-        self.customer_name_entry = tk.Entry(search_frame, width=25, font=("Arial", 10))
-        self.customer_name_entry.grid(row=1, column=1, pady=5, padx=5)
-        
+        self.form_label(search_frame, "Customer Name:").grid(row=2, column=0, sticky=tk.W, pady=5, padx=8)
+        self.customer_name_entry = self.form_entry(search_frame, width=240)
+        self.customer_name_entry.grid(row=2, column=1, pady=5, padx=8, sticky=tk.W)
+
         # Date from
-        tk.Label(search_frame, text="Date From:", font=("Arial", 10)).grid(row=1, column=2, sticky=tk.W, pady=5, padx=5)
-        self.date_from_entry = tk.Entry(search_frame, width=20, font=("Arial", 10))
-        self.date_from_entry.grid(row=1, column=3, pady=5, padx=5)
+        self.form_label(search_frame, "Date From:").grid(row=2, column=2, sticky=tk.W, pady=5, padx=8)
+        self.date_from_entry = self.form_entry(search_frame, width=190)
+        self.date_from_entry.grid(row=2, column=3, pady=5, padx=8, sticky=tk.W)
         self.date_from_entry.insert(0, date.today().strftime("%Y-%m-%d"))
-        
+
         # Date to
-        tk.Label(search_frame, text="Date To:", font=("Arial", 10)).grid(row=2, column=0, sticky=tk.W, pady=5, padx=5)
-        self.date_to_entry = tk.Entry(search_frame, width=20, font=("Arial", 10))
-        self.date_to_entry.grid(row=2, column=1, pady=5, padx=5)
+        self.form_label(search_frame, "Date To:").grid(row=3, column=0, sticky=tk.W, pady=5, padx=8)
+        self.date_to_entry = self.form_entry(search_frame, width=190)
+        self.date_to_entry.grid(row=3, column=1, pady=5, padx=8, sticky=tk.W)
         self.date_to_entry.insert(0, date.today().strftime("%Y-%m-%d"))
-        
+
         # Search button
-        tk.Button(search_frame, text="Search", command=self.search_invoices, bg="#27ae60", fg="white", width=15, font=("Arial", 10, "bold")).grid(row=2, column=2, columnspan=2, pady=10, padx=5)
-        
+        self.action_button(search_frame, "Search", self.search_invoices, width=150).grid(row=3, column=2, columnspan=2, pady=8, padx=8, sticky=tk.W)
+
         # Results frame
-        results_frame = tk.LabelFrame(self.parent, text="Search Results", font=("Arial", 12, "bold"), padx=10, pady=10)
-        results_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
+        results_frame = self.panel(page, "Search Results")
+        results_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 12))
+        results_frame.grid_rowconfigure(1, weight=1)
+        results_frame.grid_columnconfigure(0, weight=1)
+
         # Treeview for results
         columns = ('Invoice No', 'Status', 'Date', 'Customer', 'Branch', 'Total', 'Paid', 'Balance', 'invoice_id')
         self.results_tree = ttk.Treeview(results_frame, columns=columns, show='headings', height=15)
-        
+
+        column_widths = {
+            'Invoice No': 120,
+            'Status': 85,
+            'Date': 115,
+            'Customer': 180,
+            'Branch': 170,
+            'Total': 120,
+            'Paid': 120,
+            'Balance': 120,
+        }
         visible_cols = ('Invoice No', 'Status', 'Date', 'Customer', 'Branch', 'Total', 'Paid', 'Balance')
         for col in visible_cols:
             self.results_tree.heading(col, text=col)
-            self.results_tree.column(col, width=120, anchor=tk.CENTER)
-        
+            self.results_tree.column(col, width=column_widths[col], minwidth=column_widths[col], anchor=tk.CENTER)
+
         # Hide invoice_id column
         self.results_tree.heading('invoice_id', text='')
         self.results_tree.column('invoice_id', width=0, stretch=False)
-        
-        self.results_tree.column('Customer', width=150)
-        self.results_tree.column('Branch', width=150)
-        self.results_tree.column('Status', width=80)
-        
+
         scrollbar = ttk.Scrollbar(results_frame, orient=tk.VERTICAL, command=self.results_tree.yview)
-        self.results_tree.configure(yscrollcommand=scrollbar.set)
-        
-        self.results_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
+        xscrollbar = ttk.Scrollbar(results_frame, orient=tk.HORIZONTAL, command=self.results_tree.xview)
+        self.results_tree.configure(yscrollcommand=scrollbar.set, xscrollcommand=xscrollbar.set)
+
+        self.results_tree.grid(row=1, column=0, sticky=tk.NSEW, padx=(12, 0), pady=(0, 0))
+        scrollbar.grid(row=1, column=1, sticky=tk.NS, padx=(0, 12), pady=(0, 0))
+        xscrollbar.grid(row=2, column=0, sticky=tk.EW, padx=(12, 0), pady=(0, 12))
+
         self.results_tree.bind('<Double-1>', self.on_invoice_double_click)
-        
+
         # Action buttons
-        btn_frame = tk.Frame(self.parent)
-        btn_frame.pack(pady=10)
-        
-        tk.Button(btn_frame, text="View/Print Invoice", command=self.view_invoice, bg="#3498db", fg="white", width=20).pack(side=tk.LEFT, padx=5)
+        btn_frame = ctk.CTkFrame(page, fg_color="transparent", corner_radius=0)
+        btn_frame.pack(pady=(0, 4))
+
+        self.action_button(btn_frame, "View/Print Invoice", self.view_invoice, width=190).pack(side=tk.LEFT, padx=5)
         if getattr(self.current_user, 'role', '') == 'admin':
-            tk.Button(btn_frame, text="Void Invoice", command=self.void_invoice, bg="#c0392b", fg="white", width=20).pack(side=tk.LEFT, padx=5)
+            self.action_button(btn_frame, "Void Invoice", self.void_invoice, width=170, danger=True).pack(side=tk.LEFT, padx=5)
+
+    def panel(self, parent, title):
+        panel = ctk.CTkFrame(
+            parent,
+            fg_color=COLORS["surface"],
+            corner_radius=SIZES["corner_radius"],
+            border_width=1,
+            border_color=COLORS["border"],
+        )
+        ctk.CTkLabel(
+            panel,
+            text=title,
+            font=FONTS["body_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["section_label_height"],
+        ).grid(row=0, column=0, columnspan=4, sticky=tk.EW, padx=12, pady=(10, 8))
+        return panel
+
+    def form_label(self, parent, text):
+        return ctk.CTkLabel(
+            parent,
+            text=text,
+            font=FONTS["small"],
+            text_color=COLORS["text"],
+            height=SIZES["small_label_height"],
+            anchor=tk.W,
+        )
+
+    def form_entry(self, parent, width):
+        return ctk.CTkEntry(
+            parent,
+            width=width,
+            height=SIZES["input_height"],
+            font=FONTS["small"],
+            fg_color=COLORS["app_bg"],
+            border_color=COLORS["border"],
+            text_color=COLORS["text"],
+        )
+
+    def action_button(self, parent, text, command, width=150, danger=False):
+        return ctk.CTkButton(
+            parent,
+            text=text,
+            command=command,
+            width=width,
+            height=34,
+            fg_color=COLORS["danger"] if danger else COLORS["primary"],
+            hover_color=COLORS["danger_hover"] if danger else COLORS["primary_hover"],
+            text_color=COLORS["text"],
+            font=FONTS["small_bold"],
+            corner_radius=SIZES["corner_radius"],
+            cursor="hand2",
+        )
     
     def search_invoices(self):
         """Search for invoices"""
@@ -161,7 +231,7 @@ class InvoiceSearchWindow:
                 ))
                 if status_text == "VOID":
                     self.results_tree.item(item_id, tags=("void",))
-            self.results_tree.tag_configure("void", foreground="#c0392b")
+            self.results_tree.tag_configure("void", foreground=COLORS["danger"])
             
             if len(invoices) == 0:
                 messagebox.showinfo("Search Results", "No invoices found matching the criteria.")
