@@ -1,5 +1,7 @@
 """Shared presentation values for the desktop UI."""
 
+from tkinter import ttk
+
 import customtkinter as ctk
 
 
@@ -81,3 +83,86 @@ SPACING = {
 def apply_theme():
     ctk.set_appearance_mode(APPEARANCE_MODE)
     ctk.set_default_color_theme(COLOR_THEME)
+    apply_ttk_theme()
+
+
+def apply_ttk_theme():
+    """Style native ttk widgets used for searchable dropdowns and data tables."""
+    style = ttk.Style()
+    try:
+        style.theme_use("clam")
+    except Exception:
+        pass
+
+    style.configure(
+        "TCombobox",
+        fieldbackground=COLORS["surface"],
+        background=COLORS["surface"],
+        foreground=COLORS["text"],
+        arrowcolor=COLORS["text_muted"],
+        bordercolor=COLORS["border"],
+        lightcolor=COLORS["border"],
+        darkcolor=COLORS["border"],
+        selectbackground=COLORS["primary"],
+        selectforeground=COLORS["text"],
+        padding=(8, 4),
+    )
+    style.map(
+        "TCombobox",
+        fieldbackground=[
+            ("readonly", COLORS["surface"]),
+            ("focus", COLORS["surface"]),
+            ("active", COLORS["surface"]),
+            ("disabled", COLORS["surface_alt"]),
+        ],
+        foreground=[
+            ("readonly", COLORS["text"]),
+            ("focus", COLORS["text"]),
+            ("active", COLORS["text"]),
+            ("disabled", COLORS["text_muted"]),
+        ],
+        background=[
+            ("readonly", COLORS["surface"]),
+            ("active", COLORS["card_hover"]),
+            ("disabled", COLORS["surface_alt"]),
+        ],
+    )
+    try:
+        style.master.option_add("*TCombobox*Listbox.background", COLORS["surface"])
+        style.master.option_add("*TCombobox*Listbox.foreground", COLORS["text"])
+        style.master.option_add("*TCombobox*Listbox.selectBackground", COLORS["primary"])
+        style.master.option_add("*TCombobox*Listbox.selectForeground", COLORS["text"])
+    except Exception:
+        pass
+
+    style.configure(
+        "Treeview",
+        background=COLORS["surface"],
+        fieldbackground=COLORS["surface"],
+        foreground=COLORS["text"],
+        bordercolor=COLORS["border"],
+        lightcolor=COLORS["border"],
+        darkcolor=COLORS["border"],
+        rowheight=28,
+        font=FONTS["small"],
+    )
+    style.configure(
+        "Treeview.Heading",
+        background=COLORS["surface_alt"],
+        foreground=COLORS["text"],
+        bordercolor=COLORS["border"],
+        lightcolor=COLORS["border"],
+        darkcolor=COLORS["border"],
+        font=FONTS["small_bold"],
+        padding=(8, 6),
+    )
+    style.map(
+        "Treeview",
+        background=[("selected", COLORS["primary"])],
+        foreground=[("selected", COLORS["text"])],
+    )
+    style.map(
+        "Treeview.Heading",
+        background=[("active", COLORS["card_hover"])],
+        foreground=[("active", COLORS["text"])],
+    )
