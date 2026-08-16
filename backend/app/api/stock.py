@@ -77,6 +77,9 @@ def _tile_rows(db: Session, branches, search_text: str, branch_id: int | None, g
                     "boxes": boxes,
                     "loose_pieces": loose,
                     "total_pieces": pieces,
+                    "rate_per_sqm": float(inv.rate_per_sqm if inv else 0),
+                    "rate_per_box": float(inv.rate_per_box if inv else 0),
+                    "rate_per_piece": float(inv.rate_per_piece if inv else 0),
                 })
 
             total_pieces = total_boxes * int(product.pieces_per_box or 0) + total_loose
@@ -140,6 +143,7 @@ def _accessory_rows(db: Session, branches, search_text: str, branch_id: int | No
             "accessory_id": accessory.id,
             "product": label,
             "category": accessory.category,
+            "unit_price": float(accessory.unit_price or 0),
             "total_quantity": total_quantity,
             "branches": branch_rows,
         })

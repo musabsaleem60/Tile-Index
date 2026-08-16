@@ -9,7 +9,8 @@ class InvoiceItem:
     
     def __init__(self, id=None, invoice_id=None, product_id=None, accessory_id=None,
                  sanitary_product_id=None, tile_size=None, grade=None, boxes=0, loose_pieces=0, rate_per_sqm=0,
-                 rate_per_box=0, rate_per_piece=0, line_total=0, boxes_from_boxes=None, pieces_from_loose=None):
+                 rate_per_box=0, rate_per_piece=0, line_total=0, boxes_from_boxes=None, pieces_from_loose=None,
+                 source_branch_id=None):
         self.id = id
         self.invoice_id = invoice_id
         self.product_id = product_id
@@ -25,6 +26,7 @@ class InvoiceItem:
         self.line_total = line_total
         self.boxes_from_boxes = boxes_from_boxes
         self.pieces_from_loose = pieces_from_loose
+        self.source_branch_id = source_branch_id
     
     def __repr__(self):
         return f"InvoiceItem(id={self.id}, invoice_id={self.invoice_id}, product_id={self.product_id}, accessory_id={self.accessory_id}, sanitary_product_id={self.sanitary_product_id}, grade='{self.grade}', total={self.line_total})"
@@ -46,7 +48,8 @@ class InvoiceItem:
             'rate_per_piece': self.rate_per_piece,
             'line_total': self.line_total,
             'boxes_from_boxes': self.boxes_from_boxes,
-            'pieces_from_loose': self.pieces_from_loose
+            'pieces_from_loose': self.pieces_from_loose,
+            'source_branch_id': self.source_branch_id
         }
     
     @classmethod
@@ -67,6 +70,7 @@ class InvoiceItem:
             rate_per_piece=data.get('rate_per_piece', 0),
             line_total=data.get('line_total', 0),
             boxes_from_boxes=data.get('boxes_from_boxes'),
-            pieces_from_loose=data.get('pieces_from_loose')
+            pieces_from_loose=data.get('pieces_from_loose'),
+            source_branch_id=data.get('source_branch_id')
         )
 

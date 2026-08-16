@@ -15,6 +15,8 @@ from services.invoice_service import InvoiceService
 from services.inventory_service import InventoryService
 from services.accessory_service import AccessoryService
 from services.sanitary_service import SanitaryService
+from desktop_client.api_client import ApiClientError
+from desktop_client.session import api_client
 from utils.validators import validate_positive_number, validate_integer, validate_required
 from utils.invoice_printer import InvoicePrintWindow
 from utils.grade_constants import VALID_GRADES, GRADE_1
@@ -36,6 +38,8 @@ class InvoiceWindow:
         self.sanitary_products = SanitaryProductRepository.get_all()
         self.selected_branch_id = None
         self.invoice_items = []  # List of item dicts
+        self.source_branch_options = []
+        self.current_stock_overview_row = None
         
         # Filter branches for employees
         from services.auth_service import AuthenticationService
@@ -139,17 +143,24 @@ class InvoiceWindow:
         self.grade_combo['values'] = VALID_GRADES
         self.grade_combo.grid(row=3, column=1, pady=3, padx=8, sticky=tk.W)
         self.grade_combo.bind('<<ComboboxSelected>>', self.on_grade_select)
+
+        self.source_branch_label = self.form_label(item_frame, "Source Branch:")
+        self.source_branch_label.grid(row=4, column=0, sticky=tk.W, pady=3, padx=8)
+        self.source_branch_var = tk.StringVar()
+        self.source_branch_combo = ttk.Combobox(item_frame, textvariable=self.source_branch_var, width=SIZES["dropdown_width"], state="readonly", font=FONTS["small"])
+        self.source_branch_combo.grid(row=4, column=1, pady=3, padx=8, sticky=tk.W)
+        self.source_branch_combo.bind('<<ComboboxSelected>>', lambda _event: self.update_stock_info())
         
         self.boxes_label = self.form_label(item_frame, "Boxes:")
-        self.boxes_label.grid(row=4, column=0, sticky=tk.W, pady=3, padx=8)
+        self.boxes_label.grid(row=5, column=0, sticky=tk.W, pady=3, padx=8)
         self.item_boxes_entry = self.form_entry(item_frame, width=160)
-        self.item_boxes_entry.grid(row=4, column=1, pady=3, padx=8)
+        self.item_boxes_entry.grid(row=5, column=1, pady=3, padx=8)
         self.item_boxes_entry.insert(0, "0")
         
         self.pieces_label = self.form_label(item_frame, "Loose Pieces:")
-        self.pieces_label.grid(row=5, column=0, sticky=tk.W, pady=3, padx=8)
+        self.pieces_label.grid(row=6, column=0, sticky=tk.W, pady=3, padx=8)
         self.item_pieces_entry = self.form_entry(item_frame, width=160)
-        self.item_pieces_entry.grid(row=5, column=1, pady=3, padx=8)
+        self.item_pieces_entry.grid(row=6, column=1, pady=3, padx=8)
         self.item_pieces_entry.insert(0, "0")
         
         # Stock info display
@@ -161,9 +172,9 @@ class InvoiceWindow:
             wraplength=300,
             height=SIZES["small_label_height"],
         )
-        self.stock_info_label.grid(row=6, column=0, columnspan=2, pady=5)
+        self.stock_info_label.grid(row=7, column=0, columnspan=2, pady=5)
         
-        self.action_button(item_frame, "Add to Invoice", self.add_item, width=180).grid(row=7, column=0, columnspan=2, pady=10)
+        self.action_button(item_frame, "Add to Invoice", self.add_item, width=180).grid(row=8, column=0, columnspan=2, pady=10)
         
         # Totals section
         totals_frame = self.create_subpanel(left_frame, "Totals")
@@ -219,7 +230,7 @@ class InvoiceWindow:
         ).pack(fill=tk.X, padx=12, pady=(10, 8))
         
         # Treeview for items
-        columns = ('S.No', 'Product', 'Size', 'Grade', 'Boxes', 'Pieces', 'Rate/Box', 'Rate/Piece', 'Total')
+        columns = ('S.No', 'Product', 'Source', 'Size', 'Grade', 'Boxes', 'Pieces', 'Rate/Box', 'Rate/Piece', 'Total')
         table_frame = ctk.CTkFrame(right_frame, fg_color=COLORS["surface"], corner_radius=SIZES["corner_radius"], border_width=1, border_color=COLORS["border"])
         table_frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 8))
         table_frame.grid_rowconfigure(0, weight=1)
@@ -228,7 +239,8 @@ class InvoiceWindow:
 
         column_widths = {
             'S.No': 55,
-            'Product': 210,
+            'Product': 190,
+            'Source': 135,
             'Size': 75,
             'Grade': 90,
             'Boxes': 70,
@@ -331,6 +343,8 @@ class InvoiceWindow:
             self.product_combo.set_completion_list([f"{p.name} - {p.tile_size}" for p in self.products])
             self.grade_label.grid()
             self.grade_combo.grid()
+            self.source_branch_label.grid()
+            self.source_branch_combo.grid()
             self.boxes_label.configure(text="Boxes:")
             self.pieces_label.grid()
             self.item_pieces_entry.grid()
@@ -339,6 +353,8 @@ class InvoiceWindow:
             self.product_combo.set_completion_list([self.format_accessory(a) for a in self.accessories])
             self.grade_label.grid_remove()
             self.grade_combo.grid_remove()
+            self.source_branch_label.grid()
+            self.source_branch_combo.grid()
             self.boxes_label.configure(text="Quantity:")
             self.pieces_label.grid_remove()
             self.item_pieces_entry.grid_remove()
@@ -347,6 +363,8 @@ class InvoiceWindow:
             self.product_combo.set_completion_list([self.format_sanitary_product(p) for p in self.sanitary_products])
             self.grade_label.grid_remove()
             self.grade_combo.grid_remove()
+            self.source_branch_label.grid_remove()
+            self.source_branch_combo.grid_remove()
             self.boxes_label.configure(text="Quantity:")
             self.pieces_label.grid_remove()
             self.item_pieces_entry.grid_remove()
@@ -359,6 +377,7 @@ class InvoiceWindow:
         for branch in self.branches:
             if branch.name == selected:
                 self.selected_branch_id = branch.id
+                self.source_branch_var.set(branch.name)
                 break
         self.update_stock_info()
     
@@ -381,7 +400,6 @@ class InvoiceWindow:
                 return
             
             if item_type == "Tiles":
-                # Find product
                 product = None
                 for p in self.products:
                     if f"{p.name} - {p.tile_size}" == item_str:
@@ -393,18 +411,30 @@ class InvoiceWindow:
                     return
                 
                 grade = self.grade_var.get()
-                inv = InventoryService.get_inventory(self.selected_branch_id, product.id, grade)
-                
-                if inv:
+                overview_row = self.load_stock_overview_row("tiles", product.id, grade=grade)
+                self.current_stock_overview_row = overview_row
+                if overview_row:
+                    self.update_source_branch_options(overview_row)
+                    selected_stock = self.selected_source_stock()
+                    branch_lines = [
+                        f"{b['branch_name']}: {b.get('boxes', 0)} boxes + {b.get('loose_pieces', 0)} loose"
+                        for b in overview_row.get("branches", [])
+                    ]
+                    if selected_stock:
+                        rate_line = (
+                            f"Selected source rate/box: Rs. {selected_stock.get('rate_per_box', 0):.2f} | "
+                            f"rate/piece: Rs. {selected_stock.get('rate_per_piece', 0):.2f}"
+                        )
+                    else:
+                        rate_line = "Select a source branch"
                     self.stock_info_label.configure(
-                        text=f"Available: {inv.boxes} boxes + {inv.loose_pieces} pieces\n"
-                             f"Rate/Box: Rs. {inv.rate_per_box:.2f} | Rate/Piece: Rs. {inv.rate_per_piece:.2f}",
+                        text="\n".join(branch_lines + [rate_line]),
                         text_color=COLORS["primary"]
                     )
                 else:
+                    self.update_source_branch_options(None)
                     self.stock_info_label.configure(text="No stock available for this grade", text_color=COLORS["danger"])
             elif item_type == "Accessories":
-                # Find accessory
                 accessory = None
                 for a in self.accessories:
                     if self.format_accessory(a) == item_str:
@@ -415,12 +445,21 @@ class InvoiceWindow:
                     self.stock_info_label.configure(text="")
                     return
                 
-                acc_inv = AccessoryService.get_inventory(self.selected_branch_id, accessory.id)
-                available = acc_inv.quantity if acc_inv else 0
-                
+                overview_row = self.load_stock_overview_row("accessories", accessory.id)
+                self.current_stock_overview_row = overview_row
+                if overview_row:
+                    self.update_source_branch_options(overview_row)
+                    branch_lines = [
+                        f"{b['branch_name']}: {b.get('quantity', 0)} items"
+                        for b in overview_row.get("branches", [])
+                    ]
+                    available = self.selected_source_stock().get("quantity", 0) if self.selected_source_stock() else 0
+                else:
+                    self.update_source_branch_options(None)
+                    branch_lines = []
+                    available = 0
                 self.stock_info_label.configure(
-                    text=f"Available: {available} items\n"
-                         f"Unit Price: Rs. {accessory.unit_price:.2f}",
+                    text="\n".join(branch_lines + [f"Selected source: {available} items | Unit Price: Rs. {accessory.unit_price:.2f}"]),
                     text_color=COLORS["primary"]
                 )
             else:
@@ -444,6 +483,62 @@ class InvoiceWindow:
                 )
         except:
             self.stock_info_label.configure(text="")
+
+    def load_stock_overview_row(self, item_type, item_id, grade=None):
+        try:
+            params = f"item_type={item_type}&include_zero=true"
+            data = api_client.get(f"/stock/overview?{params}")
+            rows = data.get("tiles" if item_type == "tiles" else "accessories", [])
+            for row in rows:
+                if item_type == "tiles" and row.get("product_id") == item_id and row.get("grade") == grade:
+                    return row
+                if item_type == "accessories" and row.get("accessory_id") == item_id:
+                    return row
+        except ApiClientError:
+            return None
+        except Exception:
+            return None
+        return None
+
+    def update_source_branch_options(self, overview_row):
+        branches = overview_row.get("branches", []) if overview_row else []
+        self.source_branch_options = branches
+        names = [branch["branch_name"] for branch in branches]
+        self.source_branch_combo["values"] = names
+        current = self.source_branch_var.get()
+        invoice_branch = self.invoice_branch_name()
+        if invoice_branch in names and (not current or current not in names):
+            self.source_branch_var.set(invoice_branch)
+        elif names and current not in names:
+            self.source_branch_var.set(names[0])
+        elif not names:
+            self.source_branch_var.set("")
+
+    def selected_source_stock(self):
+        selected = self.source_branch_var.get()
+        for branch in self.source_branch_options:
+            if branch.get("branch_name") == selected:
+                return branch
+        return None
+
+    def selected_source_branch_id(self):
+        stock = self.selected_source_stock()
+        return stock.get("branch_id") if stock else self.selected_branch_id
+
+    def invoice_branch_name(self):
+        for branch in self.branches:
+            if branch.id == self.selected_branch_id:
+                return branch.name
+        return ""
+
+    def confirm_cross_branch_source(self, source_branch_id):
+        if not source_branch_id or source_branch_id == self.selected_branch_id:
+            return True
+        source_name = self.source_branch_var.get()
+        return messagebox.askyesno(
+            "Confirm Cross-Branch Stock",
+            f"This is {source_name} stock. Confirm you have arranged it with that branch?"
+        )
     
     def add_item(self):
         """Add item to invoice"""
@@ -474,31 +569,38 @@ class InvoiceWindow:
                 if boxes == 0 and loose_pieces == 0:
                     raise ValueError("Please enter at least some quantity")
                 
-                # Check stock
-                inv = InventoryService.get_inventory(self.selected_branch_id, product.id, grade)
-                if not inv:
-                    raise ValueError(f"No stock available for {product.name} - Grade {grade}")
+                source_branch_id = self.selected_source_branch_id()
+                if not self.confirm_cross_branch_source(source_branch_id):
+                    return
+                source_stock = self.selected_source_stock()
+                if not source_stock:
+                    raise ValueError(f"No source stock selected for {product.name} - Grade {grade}")
                 
-                total_available_pieces = (inv.boxes * product.pieces_per_box) + inv.loose_pieces
+                total_available_pieces = source_stock.get("total_pieces", 0)
                 total_requested_pieces = (boxes * product.pieces_per_box) + loose_pieces
                 
                 if total_requested_pieces > total_available_pieces:
-                    raise ValueError(f"Insufficient stock. Available: {inv.boxes} boxes + {inv.loose_pieces} pieces")
+                    raise ValueError(
+                        f"Insufficient stock. Available at {self.source_branch_var.get()}: "
+                        f"{source_stock.get('boxes', 0)} boxes + {source_stock.get('loose_pieces', 0)} pieces"
+                    )
                 
                 # Calculate line total
-                line_total = (boxes * inv.rate_per_box) + (loose_pieces * inv.rate_per_piece)
+                line_total = (boxes * source_stock.get("rate_per_box", 0)) + (loose_pieces * source_stock.get("rate_per_piece", 0))
                 
                 # Add to items list
                 item_data = {
                     'type': 'Tiles',
                     'product_id': product.id,
+                    'source_branch_id': source_branch_id,
+                    'source_branch_name': self.source_branch_var.get(),
                     'product_name': product.name,
                     'tile_size': product.tile_size,
                     'grade': grade,
                     'boxes': boxes,
                     'loose_pieces': loose_pieces,
-                    'rate_per_box': inv.rate_per_box,
-                    'rate_per_piece': inv.rate_per_piece,
+                    'rate_per_box': source_stock.get("rate_per_box", 0),
+                    'rate_per_piece': source_stock.get("rate_per_piece", 0),
                     'line_total': line_total
                 }
             elif item_type == "Accessories":
@@ -516,11 +618,16 @@ class InvoiceWindow:
                 if quantity <= 0:
                     raise ValueError("Please enter a valid quantity")
                 
-                # Check stock
-                acc_inv = AccessoryService.get_inventory(self.selected_branch_id, accessory.id)
-                available = acc_inv.quantity if acc_inv else 0
+                source_branch_id = self.selected_source_branch_id()
+                if not self.confirm_cross_branch_source(source_branch_id):
+                    return
+                source_stock = self.selected_source_stock()
+                available = source_stock.get("quantity", 0) if source_stock else 0
                 if quantity > available:
-                    raise ValueError(f"Insufficient stock for accessory {accessory_display_label(accessory)}. Available: {available}")
+                    raise ValueError(
+                        f"Insufficient stock for accessory {accessory_display_label(accessory)} at "
+                        f"{self.source_branch_var.get()}. Available: {available}"
+                    )
                 
                 # Calculate line total
                 line_total = quantity * accessory.unit_price
@@ -529,6 +636,8 @@ class InvoiceWindow:
                 item_data = {
                     'type': 'Accessory',
                     'accessory_id': accessory.id,
+                    'source_branch_id': source_branch_id,
+                    'source_branch_name': self.source_branch_var.get(),
                     'product_name': accessory_display_label(accessory),
                     'tile_size': accessory.category,
                     'grade': '-',
@@ -565,6 +674,8 @@ class InvoiceWindow:
                 item_data = {
                     'type': 'Sanitary',
                     'sanitary_product_id': sanitary_product.id,
+                    'source_branch_id': self.selected_branch_id,
+                    'source_branch_name': self.invoice_branch_name(),
                     'product_name': f"{sanitary_product.company_name} - {sanitary_product.product_category}",
                     'tile_size': sanitary_product.color,
                     'grade': sanitary_product.sku,
@@ -614,6 +725,7 @@ class InvoiceWindow:
             self.items_tree.insert('', tk.END, values=(
                 idx,
                 item['product_name'],
+                item.get('source_branch_name', self.invoice_branch_name()),
                 item['tile_size'],
                 item['grade'],
                 item['boxes'],
@@ -665,6 +777,7 @@ class InvoiceWindow:
                 if item.get('type') == 'Tiles':
                     items_data.append({
                         'product_id': item['product_id'],
+                        'source_branch_id': item.get('source_branch_id'),
                         'grade': item['grade'],
                         'boxes': item['boxes'],
                         'loose_pieces': item['loose_pieces']
@@ -672,11 +785,13 @@ class InvoiceWindow:
                 elif item.get('type') == 'Accessory':
                     items_data.append({
                         'accessory_id': item['accessory_id'],
+                        'source_branch_id': item.get('source_branch_id'),
                         'quantity': item['boxes']  # boxes field used for quantity in accessories
                     })
                 else:
                     items_data.append({
                         'sanitary_product_id': item['sanitary_product_id'],
+                        'source_branch_id': item.get('source_branch_id'),
                         'quantity': item['boxes']
                     })
             

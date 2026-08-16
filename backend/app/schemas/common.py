@@ -145,6 +145,7 @@ class InvoiceItemIn(BaseModel):
     product_id: int | None = None
     accessory_id: int | None = None
     sanitary_product_id: int | None = None
+    source_branch_id: int | None = None
     grade: str | None = None
     boxes: int = Field(default=0, ge=0)
     loose_pieces: int = Field(default=0, ge=0)
@@ -165,6 +166,7 @@ class InvoiceItemOut(ORMModel):
     product_id: int | None = None
     accessory_id: int | None = None
     sanitary_product_id: int | None = None
+    source_branch_id: int
     item_type: str
     description: str
     tile_size: str | None = None

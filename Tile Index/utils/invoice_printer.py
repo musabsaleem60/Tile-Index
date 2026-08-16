@@ -44,6 +44,7 @@ class InvoicePrintWindow:
         
         # Get branch, products, and accessories
         self.branch = BranchRepository.get_by_id(self.invoice.branch_id)
+        self.branches = {b.id: b for b in BranchRepository.get_all()}
         self.products = {p.id: p for p in ProductRepository.get_all()}
         self.accessories = {a.id: a for a in AccessoryRepository.get_all()}
         self.sanitary_products = {p.id: p for p in SanitaryProductRepository.get_all()}
@@ -176,6 +177,9 @@ class InvoicePrintWindow:
             if item.product_id:
                 product = self.products.get(item.product_id)
                 product_name = product.name if product else "N/A"
+                source_note = self.source_branch_note(item)
+                if source_note:
+                    product_name = f"{product_name}\n{source_note}"
                 size = item.tile_size
                 grade = item.grade
                 qty_main = str(item.boxes)
@@ -187,6 +191,9 @@ class InvoicePrintWindow:
                 accessory = self.accessories.get(item.accessory_id)
                 if accessory:
                     product_name = accessory_display_label(accessory)
+                    source_note = self.source_branch_note(item)
+                    if source_note:
+                        product_name = f"{product_name}\n{source_note}"
                     size = accessory.category
                 else:
                     product_name = "Unknown Accessory"
@@ -202,6 +209,9 @@ class InvoicePrintWindow:
                 sanitary_product = self.sanitary_products.get(item.sanitary_product_id)
                 if sanitary_product:
                     product_name = f"{sanitary_product.company_name} - {sanitary_product.product_category}"
+                    source_note = self.source_branch_note(item)
+                    if source_note:
+                        product_name = f"{product_name}\n{source_note}"
                     size = sanitary_product.color
                     grade = sanitary_product.sku
                 else:
@@ -403,7 +413,7 @@ class InvoicePrintWindow:
         for idx, item in enumerate(self.invoice.items, 1):
             table_data.append([
                 str(idx),
-                Paragraph(self.escape_text(self.item_label(item)), normal),
+                Paragraph(self.item_label_pdf(item), normal),
                 Paragraph(self.escape_text(self.item_size(item)), normal),
                 Paragraph(self.escape_text(item.grade or "-"), normal),
                 self.quantity_text(item.boxes),
@@ -533,6 +543,20 @@ class InvoicePrintWindow:
                 return f"{sanitary_product.company_name} - {sanitary_product.product_category}"
             return "Unknown Sanitary Product"
         return "Unknown Item"
+
+    def item_label_pdf(self, item):
+        label = self.escape_text(self.item_label(item))
+        note = self.source_branch_note(item)
+        if note:
+            return f"{label}<br/><b>{self.escape_text(note)}</b>"
+        return label
+
+    def source_branch_note(self, item):
+        source_branch_id = getattr(item, "source_branch_id", None)
+        if not source_branch_id or source_branch_id == self.invoice.branch_id:
+            return ""
+        branch = self.branches.get(source_branch_id)
+        return f"Source: {branch.name if branch else 'Other branch'}"
 
     def item_size(self, item):
         if item.product_id:

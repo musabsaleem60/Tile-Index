@@ -38,6 +38,7 @@ class InvoiceService:
                     api_items.append({
                         "item_type": "tile",
                         "product_id": item["product_id"],
+                        "source_branch_id": item.get("source_branch_id"),
                         "grade": item["grade"],
                         "boxes": item.get("boxes", 0),
                         "loose_pieces": item.get("loose_pieces", 0),
@@ -47,6 +48,7 @@ class InvoiceService:
                     api_items.append({
                         "item_type": "accessory",
                         "accessory_id": item["accessory_id"],
+                        "source_branch_id": item.get("source_branch_id"),
                         "quantity": item.get("quantity", 0),
                         "boxes": item.get("quantity", 0),
                         "loose_pieces": 0,
@@ -55,6 +57,7 @@ class InvoiceService:
                     api_items.append({
                         "item_type": "sanitary",
                         "sanitary_product_id": item["sanitary_product_id"],
+                        "source_branch_id": item.get("source_branch_id"),
                         "quantity": item.get("quantity", 0),
                         "boxes": item.get("quantity", 0),
                         "loose_pieces": 0,
@@ -332,6 +335,7 @@ class InvoiceService:
                 product_id=item.get("product_id"),
                 accessory_id=item.get("accessory_id"),
                 sanitary_product_id=item.get("sanitary_product_id"),
+                source_branch_id=item.get("source_branch_id"),
                 tile_size=item.get("tile_size"),
                 grade=item.get("grade"),
                 boxes=item.get("boxes", item.get("quantity", 0)),

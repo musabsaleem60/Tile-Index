@@ -282,6 +282,7 @@ class InvoiceItem(Base):
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"))
     accessory_id: Mapped[int | None] = mapped_column(ForeignKey("accessories.id", ondelete="RESTRICT"))
     sanitary_product_id: Mapped[int | None] = mapped_column(ForeignKey("sanitary_products.id", ondelete="RESTRICT"))
+    source_branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), nullable=False)
     item_type: Mapped[str] = mapped_column(String(30), nullable=False)
     description: Mapped[str] = mapped_column(String(255), nullable=False)
     tile_size: Mapped[str | None] = mapped_column(String(80))
@@ -301,6 +302,7 @@ class InvoiceItem(Base):
     product = relationship("Product")
     accessory = relationship("Accessory")
     sanitary_product = relationship("SanitaryProduct")
+    source_branch = relationship("Branch")
 
     __table_args__ = (
         CheckConstraint("item_type IN ('tile', 'accessory', 'sanitary')", name="ck_invoice_items_type"),

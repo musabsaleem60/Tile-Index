@@ -36,12 +36,12 @@ class StockOverviewWindow:
             font=FONTS["section"],
             fg_color=COLORS["surface"],
             text_color=COLORS["text"],
-            height=48,
+            height=38,
         )
         header.pack(fill=tk.X)
 
         main = ctk.CTkFrame(self.parent, fg_color=COLORS["app_bg"], corner_radius=0)
-        main.pack(fill=tk.BOTH, expand=True, padx=SPACING["page_x"], pady=SPACING["page_y"])
+        main.pack(fill=tk.BOTH, expand=True, padx=SPACING["page_x"], pady=(8, SPACING["page_y"]))
 
         controls = ctk.CTkFrame(
             main,
