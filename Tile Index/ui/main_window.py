@@ -11,6 +11,7 @@ from ui.accessory_window import AccessoryWindow
 from ui.sanitary_window import SanitaryWindow
 from ui.invoice_window import InvoiceWindow
 from ui.invoice_search_window import InvoiceSearchWindow
+from ui.stock_overview_window import StockOverviewWindow
 from ui.report_window import ReportWindow
 from services.auth_service import AuthenticationService
 from desktop_client.session import get_update_warning
@@ -215,6 +216,7 @@ class MainWindow:
         # Grid layout for buttons
         buttons = [
             ("Inventory Management", COLORS["primary"], COLORS["primary_hover"], self.open_inventory),
+            ("Stock Overview", COLORS["search"], COLORS["search_hover"], self.open_stock_overview),
             ("Accessories", COLORS["accessory"], COLORS["accessory_hover"], self.open_accessories),
             ("Invoice & Billing", COLORS["success"], COLORS["success_hover"], self.open_invoice),
             ("Search Invoices", COLORS["search"], COLORS["search_hover"], self.open_invoice_search),
@@ -369,6 +371,10 @@ class MainWindow:
     def open_invoice(self):
         """Open invoice creation within the same window"""
         self.switch_view(InvoiceWindow, self.current_user)
+
+    def open_stock_overview(self):
+        """Open read-only stock overview within the same window"""
+        self.switch_view(StockOverviewWindow, self.current_user)
 
     def open_reports(self):
         """Open reports within the same window (Admin only)"""

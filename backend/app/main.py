@@ -1,9 +1,9 @@
-import os
+﻿import os
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, select, text
-from app.api import auth, catalog, inventory, invoices, reports, updates
+from app.api import auth, catalog, inventory, invoices, reports, stock, updates
 from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.models.entities import TileRate
@@ -53,4 +53,6 @@ app.include_router(catalog.router)
 app.include_router(inventory.router)
 app.include_router(invoices.router)
 app.include_router(reports.router)
+app.include_router(stock.router)
 app.include_router(updates.router)
+
