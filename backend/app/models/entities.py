@@ -191,6 +191,15 @@ class Accessory(Base):
     updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class AccessoryCategory(Base):
+    __tablename__ = "accessory_categories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class AccessoryInventory(Base):
     __tablename__ = "accessories_inventory"
 

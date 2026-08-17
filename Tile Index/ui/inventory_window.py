@@ -133,21 +133,20 @@ class InventoryWindow:
         products_scroll.configure(command=self.products_listbox.yview)
         self.products_listbox.bind('<<ListboxSelect>>', self.on_product_select)
         
-        # Edit and Delete buttons for products (Admin only)
+        # Edit and Delete buttons for products
         product_action_frame = ctk.CTkFrame(left_frame, fg_color="transparent", corner_radius=0)
         product_action_frame.grid(row=8, column=0, columnspan=2, pady=5)
         
         if AuthenticationService.can_manage_products(self.current_user):
             self.action_button(product_action_frame, "Edit Product", self.edit_selected_product, width=140, primary=False).pack(side=tk.LEFT, padx=5)
             self.action_button(product_action_frame, "Delete Product", self.delete_selected_product, width=140, primary=False).pack(side=tk.LEFT, padx=5)
-        
-        # Hide product management for employees
-        if AuthenticationService.is_employee(self.current_user):
-            # Hide product form fields
+
+        # Hide product management only for roles that cannot manage products.
+        if not AuthenticationService.can_manage_products(self.current_user):
             for row in range(9):
                 for widget in left_frame.grid_slaves(row=row):
                     widget.grid_remove()
-            self.form_label(left_frame, "Product management is restricted to administrators.", bold=True).grid(row=0, column=0, columnspan=2, pady=50)
+            self.form_label(left_frame, "Product management is restricted.", bold=True).grid(row=0, column=0, columnspan=2, pady=50)
         
         # Right panel - Stock Management
         right_frame = ctk.CTkFrame(

@@ -138,7 +138,7 @@ class SanitaryWindow:
         action_frame = tk.Frame(left_frame)
         action_frame.grid(row=10, column=0, columnspan=2, pady=5)
 
-        if AuthenticationService.can_manage_products(self.current_user):
+        if AuthenticationService.is_admin(self.current_user):
             tk.Button(action_frame, text="Edit", command=self.edit_selected, bg="#f39c12", fg="white", width=12).pack(side=tk.LEFT, padx=5)
             tk.Button(action_frame, text="Delete", command=self.delete_selected, bg="#e74c3c", fg="white", width=12).pack(side=tk.LEFT, padx=5)
 

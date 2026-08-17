@@ -121,7 +121,7 @@ class AccessoryWindow:
         action_frame = ctk.CTkFrame(left_frame, fg_color="transparent", corner_radius=0)
         action_frame.grid(row=8, column=0, columnspan=2, pady=(5, 12))
 
-        if AuthenticationService.can_manage_products(self.current_user):
+        if AuthenticationService.is_admin(self.current_user):
             self.action_button(action_frame, "Edit", self.edit_selected, width=110).pack(side=tk.LEFT, padx=5)
             self.action_button(action_frame, "Delete", self.delete_selected, width=110, danger=True).pack(side=tk.LEFT, padx=5)
 

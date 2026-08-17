@@ -57,7 +57,7 @@ class AuthenticationService:
     @staticmethod
     def can_manage_products(user):
         """Check if user can manage products"""
-        return AuthenticationService.is_admin(user)
+        return user and user.role in ('admin', 'employee')
     
     @staticmethod
     def can_view_reports(user):

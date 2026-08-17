@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.api.deps import get_current_user, require_admin
+from app.api.deps import get_current_user, require_admin, require_product_manager
 from app.db.session import get_db
 from app.models.entities import Accessory, Branch, Product, SanitaryProduct, User
 from app.schemas.common import (
@@ -32,7 +32,7 @@ def list_products(db: Session = Depends(get_db), _: User = Depends(get_current_u
     return db.scalars(select(Product).order_by(Product.name, Product.tile_size)).all()
 
 
-@router.post("/products", response_model=ProductOut, dependencies=[Depends(require_admin)])
+@router.post("/products", response_model=ProductOut, dependencies=[Depends(require_product_manager)])
 def create_product(payload: ProductIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     product = Product(**payload.model_dump())
     db.add(product)
@@ -42,7 +42,7 @@ def create_product(payload: ProductIn, db: Session = Depends(get_db), current_us
     return product
 
 
-@router.put("/products/{product_id}", response_model=ProductOut, dependencies=[Depends(require_admin)])
+@router.put("/products/{product_id}", response_model=ProductOut, dependencies=[Depends(require_product_manager)])
 def update_product(product_id: int, payload: ProductIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     product = db.get(Product, product_id)
     if not product:
@@ -55,7 +55,7 @@ def update_product(product_id: int, payload: ProductIn, db: Session = Depends(ge
     return product
 
 
-@router.delete("/products/{product_id}", dependencies=[Depends(require_admin)])
+@router.delete("/products/{product_id}", dependencies=[Depends(require_product_manager)])
 def delete_product(product_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     product = db.get(Product, product_id)
     if not product:
