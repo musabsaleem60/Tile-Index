@@ -7,14 +7,13 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import customtkinter as ctk
 from datetime import datetime
+from urllib.parse import urlencode
 from repositories.branch_repository import BranchRepository
 from repositories.product_repository import ProductRepository
 from repositories.accessory_repository import AccessoryRepository
-from repositories.sanitary_repository import SanitaryProductRepository
 from services.invoice_service import InvoiceService
 from services.inventory_service import InventoryService
 from services.accessory_service import AccessoryService
-from services.sanitary_service import SanitaryService
 from desktop_client.api_client import ApiClientError
 from desktop_client.session import api_client
 from utils.validators import validate_positive_number, validate_integer, validate_required
@@ -35,7 +34,6 @@ class InvoiceWindow:
         self.branches = BranchRepository.get_all()
         self.products = ProductRepository.get_all()
         self.accessories = AccessoryService.get_all_accessories()
-        self.sanitary_products = SanitaryProductRepository.get_all()
         self.selected_branch_id = None
         self.invoice_items = []  # List of item dicts
         self.source_branch_options = []
@@ -124,7 +122,7 @@ class InvoiceWindow:
         self.form_label(item_frame, "Item Type:").grid(row=1, column=0, sticky=tk.W, pady=3, padx=8)
         self.item_type_var = tk.StringVar(value="Tiles")
         item_type_combo = ttk.Combobox(item_frame, textvariable=self.item_type_var, width=SIZES["dropdown_width"], state="readonly", font=FONTS["small"])
-        item_type_combo['values'] = ("Tiles", "Accessories", "Sanitary")
+        item_type_combo['values'] = ("Tiles", "Accessories")
         item_type_combo.grid(row=1, column=1, pady=3, padx=8, sticky=tk.W)
         item_type_combo.bind('<<ComboboxSelected>>', self.on_item_type_change)
         
@@ -358,16 +356,6 @@ class InvoiceWindow:
             self.boxes_label.configure(text="Quantity:")
             self.pieces_label.grid_remove()
             self.item_pieces_entry.grid_remove()
-        else:
-            self.product_label.configure(text="Sanitary:")
-            self.product_combo.set_completion_list([self.format_sanitary_product(p) for p in self.sanitary_products])
-            self.grade_label.grid_remove()
-            self.grade_combo.grid_remove()
-            self.source_branch_label.grid_remove()
-            self.source_branch_combo.grid_remove()
-            self.boxes_label.configure(text="Quantity:")
-            self.pieces_label.grid_remove()
-            self.item_pieces_entry.grid_remove()
             
         self.update_stock_info()
     
@@ -462,38 +450,19 @@ class InvoiceWindow:
                     text="\n".join(branch_lines + [f"Selected source: {available} items | Unit Price: Rs. {accessory.unit_price:.2f}"]),
                     text_color=COLORS["primary"]
                 )
-            else:
-                sanitary_product = None
-                for product in self.sanitary_products:
-                    if self.format_sanitary_product(product) == item_str:
-                        sanitary_product = product
-                        break
-
-                if not sanitary_product:
-                    self.stock_info_label.configure(text="")
-                    return
-
-                sanitary_inv = SanitaryService.get_inventory(self.selected_branch_id, sanitary_product.id)
-                available = sanitary_inv.quantity if sanitary_inv else 0
-
-                self.stock_info_label.configure(
-                    text=f"Available: {available} items\n"
-                         f"Sale Price: Rs. {sanitary_product.sale_price:.2f}",
-                    text_color=COLORS["primary"]
-                )
         except:
             self.stock_info_label.configure(text="")
 
     def load_stock_overview_row(self, item_type, item_id, grade=None):
         try:
-            params = f"item_type={item_type}&include_zero=true"
-            data = api_client.get(f"/stock/overview?{params}")
-            rows = data.get("tiles" if item_type == "tiles" else "accessories", [])
-            for row in rows:
-                if item_type == "tiles" and row.get("product_id") == item_id and row.get("grade") == grade:
-                    return row
-                if item_type == "accessories" and row.get("accessory_id") == item_id:
-                    return row
+            params = {"item_type": "tile" if item_type == "tiles" else "accessory"}
+            if item_type == "tiles":
+                params["product_id"] = str(item_id)
+                params["grade"] = grade
+            else:
+                params["accessory_id"] = str(item_id)
+            data = api_client.get(f"/stock/item?{urlencode(params)}")
+            return data.get("item")
         except ApiClientError:
             return None
         except Exception:
@@ -647,44 +616,6 @@ class InvoiceWindow:
                     'rate_per_piece': 0,
                     'line_total': line_total
                 }
-            else:
-                sanitary_product = None
-                for product in self.sanitary_products:
-                    if self.format_sanitary_product(product) == item_str:
-                        sanitary_product = product
-                        break
-
-                if not sanitary_product:
-                    raise ValueError("Sanitary product not found")
-
-                quantity = validate_integer(self.item_boxes_entry.get() or "0", "Quantity")
-                if quantity <= 0:
-                    raise ValueError("Please enter a valid quantity")
-
-                sanitary_inv = SanitaryService.get_inventory(self.selected_branch_id, sanitary_product.id)
-                available = sanitary_inv.quantity if sanitary_inv else 0
-                if quantity > available:
-                    raise ValueError(
-                        f"Insufficient stock for sanitary product {sanitary_product.product_category}. "
-                        f"Available: {available}"
-                    )
-
-                line_total = quantity * sanitary_product.sale_price
-
-                item_data = {
-                    'type': 'Sanitary',
-                    'sanitary_product_id': sanitary_product.id,
-                    'source_branch_id': self.selected_branch_id,
-                    'source_branch_name': self.invoice_branch_name(),
-                    'product_name': f"{sanitary_product.company_name} - {sanitary_product.product_category}",
-                    'tile_size': sanitary_product.color,
-                    'grade': sanitary_product.sku,
-                    'boxes': quantity,
-                    'loose_pieces': 0,
-                    'rate_per_box': sanitary_product.sale_price,
-                    'rate_per_piece': 0,
-                    'line_total': line_total
-                }
             
             self.invoice_items.append(item_data)
             self.update_items_table()
@@ -788,12 +719,6 @@ class InvoiceWindow:
                         'source_branch_id': item.get('source_branch_id'),
                         'quantity': item['boxes']  # boxes field used for quantity in accessories
                     })
-                else:
-                    items_data.append({
-                        'sanitary_product_id': item['sanitary_product_id'],
-                        'source_branch_id': item.get('source_branch_id'),
-                        'quantity': item['boxes']
-                    })
             
             # Check branch access for employees
             from services.auth_service import AuthenticationService
@@ -850,11 +775,4 @@ class InvoiceWindow:
     def format_accessory(accessory):
         return f"{accessory.category} - {accessory_display_label(accessory)}"
 
-    @staticmethod
-    def format_sanitary_product(product):
-        """Format sanitary product for dropdown display"""
-        return (
-            f"{product.company_name} - {product.product_category} - "
-            f"{product.color} ({product.sku})"
-        )
 

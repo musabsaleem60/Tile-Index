@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -35,6 +35,122 @@ def stock_overview(
         "accessories": _accessory_rows(db, branches, search_text, branch_id, category, include_zero)
         if item_type in ("all", "accessories")
         else [],
+    }
+
+
+@router.get("/item")
+def stock_item(
+    item_type: str = Query(pattern="^(tile|accessory)$"),
+    product_id: int | None = None,
+    accessory_id: int | None = None,
+    grade: str | None = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    branches = db.scalars(select(Branch).order_by(Branch.name)).all()
+    if item_type == "tile":
+        if product_id is None or not grade:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="product_id and grade are required for tile stock",
+            )
+        product = db.get(Product, product_id)
+        if not product or not product.active:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        return {
+            "branches": _branch_rows(branches),
+            "item": _tile_item_row(db, branches, product, grade),
+        }
+
+    if accessory_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="accessory_id is required for accessory stock",
+        )
+    accessory = db.get(Accessory, accessory_id)
+    if not accessory or not accessory.active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Accessory not found")
+    return {
+        "branches": _branch_rows(branches),
+        "item": _accessory_item_row(db, branches, accessory),
+    }
+
+
+def _branch_rows(branches):
+    return [
+        {"id": branch.id, "name": branch.name, "code": branch.code}
+        for branch in branches
+    ]
+
+
+def _tile_item_row(db: Session, branches, product: Product, grade: str):
+    inventory_rows = db.scalars(
+        select(Inventory).where(
+            Inventory.product_id == product.id,
+            Inventory.grade == grade,
+        )
+    ).all()
+    inventory_by_branch = {inv.branch_id: inv for inv in inventory_rows}
+    branch_rows = []
+    total_boxes = 0
+    total_loose = 0
+    for branch in branches:
+        inv = inventory_by_branch.get(branch.id)
+        boxes = int(inv.boxes if inv else 0)
+        loose = int(inv.loose_pieces if inv else 0)
+        pieces = boxes * int(product.pieces_per_box or 0) + loose
+        total_boxes += boxes
+        total_loose += loose
+        branch_rows.append({
+            "branch_id": branch.id,
+            "branch_name": branch.name,
+            "boxes": boxes,
+            "loose_pieces": loose,
+            "total_pieces": pieces,
+            "rate_per_sqm": float(inv.rate_per_sqm if inv else 0),
+            "rate_per_box": float(inv.rate_per_box if inv else 0),
+            "rate_per_piece": float(inv.rate_per_piece if inv else 0),
+        })
+
+    return {
+        "kind": "tile",
+        "product_id": product.id,
+        "product": product.name,
+        "size": product.tile_size,
+        "grade": grade,
+        "pieces_per_box": product.pieces_per_box,
+        "total_boxes": total_boxes,
+        "total_loose_pieces": total_loose,
+        "total_pieces": total_boxes * int(product.pieces_per_box or 0) + total_loose,
+        "branches": branch_rows,
+    }
+
+
+def _accessory_item_row(db: Session, branches, accessory: Accessory):
+    inventory_rows = db.scalars(
+        select(AccessoryInventory).where(AccessoryInventory.accessory_id == accessory.id)
+    ).all()
+    inventory_by_branch = {inv.branch_id: inv for inv in inventory_rows}
+    branch_rows = []
+    total_quantity = 0
+    for branch in branches:
+        inv = inventory_by_branch.get(branch.id)
+        quantity = int(inv.quantity if inv else 0)
+        total_quantity += quantity
+        branch_rows.append({
+            "branch_id": branch.id,
+            "branch_name": branch.name,
+            "quantity": quantity,
+        })
+
+    return {
+        "kind": "accessory",
+        "accessory_id": accessory.id,
+        "product": accessory_display_label(accessory),
+        "category": accessory.category,
+        "unit_price": float(accessory.unit_price or 0),
+        "total_quantity": total_quantity,
+        "branches": branch_rows,
     }
 
 
