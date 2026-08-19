@@ -13,6 +13,7 @@ from repositories.user_repository import UserRepository
 from services.activity_log_service import ActivityLogService
 from services.auth_service import AuthenticationService
 from utils.datetime_format import format_business_datetime
+from utils.activity_log_formatter import activity_reason, format_activity_details
 from ui.theme import COLORS, FONTS, SIZES, SPACING
 
 
@@ -117,7 +118,7 @@ class ActivityLogWindow:
         right_frame.grid_rowconfigure(1, weight=1)
         right_frame.grid_columnconfigure(0, weight=1)
 
-        columns = ('Date/Time', 'User', 'Role', 'Branch', 'Action', 'Details')
+        columns = ('Date/Time', 'User', 'Role', 'Branch', 'Action', 'Reason', 'Details')
         self.activities_tree = ttk.Treeview(right_frame, columns=columns, show='headings', height=25)
 
         column_widths = {
@@ -126,7 +127,8 @@ class ActivityLogWindow:
             'Role': 80,
             'Branch': 150,
             'Action': 150,
-            'Details': 320,
+            'Reason': 180,
+            'Details': 360,
         }
         for col in columns:
             self.activities_tree.heading(col, text=col)
@@ -286,7 +288,10 @@ class ActivityLogWindow:
                 date_str = format_business_datetime(activity.action_date)
                 
                 branch_name = activity.branch_name or "N/A"
-                details_short = activity.action_details[:50] + "..." if activity.action_details and len(activity.action_details) > 50 else (activity.action_details or "")
+                details = format_activity_details(activity)
+                details_one_line = " | ".join(details.splitlines())
+                details_short = details_one_line[:80] + "..." if len(details_one_line) > 80 else details_one_line
+                reason = activity_reason(activity)
                 
                 self.activities_tree.insert('', tk.END, values=(
                     date_str,
@@ -294,6 +299,7 @@ class ActivityLogWindow:
                     activity.user_role.upper(),
                     branch_name,
                     activity.action_type,
+                    reason,
                     details_short
                 ), tags=(activity.id,))
             
@@ -373,7 +379,10 @@ class ActivityLogWindow:
                 date_str = format_business_datetime(activity.action_date)
                 
                 branch_name = activity.branch_name or "N/A"
-                details_short = activity.action_details[:50] + "..." if activity.action_details and len(activity.action_details) > 50 else (activity.action_details or "")
+                details = format_activity_details(activity)
+                details_one_line = " | ".join(details.splitlines())
+                details_short = details_one_line[:80] + "..." if len(details_one_line) > 80 else details_one_line
+                reason = activity_reason(activity)
                 
                 self.activities_tree.insert('', tk.END, values=(
                     date_str,
@@ -381,6 +390,7 @@ class ActivityLogWindow:
                     activity.user_role.upper(),
                     branch_name,
                     activity.action_type,
+                    reason,
                     details_short
                 ), tags=(activity.id,))
             
@@ -428,7 +438,7 @@ class ActivityLogWindow:
                 self.details_text.insert(tk.END, f"Branch: {activity.branch_name or 'N/A'}\n")
                 self.details_text.insert(tk.END, f"Action: {activity.action_type}\n\n")
                 self.details_text.insert(tk.END, "Details:\n")
-                self.details_text.insert(tk.END, activity.action_details or "No additional details")
+                self.details_text.insert(tk.END, format_activity_details(activity) or "No additional details")
                 
                 self.details_text.config(state=tk.DISABLED)
         except Exception as e:
@@ -472,11 +482,11 @@ class ActivityLogWindow:
                 f.write("TILE INDEX - ACTIVITY LOG / AUDIT TRAIL\n")
                 f.write("=" * 100 + "\n\n")
                 f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-                f.write(f"{'Date/Time':<20} {'User':<15} {'Role':<10} {'Branch':<20} {'Action':<20} {'Details':<30}\n")
+                f.write(f"{'Date/Time':<20} {'User':<15} {'Role':<10} {'Branch':<20} {'Action':<20} {'Reason':<25} {'Details':<30}\n")
                 f.write("-" * 100 + "\n")
                 
                 for activity in activities:
-                    f.write(f"{activity[0]:<20} {activity[1]:<15} {activity[2]:<10} {activity[3]:<20} {activity[4]:<20} {activity[5]:<30}\n")
+                    f.write(f"{activity[0]:<20} {activity[1]:<15} {activity[2]:<10} {activity[3]:<20} {activity[4]:<20} {activity[5]:<25} {activity[6]:<30}\n")
             
             messagebox.showinfo("Success", f"Activity log exported to:\n{filename}")
         except Exception as e:

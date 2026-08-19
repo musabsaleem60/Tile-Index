@@ -263,13 +263,13 @@ class AccessoryInventoryRepository:
         return AccessoryInventoryRepository.create_or_update(branch_id, accessory_id, new_qty)
     
     @staticmethod
-    def deduct_stock(branch_id, accessory_id, quantity_to_deduct):
+    def deduct_stock(branch_id, accessory_id, quantity_to_deduct, notes=None):
         """Deduct stock quantity"""
         if is_api_authenticated():
             data = api_client.post(f"/inventory/accessories/{accessory_id}/stock-out", {
                 "branch_id": branch_id,
                 "quantity": quantity_to_deduct,
-                "notes": "Desktop accessory stock out",
+                "notes": notes,
             })
             return AccessoryInventory(id=data["id"], branch_id=data["branch_id"],
                                       accessory_id=data["accessory_id"], quantity=data["quantity"],

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import ensure_branch_access, get_current_user
 from app.db.session import get_db
 from app.models.entities import (
+    Accessory,
     AccessoryInventory,
     Inventory,
     Product,
@@ -14,11 +15,22 @@ from app.models.entities import (
 )
 from app.schemas.common import AccessoryInventoryOut, InventoryOut, SanitaryInventoryOut, SimpleQuantityRequest, StockInRequest
 from app.services.audit import write_audit_log
+from app.services.accessory_labels import accessory_display_label
 from app.services.tile_pricing import resolve_tile_price
 from stock_math import deduct_verbatim_stock, total_pieces
 
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
+
+
+def _require_stock_out_reason(notes: str | None) -> str:
+    reason = (notes or "").strip()
+    if len(reason) < 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please enter a reason for removing stock.",
+        )
+    return reason
 
 
 @router.get("/tiles/{branch_id}", response_model=list[InventoryOut])
@@ -85,8 +97,16 @@ def tile_stock_in(payload: StockInRequest, db: Session = Depends(get_db), curren
         loose_pieces=payload.loose_pieces,
         notes=payload.notes,
     ))
-    audit_payload = payload.model_dump()
-    audit_payload["rate_fields_ignored"] = True
+    audit_payload = {
+        "branch_id": payload.branch_id,
+        "product_id": payload.product_id,
+        "product_name": product.name,
+        "tile_size": product.tile_size,
+        "grade": payload.grade,
+        "boxes": payload.boxes,
+        "loose_pieces": payload.loose_pieces,
+        "notes": payload.notes,
+    }
     write_audit_log(db, current_user, "Stock IN", audit_payload, payload.branch_id)
     db.commit()
     db.refresh(inventory)
@@ -96,6 +116,7 @@ def tile_stock_in(payload: StockInRequest, db: Session = Depends(get_db), curren
 @router.post("/tiles/stock-out", response_model=InventoryOut)
 def tile_stock_out(payload: StockInRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     ensure_branch_access(current_user, payload.branch_id)
+    reason = _require_stock_out_reason(payload.notes)
     if payload.boxes == 0 and payload.loose_pieces == 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stock quantity is required")
 
@@ -137,10 +158,18 @@ def tile_stock_out(payload: StockInRequest, db: Session = Depends(get_db), curre
         transaction_type="OUT",
         boxes=payload.boxes,
         loose_pieces=payload.loose_pieces,
-        notes=payload.notes,
+        notes=reason,
     ))
-    audit_payload = payload.model_dump()
-    audit_payload["rate_fields_ignored"] = True
+    audit_payload = {
+        "branch_id": payload.branch_id,
+        "product_id": payload.product_id,
+        "product_name": product.name,
+        "tile_size": product.tile_size,
+        "grade": payload.grade,
+        "boxes": payload.boxes,
+        "loose_pieces": payload.loose_pieces,
+        "reason": reason,
+    }
     write_audit_log(db, current_user, "Stock OUT", audit_payload, payload.branch_id)
     db.commit()
     db.refresh(inventory)
@@ -156,6 +185,9 @@ def list_accessory_inventory(branch_id: int, db: Session = Depends(get_db), curr
 @router.post("/accessories/{accessory_id}/stock-in", response_model=AccessoryInventoryOut)
 def accessory_stock_in(accessory_id: int, payload: SimpleQuantityRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     ensure_branch_access(current_user, payload.branch_id)
+    accessory = db.get(Accessory, accessory_id)
+    if not accessory:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Accessory not found")
     inventory = db.scalar(
         select(AccessoryInventory).where(
             AccessoryInventory.branch_id == payload.branch_id,
@@ -166,7 +198,18 @@ def accessory_stock_in(accessory_id: int, payload: SimpleQuantityRequest, db: Se
         inventory = AccessoryInventory(branch_id=payload.branch_id, accessory_id=accessory_id, quantity=0)
         db.add(inventory)
     inventory.quantity += payload.quantity
-    write_audit_log(db, current_user, "Accessory Stock IN", {"accessory_id": accessory_id, **payload.model_dump()}, payload.branch_id)
+    write_audit_log(
+        db,
+        current_user,
+        "Accessory Stock IN",
+        {
+            "accessory_id": accessory_id,
+            "accessory_name": accessory_display_label(accessory),
+            "category": accessory.category,
+            **payload.model_dump(),
+        },
+        payload.branch_id,
+    )
     db.commit()
     db.refresh(inventory)
     return inventory
@@ -175,6 +218,10 @@ def accessory_stock_in(accessory_id: int, payload: SimpleQuantityRequest, db: Se
 @router.post("/accessories/{accessory_id}/stock-out", response_model=AccessoryInventoryOut)
 def accessory_stock_out(accessory_id: int, payload: SimpleQuantityRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     ensure_branch_access(current_user, payload.branch_id)
+    reason = _require_stock_out_reason(payload.notes)
+    accessory = db.get(Accessory, accessory_id)
+    if not accessory:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Accessory not found")
     inventory = db.scalar(
         select(AccessoryInventory).where(
             AccessoryInventory.branch_id == payload.branch_id,
@@ -184,7 +231,20 @@ def accessory_stock_out(accessory_id: int, payload: SimpleQuantityRequest, db: S
     if not inventory or inventory.quantity < payload.quantity:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient accessory stock")
     inventory.quantity -= payload.quantity
-    write_audit_log(db, current_user, "Accessory Stock OUT", {"accessory_id": accessory_id, **payload.model_dump()}, payload.branch_id)
+    write_audit_log(
+        db,
+        current_user,
+        "Accessory Stock OUT",
+        {
+            "accessory_id": accessory_id,
+            "accessory_name": accessory_display_label(accessory),
+            "category": accessory.category,
+            "branch_id": payload.branch_id,
+            "quantity": payload.quantity,
+            "reason": reason,
+        },
+        payload.branch_id,
+    )
     db.commit()
     db.refresh(inventory)
     return inventory

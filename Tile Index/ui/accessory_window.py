@@ -173,7 +173,11 @@ class AccessoryWindow:
         self.stock_out_qty_entry = self.form_entry(stock_out_frame, width=160)
         self.stock_out_qty_entry.grid(row=1, column=1, pady=3, padx=8, sticky=tk.W)
 
-        self.action_button(stock_out_frame, "Remove Stock", self.remove_stock, width=160, danger=True).grid(row=2, column=0, columnspan=2, pady=10)
+        self.form_label(stock_out_frame, "Reason:").grid(row=2, column=0, sticky=tk.W, pady=3, padx=8)
+        self.stock_out_reason_entry = self.form_entry(stock_out_frame, width=160)
+        self.stock_out_reason_entry.grid(row=2, column=1, pady=3, padx=8, sticky=tk.W)
+
+        self.action_button(stock_out_frame, "Remove Stock", self.remove_stock, width=160, danger=True).grid(row=3, column=0, columnspan=2, pady=10)
 
         stock_display_frame = self.subpanel(right_frame, "Current Stock")
         stock_display_frame.grid(row=5, column=0, columnspan=2, sticky=tk.NSEW, pady=10, padx=12)
@@ -505,6 +509,10 @@ class AccessoryWindow:
             
             if quantity <= 0:
                 raise ValueError("Quantity must be positive")
+
+            reason = self.stock_out_reason_entry.get().strip()
+            if len(reason) < 5:
+                raise ValueError("Please enter a reason for removing stock.")
             
             if not AuthenticationService.can_access_branch(self.current_user, self.selected_branch_id):
                 raise ValueError("You do not have access to this branch")
@@ -560,16 +568,17 @@ class AccessoryWindow:
             label = accessory_display_label(accessory)
             confirm = messagebox.askyesno(
                 "Confirm Stock OUT",
-                f"Remove {quantity} units of {accessory.category} - {label}?"
+                f"Remove {quantity} units of {accessory.category} - {label}?\n\nReason: {reason}"
             )
             
             if not confirm:
                 return
             
-            AccessoryService.deduct_stock(self.selected_branch_id, accessory.id, quantity)
-            messagebox.showinfo("Success", f"Removed {quantity} units of {accessory.category} - {label} from stock!")
+            AccessoryService.deduct_stock(self.selected_branch_id, accessory.id, quantity, notes=reason)
+            messagebox.showinfo("Success", f"Removed {quantity} units of {accessory.category} - {label} from stock!\nReason: {reason}")
             
             self.stock_out_qty_entry.delete(0, tk.END)
+            self.stock_out_reason_entry.delete(0, tk.END)
             self.refresh_stock()
             
         except Exception as e:

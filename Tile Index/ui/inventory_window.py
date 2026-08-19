@@ -221,7 +221,6 @@ class InventoryWindow:
         self.form_label(stock_out_frame, "Reason/Comment:").grid(row=3, column=0, sticky=tk.W, pady=3, padx=8)
         self.stock_out_comment_entry = self.form_entry(stock_out_frame, width=160)
         self.stock_out_comment_entry.grid(row=3, column=1, pady=3, padx=8)
-        self.stock_out_comment_entry.insert(0, "Customer return / Other reason")
         
         self.action_button(stock_out_frame, "Remove Stock", self.remove_stock, width=180, primary=False).grid(row=4, column=0, columnspan=2, pady=10)
         
@@ -581,7 +580,9 @@ class InventoryWindow:
             grade = validate_grade(self.grade_var.get())
             boxes = validate_integer(self.stock_out_boxes_entry.get() or "0", "Boxes")
             loose_pieces = validate_integer(self.stock_out_pieces_entry.get() or "0", "Loose Pieces")
-            comment = self.stock_out_comment_entry.get().strip() or "Stock OUT"
+            comment = self.stock_out_comment_entry.get().strip()
+            if len(comment) < 5:
+                raise ValueError("Please enter a reason for removing stock.")
             
             if boxes == 0 and loose_pieces == 0:
                 raise ValueError("Please enter at least some quantity to remove")
@@ -626,7 +627,6 @@ class InventoryWindow:
             self.stock_out_boxes_entry.delete(0, tk.END)
             self.stock_out_pieces_entry.delete(0, tk.END)
             self.stock_out_comment_entry.delete(0, tk.END)
-            self.stock_out_comment_entry.insert(0, "Customer return / Other reason")
             self.selected_product_id = selected_product.id
             self.refresh_stock()
             

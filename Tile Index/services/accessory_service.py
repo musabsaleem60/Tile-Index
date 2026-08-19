@@ -85,11 +85,11 @@ class AccessoryService:
         return AccessoryInventoryRepository.add_stock(branch_id, accessory_id, quantity)
     
     @staticmethod
-    def deduct_stock(branch_id, accessory_id, quantity):
+    def deduct_stock(branch_id, accessory_id, quantity, notes=None):
         """Deduct stock for an accessory at a branch"""
         if quantity <= 0:
             raise ValueError("Quantity must be positive")
-        return AccessoryInventoryRepository.deduct_stock(branch_id, accessory_id, quantity)
+        return AccessoryInventoryRepository.deduct_stock(branch_id, accessory_id, quantity, notes=notes)
     
     @staticmethod
     def set_stock(branch_id, accessory_id, quantity):
