@@ -257,3 +257,35 @@ class ActivityLogOut(ORMModel):
     action_details: str | None = None
     action_date: datetime
     ip_address: str | None = None
+
+
+class TileRateUpdate(BaseModel):
+    rate_per_meter: float = Field(gt=0)
+    reason: str = Field(min_length=5, max_length=500)
+
+
+class TileSizeCreate(BaseModel):
+    tile_size: str = Field(min_length=1, max_length=80)
+    pieces_per_box: int = Field(gt=0)
+    area_per_box: float = Field(gt=0)
+    g1_prime: float = Field(gt=0)
+    g2_standard: float = Field(gt=0)
+    g3_regular: float = Field(gt=0)
+    reason: str = Field(min_length=5, max_length=500)
+
+
+class ProductRateOverrideIn(BaseModel):
+    product_id: int
+    grade: str = Field(min_length=1, max_length=80)
+    rate_per_meter: float = Field(gt=0)
+    reason: str = Field(min_length=5, max_length=500)
+
+
+class ProductRateOverrideRemove(BaseModel):
+    product_id: int
+    grade: str = Field(min_length=1, max_length=80)
+    reason: str = Field(min_length=5, max_length=500)
+
+
+class RateRemovalReason(BaseModel):
+    reason: str = Field(min_length=5, max_length=500)

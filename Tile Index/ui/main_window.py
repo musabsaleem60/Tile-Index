@@ -257,6 +257,7 @@ class MainWindow:
 
             admin_buttons = [
                 ("Reports", COLORS["reports"], COLORS["reports_hover"], self.open_reports),
+                ("Rate Management", COLORS["reports"], COLORS["reports_hover"], self.open_rate_management),
                 ("User Management", COLORS["users"], COLORS["users_hover"], self.open_user_management),
                 ("Activity Log", COLORS["activity"], COLORS["activity_hover"], self.open_activity_log),
             ]
@@ -277,7 +278,7 @@ class MainWindow:
                     corner_radius=SIZES["button_corner_radius"],
                     cursor="hand2",
                 )
-                btn.grid(row=0, column=i, padx=10, pady=10)
+                btn.grid(row=i // 2, column=i % 2, padx=10, pady=10)
 
         # Back Button (Initially hidden)
         self.nav_bar = ctk.CTkFrame(self.content_frame, fg_color=COLORS["surface_alt"], corner_radius=0, height=44)
@@ -394,6 +395,14 @@ class MainWindow:
             return
         from ui.user_management_window import UserManagementWindow
         self.switch_view(UserManagementWindow, current_user=self.current_user)
+
+    def open_rate_management(self):
+        """Open rate management within the same window (Admin only)"""
+        if not AuthenticationService.is_admin(self.current_user):
+            messagebox.showerror("Access Denied", "You do not have permission to manage rates.")
+            return
+        from ui.rate_management_window import RateManagementWindow
+        self.switch_view(RateManagementWindow, current_user=self.current_user)
 
     def open_activity_log(self):
         """Open activity log within the same window (Admin only)"""

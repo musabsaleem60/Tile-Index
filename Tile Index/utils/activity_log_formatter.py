@@ -60,6 +60,33 @@ def format_activity_details(activity) -> str:
             f"Role: {data.get('role')}" if data.get("role") else None,
             f"Target user ID: {data.get('user_id')}" if data.get("user_id") else None,
         ])
+    if action == "Rate Card Updated":
+        return _join_sentences([
+            f"{data.get('tile_size')} | {data.get('grade')}",
+            _rate_change(data),
+            _impact(data),
+            f"Reason: {data.get('reason')}" if data.get("reason") else None,
+        ])
+    if action == "Tile Size Added":
+        rates = data.get("rates") or {}
+        return _join_sentences([
+            f"Added size {data.get('tile_size')}",
+            f"{data.get('pieces_per_box')} pieces/box | {data.get('area_per_box')} m2/box",
+            "Rates: " + ", ".join(f"{grade} Rs. {rate}" for grade, rate in rates.items()) if rates else None,
+            f"Reason: {data.get('reason')}" if data.get("reason") else None,
+        ])
+    if action in {"Product Rate Override Added", "Product Rate Override Updated"}:
+        return _join_sentences([
+            f"{data.get('product_name')} - {data.get('tile_size')} | {data.get('grade')}",
+            _rate_change(data),
+            f"Reason: {data.get('reason')}" if data.get("reason") else None,
+        ])
+    if action == "Product Rate Override Removed":
+        return _join_sentences([
+            f"Removed override for {data.get('product_name')} - {data.get('tile_size')} | {data.get('grade')}",
+            _money("Old override", data.get("old_rate"), "/m2"),
+            f"Reason: {data.get('reason')}" if data.get("reason") else None,
+        ])
 
     return _generic(data)
 
@@ -167,6 +194,22 @@ def _money(label, value, suffix=""):
         return f"{label}: Rs. {float(value):.2f}{suffix}"
     except Exception:
         return f"{label}: {value}{suffix}"
+
+
+def _rate_change(data):
+    old_rate = data.get("old_rate")
+    new_rate = data.get("new_rate")
+    if old_rate is None:
+        return _money("New rate", new_rate, "/m2")
+    return f"Rate: Rs. {float(old_rate):.2f}/m2 -> Rs. {float(new_rate):.2f}/m2"
+
+
+def _impact(data):
+    products = data.get("affected_products")
+    branches = data.get("affected_branches")
+    if products is None or branches is None:
+        return None
+    return f"Affects {products} products across {branches} branches"
 
 
 def _join_sentences(parts):

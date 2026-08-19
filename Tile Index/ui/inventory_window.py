@@ -5,6 +5,7 @@ Manage products and inventory stock
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+from urllib.parse import urlencode
 import customtkinter as ctk
 from repositories.branch_repository import BranchRepository
 from repositories.product_repository import ProductRepository
@@ -15,6 +16,8 @@ from utils.validators import validate_positive_number, validate_integer, validat
 from utils.grade_constants import VALID_GRADES, GRADE_1
 from utils.searchable_combobox import SearchableCombobox
 from desktop_client.remote_state import is_api_authenticated
+from desktop_client.api_client import ApiClientError
+from desktop_client.session import api_client
 from ui.theme import COLORS, FONTS, SIZES, SPACING
 
 
@@ -364,6 +367,8 @@ class InventoryWindow:
             tile_size = validate_required(self.tile_size_entry.get(), "Tile Size")
             area_per_box = validate_positive_number(self.area_per_box_entry.get(), "Area per Box")
             pieces_per_box = validate_integer(self.pieces_per_box_entry.get(), "Pieces per Box", min_value=1)
+            if not self.confirm_rate_card_exists(tile_size):
+                return
             
             if self.editing_product_id:
                 # Update existing product
@@ -398,6 +403,29 @@ class InventoryWindow:
             
         except Exception as e:
             messagebox.showerror("Error", str(e))
+
+    def confirm_rate_card_exists(self, tile_size):
+        """Warn when a product size has no complete card, without blocking product setup."""
+        if not is_api_authenticated():
+            return True
+        try:
+            params = urlencode({"tile_size": tile_size.strip()})
+            status = api_client.get(f"/rates/size-status?{params}")
+            if status.get("complete_rate_card"):
+                return True
+            missing = ", ".join(status.get("missing_grades") or [])
+            message = (
+                f"Tile size '{tile_size}' has no complete rate card.\n\n"
+                "This product can be saved, but it cannot be billed until rates are added."
+            )
+            if missing:
+                message += f"\n\nMissing rates: {missing}"
+            message += "\n\nContinue?"
+            return messagebox.askyesno("Missing Rate Card", message)
+        except ApiClientError:
+            return True
+        except Exception:
+            return True
     
     def edit_selected_product(self):
         """Load selected product into form for editing"""
