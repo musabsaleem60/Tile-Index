@@ -6,6 +6,9 @@ Data access layer for activity logs (audit trail)
 from database.init_db import get_connection
 from models.activity_log import ActivityLog
 from utils.datetime_format import business_date
+from desktop_client.remote_state import is_api_authenticated
+from desktop_client.session import api_client
+from urllib.parse import urlencode
 
 
 class ActivityLogRepository:
@@ -38,6 +41,21 @@ class ActivityLogRepository:
     @staticmethod
     def search(user_id=None, action_type=None, branch_id=None, date_from=None, date_to=None, limit=1000):
         """Search activity logs with filters"""
+        if is_api_authenticated():
+            params = {"limit": limit}
+            if user_id:
+                params["user_id"] = user_id
+            if action_type:
+                params["action_type"] = action_type
+            if branch_id:
+                params["branch_id"] = branch_id
+            if date_from:
+                params["date_from"] = date_from
+            if date_to:
+                params["date_to"] = date_to
+            rows = api_client.get(f"/activity-log?{urlencode(params)}")
+            return [ActivityLog.from_dict(row) for row in rows]
+
         conn = get_connection()
         try:
             cursor = conn.cursor()
@@ -94,6 +112,9 @@ class ActivityLogRepository:
     @staticmethod
     def get_by_id(activity_id):
         """Get activity log by ID"""
+        if is_api_authenticated():
+            return ActivityLog.from_dict(api_client.get(f"/activity-log/{activity_id}"))
+
         conn = get_connection()
         try:
             cursor = conn.cursor()

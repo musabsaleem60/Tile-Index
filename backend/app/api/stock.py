@@ -6,6 +6,7 @@ from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.entities import Accessory, AccessoryInventory, Branch, Inventory, Product, TileRate, User
 from app.services.accessory_labels import accessory_display_label
+from app.services.tile_pricing import resolve_tile_price
 
 
 router = APIRouter(prefix="/stock", tags=["stock"])
@@ -84,6 +85,7 @@ def _branch_rows(branches):
 
 
 def _tile_item_row(db: Session, branches, product: Product, grade: str):
+    price = resolve_tile_price(db, product, grade)
     inventory_rows = db.scalars(
         select(Inventory).where(
             Inventory.product_id == product.id,
@@ -107,9 +109,11 @@ def _tile_item_row(db: Session, branches, product: Product, grade: str):
             "boxes": boxes,
             "loose_pieces": loose,
             "total_pieces": pieces,
-            "rate_per_sqm": float(inv.rate_per_sqm if inv else 0),
-            "rate_per_box": float(inv.rate_per_box if inv else 0),
-            "rate_per_piece": float(inv.rate_per_piece if inv else 0),
+            "rate_per_sqm": price.rate_per_sqm if price else None,
+            "rate_per_box": price.rate_per_box if price else None,
+            "rate_per_piece": price.rate_per_piece if price else None,
+            "rate_source": price.source if price else None,
+            "rate_missing": price is None,
         })
 
     return {
@@ -119,6 +123,11 @@ def _tile_item_row(db: Session, branches, product: Product, grade: str):
         "size": product.tile_size,
         "grade": grade,
         "pieces_per_box": product.pieces_per_box,
+        "rate_per_sqm": price.rate_per_sqm if price else None,
+        "rate_per_box": price.rate_per_box if price else None,
+        "rate_per_piece": price.rate_per_piece if price else None,
+        "rate_source": price.source if price else None,
+        "rate_missing": price is None,
         "total_boxes": total_boxes,
         "total_loose_pieces": total_loose,
         "total_pieces": total_boxes * int(product.pieces_per_box or 0) + total_loose,
@@ -174,6 +183,7 @@ def _tile_rows(db: Session, branches, search_text: str, branch_id: int | None, g
         if grade_filter:
             grades = [g for g in grades if g == grade_filter]
         for grade in grades:
+            price = resolve_tile_price(db, product, grade)
             branch_rows = []
             total_boxes = 0
             total_loose = 0
@@ -193,9 +203,11 @@ def _tile_rows(db: Session, branches, search_text: str, branch_id: int | None, g
                     "boxes": boxes,
                     "loose_pieces": loose,
                     "total_pieces": pieces,
-                    "rate_per_sqm": float(inv.rate_per_sqm if inv else 0),
-                    "rate_per_box": float(inv.rate_per_box if inv else 0),
-                    "rate_per_piece": float(inv.rate_per_piece if inv else 0),
+                    "rate_per_sqm": price.rate_per_sqm if price else None,
+                    "rate_per_box": price.rate_per_box if price else None,
+                    "rate_per_piece": price.rate_per_piece if price else None,
+                    "rate_source": price.source if price else None,
+                    "rate_missing": price is None,
                 })
 
             total_pieces = total_boxes * int(product.pieces_per_box or 0) + total_loose
@@ -211,6 +223,11 @@ def _tile_rows(db: Session, branches, search_text: str, branch_id: int | None, g
                 "size": product.tile_size,
                 "grade": grade,
                 "pieces_per_box": product.pieces_per_box,
+                "rate_per_sqm": price.rate_per_sqm if price else None,
+                "rate_per_box": price.rate_per_box if price else None,
+                "rate_per_piece": price.rate_per_piece if price else None,
+                "rate_source": price.source if price else None,
+                "rate_missing": price is None,
                 "total_boxes": total_boxes,
                 "total_loose_pieces": total_loose,
                 "total_pieces": total_pieces,

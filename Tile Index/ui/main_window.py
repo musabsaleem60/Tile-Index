@@ -408,8 +408,13 @@ class MainWindow:
         if messagebox.askyesno("Logout", "Are you sure you want to logout?"):
             # Log logout activity
             try:
-                from services.activity_log_service import ActivityLogService
-                ActivityLogService.log_logout(self.current_user)
+                from desktop_client.remote_state import is_api_authenticated
+                from desktop_client.session import api_client
+                if is_api_authenticated():
+                    api_client.post("/auth/logout", {})
+                else:
+                    from services.activity_log_service import ActivityLogService
+                    ActivityLogService.log_logout(self.current_user)
             except:
                 pass  # Don't fail logout if logging fails
 

@@ -244,3 +244,16 @@ class DesktopStatusOut(ORMModel):
     updates_disabled: bool
     first_seen_at: datetime | None = None
     last_seen_at: datetime | None = None
+
+
+class ActivityLogOut(ORMModel):
+    id: int
+    user_id: int
+    username: str
+    user_role: str
+    branch_id: int | None = None
+    branch_name: str | None = None
+    action_type: str
+    action_details: str | None = None
+    action_date: datetime
+    ip_address: str | None = None

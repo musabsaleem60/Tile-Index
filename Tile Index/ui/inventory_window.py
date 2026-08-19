@@ -204,26 +204,7 @@ class InventoryWindow:
         self.stock_in_pieces_entry = self.form_entry(stock_in_frame, width=160)
         self.stock_in_pieces_entry.grid(row=2, column=1, pady=3, padx=8)
         
-        self.form_label(stock_in_frame, "Rate per m² (Rs.):").grid(row=2, column=0, sticky=tk.W, pady=3)
-        for widget in stock_in_frame.grid_slaves(row=2, column=0):
-            try:
-                if str(widget.cget("text")).startswith("Rate per"):
-                    widget.grid_forget()
-            except Exception:
-                pass
-        self.form_label(stock_in_frame, "Rate per m² (Rs.):").grid(row=3, column=0, sticky=tk.W, pady=3, padx=8)
-        self.rate_sqm_entry = self.form_entry(stock_in_frame, width=160)
-        self.rate_sqm_entry.grid(row=3, column=1, pady=3, padx=8)
-        
-        self.form_label(stock_in_frame, "Rate per Box (Rs.):").grid(row=4, column=0, sticky=tk.W, pady=3, padx=8)
-        self.rate_box_entry = self.form_entry(stock_in_frame, width=160)
-        self.rate_box_entry.grid(row=4, column=1, pady=3, padx=8)
-        
-        self.form_label(stock_in_frame, "Rate per Piece (Rs.):").grid(row=5, column=0, sticky=tk.W, pady=3, padx=8)
-        self.rate_piece_entry = self.form_entry(stock_in_frame, width=160)
-        self.rate_piece_entry.grid(row=5, column=1, pady=3, padx=8)
-        
-        self.action_button(stock_in_frame, "Add Stock", self.add_stock, width=180).grid(row=6, column=0, columnspan=2, pady=10)
+        self.action_button(stock_in_frame, "Add Stock", self.add_stock, width=180).grid(row=3, column=0, columnspan=2, pady=10)
         
         # Stock OUT form
         stock_out_frame = self.create_subpanel(right_frame, "Stock OUT (Remove Stock)")
@@ -548,10 +529,6 @@ class InventoryWindow:
             grade = validate_grade(self.grade_var.get())
             boxes = validate_integer(self.stock_in_boxes_entry.get() or "0", "Boxes")
             loose_pieces = validate_integer(self.stock_in_pieces_entry.get() or "0", "Loose Pieces")
-            rate_per_sqm = validate_positive_number(self.rate_sqm_entry.get() or "0", "Rate per m²")
-            rate_per_box = validate_positive_number(self.rate_box_entry.get() or "0", "Rate per Box")
-            rate_per_piece = validate_positive_number(self.rate_piece_entry.get() or "0", "Rate per Piece")
-            
             if boxes == 0 and loose_pieces == 0:
                 raise ValueError("Please enter at least some stock quantity")
             
@@ -561,9 +538,9 @@ class InventoryWindow:
                 grade,
                 boxes,
                 loose_pieces,
-                rate_per_sqm,
-                rate_per_box,
-                rate_per_piece,
+                0,
+                0,
+                0,
                 user_id=self.current_user.id
             )
             
@@ -689,9 +666,12 @@ class InventoryWindow:
                     self.stock_display_text.insert(tk.END, f"  Boxes: {inv.boxes}\n")
                     self.stock_display_text.insert(tk.END, f"  Loose Pieces: {inv.loose_pieces}\n")
                     self.stock_display_text.insert(tk.END, f"  Total Pieces: {total_pieces}\n")
-                    self.stock_display_text.insert(tk.END, f"  Rate per m²: Rs. {inv.rate_per_sqm:.2f}\n")
-                    self.stock_display_text.insert(tk.END, f"  Rate per Box: Rs. {inv.rate_per_box:.2f}\n")
-                    self.stock_display_text.insert(tk.END, f"  Rate per Piece: Rs. {inv.rate_per_piece:.2f}\n\n")
+                    if inv.rate_per_sqm and inv.rate_per_box and inv.rate_per_piece:
+                        self.stock_display_text.insert(tk.END, f"  Rate per m²: Rs. {inv.rate_per_sqm:.2f}\n")
+                        self.stock_display_text.insert(tk.END, f"  Rate per Box: Rs. {inv.rate_per_box:.2f}\n")
+                        self.stock_display_text.insert(tk.END, f"  Rate per Piece: Rs. {inv.rate_per_piece:.2f}\n\n")
+                    else:
+                        self.stock_display_text.insert(tk.END, "  Rate: No rate set for this size and grade\n\n")
                 else:
                     self.stock_display_text.insert(tk.END, f"{grade}: No stock\n\n")
         

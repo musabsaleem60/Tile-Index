@@ -36,7 +36,7 @@ def list_products(db: Session = Depends(get_db), _: User = Depends(get_current_u
 def create_product(payload: ProductIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     product = Product(**payload.model_dump())
     db.add(product)
-    write_audit_log(db, current_user, "Product Added", payload.model_dump())
+    write_audit_log(db, current_user, "Product Added", payload.model_dump(), current_user.branch_id)
     db.commit()
     db.refresh(product)
     return product
@@ -49,7 +49,7 @@ def update_product(product_id: int, payload: ProductIn, db: Session = Depends(ge
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     for key, value in payload.model_dump().items():
         setattr(product, key, value)
-    write_audit_log(db, current_user, "Product Edited", {"product_id": product_id, **payload.model_dump()})
+    write_audit_log(db, current_user, "Product Edited", {"product_id": product_id, **payload.model_dump()}, current_user.branch_id)
     db.commit()
     db.refresh(product)
     return product
@@ -60,7 +60,7 @@ def delete_product(product_id: int, db: Session = Depends(get_db), current_user:
     product = db.get(Product, product_id)
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    write_audit_log(db, current_user, "Product Deleted", {"product_id": product_id, "name": product.name})
+    write_audit_log(db, current_user, "Product Deleted", {"product_id": product_id, "name": product.name}, current_user.branch_id)
     db.delete(product)
     db.commit()
     return {"status": "deleted"}
@@ -90,7 +90,7 @@ def list_accessories(
 def create_accessory(payload: AccessoryIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     accessory = Accessory(**payload.model_dump())
     db.add(accessory)
-    write_audit_log(db, current_user, "Accessory Added", payload.model_dump())
+    write_audit_log(db, current_user, "Accessory Added", payload.model_dump(), current_user.branch_id)
     db.commit()
     db.refresh(accessory)
     return accessory
@@ -103,7 +103,7 @@ def update_accessory(accessory_id: int, payload: AccessoryIn, db: Session = Depe
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Accessory not found")
     for key, value in payload.model_dump().items():
         setattr(accessory, key, value)
-    write_audit_log(db, current_user, "Accessory Edited", {"accessory_id": accessory_id, **payload.model_dump()})
+    write_audit_log(db, current_user, "Accessory Edited", {"accessory_id": accessory_id, **payload.model_dump()}, current_user.branch_id)
     db.commit()
     db.refresh(accessory)
     return accessory
@@ -114,7 +114,7 @@ def delete_accessory(accessory_id: int, db: Session = Depends(get_db), current_u
     accessory = db.get(Accessory, accessory_id)
     if not accessory:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Accessory not found")
-    write_audit_log(db, current_user, "Accessory Deleted", {"accessory_id": accessory_id, "name": accessory.name})
+    write_audit_log(db, current_user, "Accessory Deleted", {"accessory_id": accessory_id, "name": accessory.name}, current_user.branch_id)
     db.delete(accessory)
     db.commit()
     return {"status": "deleted"}
@@ -142,7 +142,7 @@ def list_sanitary_products(
 def create_sanitary_product(payload: SanitaryProductIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     product = SanitaryProduct(**payload.model_dump())
     db.add(product)
-    write_audit_log(db, current_user, "Sanitary Product Added", payload.model_dump())
+    write_audit_log(db, current_user, "Sanitary Product Added", payload.model_dump(), current_user.branch_id)
     db.commit()
     db.refresh(product)
     return product
@@ -155,7 +155,7 @@ def update_sanitary_product(sanitary_product_id: int, payload: SanitaryProductIn
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sanitary product not found")
     for key, value in payload.model_dump().items():
         setattr(product, key, value)
-    write_audit_log(db, current_user, "Sanitary Product Edited", {"sanitary_product_id": sanitary_product_id, **payload.model_dump()})
+    write_audit_log(db, current_user, "Sanitary Product Edited", {"sanitary_product_id": sanitary_product_id, **payload.model_dump()}, current_user.branch_id)
     db.commit()
     db.refresh(product)
     return product
@@ -166,7 +166,7 @@ def delete_sanitary_product(sanitary_product_id: int, db: Session = Depends(get_
     product = db.get(SanitaryProduct, sanitary_product_id)
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sanitary product not found")
-    write_audit_log(db, current_user, "Sanitary Product Deleted", {"sanitary_product_id": sanitary_product_id, "sku": product.sku})
+    write_audit_log(db, current_user, "Sanitary Product Deleted", {"sanitary_product_id": sanitary_product_id, "sku": product.sku}, current_user.branch_id)
     db.delete(product)
     db.commit()
     return {"status": "deleted"}

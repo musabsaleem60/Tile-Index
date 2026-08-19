@@ -20,6 +20,7 @@ from app.models.entities import (
 from app.schemas.common import InvoiceCreate
 from app.services.audit import write_audit_log
 from app.services.accessory_labels import accessory_display_label
+from app.services.tile_pricing import resolve_tile_price
 from stock_math import deduct_verbatim_stock_with_delta, total_pieces
 
 
@@ -179,7 +180,14 @@ def _build_tile_item(db: Session, invoice: Invoice, requested_item, user: User) 
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient tile stock")
 
-    line_total = requested_item.boxes * inventory.rate_per_box + requested_item.loose_pieces * inventory.rate_per_piece
+    price = resolve_tile_price(db, product, requested_item.grade)
+    if not price:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No rate set for this size and grade",
+        )
+
+    line_total = requested_item.boxes * price.rate_per_box + requested_item.loose_pieces * price.rate_per_piece
 
     db.add(StockTransaction(
         user_id=user.id,
@@ -202,9 +210,9 @@ def _build_tile_item(db: Session, invoice: Invoice, requested_item, user: User) 
         boxes=requested_item.boxes,
         loose_pieces=requested_item.loose_pieces,
         quantity=requested_pieces,
-        rate_per_sqm=inventory.rate_per_sqm,
-        rate_per_box=inventory.rate_per_box,
-        rate_per_piece=inventory.rate_per_piece,
+        rate_per_sqm=price.rate_per_sqm,
+        rate_per_box=price.rate_per_box,
+        rate_per_piece=price.rate_per_piece,
         unit_price=0,
         line_total=line_total,
         boxes_from_boxes=boxes_from_boxes,

@@ -409,10 +409,17 @@ class InvoiceWindow:
                         for b in overview_row.get("branches", [])
                     ]
                     if selected_stock:
-                        rate_line = (
-                            f"Selected source rate/box: Rs. {selected_stock.get('rate_per_box', 0):.2f} | "
-                            f"rate/piece: Rs. {selected_stock.get('rate_per_piece', 0):.2f}"
-                        )
+                        if (
+                            selected_stock.get("rate_missing")
+                            or selected_stock.get("rate_per_box") is None
+                            or selected_stock.get("rate_per_piece") is None
+                        ):
+                            rate_line = "No rate set for this size and grade"
+                        else:
+                            rate_line = (
+                                f"Selected source rate/box: Rs. {selected_stock.get('rate_per_box'):.2f} | "
+                                f"rate/piece: Rs. {selected_stock.get('rate_per_piece'):.2f}"
+                            )
                     else:
                         rate_line = "Select a source branch"
                     self.stock_info_label.configure(
@@ -544,6 +551,12 @@ class InvoiceWindow:
                 source_stock = self.selected_source_stock()
                 if not source_stock:
                     raise ValueError(f"No source stock selected for {product.name} - Grade {grade}")
+                if (
+                    source_stock.get("rate_missing")
+                    or source_stock.get("rate_per_box") is None
+                    or source_stock.get("rate_per_piece") is None
+                ):
+                    raise ValueError("No rate set for this size and grade")
                 
                 total_available_pieces = source_stock.get("total_pieces", 0)
                 total_requested_pieces = (boxes * product.pieces_per_box) + loose_pieces
@@ -555,7 +568,7 @@ class InvoiceWindow:
                     )
                 
                 # Calculate line total
-                line_total = (boxes * source_stock.get("rate_per_box", 0)) + (loose_pieces * source_stock.get("rate_per_piece", 0))
+                line_total = (boxes * source_stock["rate_per_box"]) + (loose_pieces * source_stock["rate_per_piece"])
                 
                 # Add to items list
                 item_data = {
@@ -568,8 +581,8 @@ class InvoiceWindow:
                     'grade': grade,
                     'boxes': boxes,
                     'loose_pieces': loose_pieces,
-                    'rate_per_box': source_stock.get("rate_per_box", 0),
-                    'rate_per_piece': source_stock.get("rate_per_piece", 0),
+                    'rate_per_box': source_stock["rate_per_box"],
+                    'rate_per_piece': source_stock["rate_per_piece"],
                     'line_total': line_total
                 }
             elif item_type == "Accessories":

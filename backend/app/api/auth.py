@@ -18,9 +18,16 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     if not user or not user.is_active or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
-    write_audit_log(db, user, "Login")
+    write_audit_log(db, user, "Login", branch_id=user.branch_id)
     db.commit()
     return TokenResponse(access_token=create_access_token(str(user.id)), user=user)
+
+
+@router.post("/logout")
+def logout(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    write_audit_log(db, current_user, "Logout", branch_id=current_user.branch_id)
+    db.commit()
+    return {"status": "logged"}
 
 
 @router.get("/me", response_model=UserOut)
@@ -45,7 +52,7 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db), current_user
         is_active=payload.is_active,
     )
     db.add(user)
-    write_audit_log(db, current_user, "User Created", {"username": user.username, "role": user.role})
+    write_audit_log(db, current_user, "User Created", {"username": user.username, "role": user.role}, current_user.branch_id)
     db.commit()
     db.refresh(user)
     return user
@@ -77,7 +84,7 @@ def update_user(user_id: int, payload: UserUpdate, db: Session = Depends(get_db)
     if payload.password:
         user.password_hash = hash_password(payload.password)
 
-    write_audit_log(db, current_user, "User Edited", {"user_id": user_id, "username": user.username})
+    write_audit_log(db, current_user, "User Edited", {"user_id": user_id, "username": user.username}, current_user.branch_id)
     db.commit()
     db.refresh(user)
     return user
@@ -92,7 +99,7 @@ def change_password(user_id: int, payload: dict, db: Session = Depends(get_db), 
     if not password or len(password) < 8:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password must be at least 8 characters")
     user.password_hash = hash_password(password)
-    write_audit_log(db, current_user, "Password Changed", {"user_id": user_id, "username": user.username})
+    write_audit_log(db, current_user, "Password Changed", {"user_id": user_id, "username": user.username}, current_user.branch_id)
     db.commit()
     db.refresh(user)
     return user

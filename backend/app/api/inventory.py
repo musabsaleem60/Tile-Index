@@ -14,6 +14,7 @@ from app.models.entities import (
 )
 from app.schemas.common import AccessoryInventoryOut, InventoryOut, SanitaryInventoryOut, SimpleQuantityRequest, StockInRequest
 from app.services.audit import write_audit_log
+from app.services.tile_pricing import resolve_tile_price
 from stock_math import deduct_verbatim_stock, total_pieces
 
 
@@ -23,7 +24,23 @@ router = APIRouter(prefix="/inventory", tags=["inventory"])
 @router.get("/tiles/{branch_id}", response_model=list[InventoryOut])
 def list_tile_inventory(branch_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     ensure_branch_access(current_user, branch_id)
-    return db.scalars(select(Inventory).where(Inventory.branch_id == branch_id).order_by(Inventory.product_id, Inventory.grade)).all()
+    rows = db.scalars(select(Inventory).where(Inventory.branch_id == branch_id).order_by(Inventory.product_id, Inventory.grade)).all()
+    output = []
+    for inventory in rows:
+        price = resolve_tile_price(db, inventory.product, inventory.grade)
+        output.append({
+            "id": inventory.id,
+            "branch_id": inventory.branch_id,
+            "product_id": inventory.product_id,
+            "grade": inventory.grade,
+            "boxes": inventory.boxes,
+            "loose_pieces": inventory.loose_pieces,
+            "rate_per_sqm": price.rate_per_sqm if price else 0,
+            "rate_per_box": price.rate_per_box if price else 0,
+            "rate_per_piece": price.rate_per_piece if price else 0,
+            "updated_at": inventory.updated_at,
+        })
+    return output
 
 
 @router.post("/tiles/stock-in", response_model=InventoryOut)
