@@ -57,7 +57,11 @@ def create_invoice(db: Session, payload: InvoiceCreate, user: User) -> Invoice:
 
     invoice.subtotal = subtotal
     invoice.grand_total = subtotal - payload.discount
+    if payload.paid_amount > invoice.grand_total:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Paid amount exceeds invoice total")
     invoice.balance = invoice.grand_total - payload.paid_amount
+    if abs(invoice.balance) < 0.005:
+        invoice.balance = 0
 
     db.add(invoice)
     write_audit_log(
