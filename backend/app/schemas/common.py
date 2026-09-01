@@ -206,6 +206,25 @@ class InvoiceVoidRequest(BaseModel):
     reason: str = Field(min_length=10, max_length=500)
 
 
+class InvoicePaymentIn(BaseModel):
+    amount: float = Field(gt=0)
+    payment_date: datetime
+    method: str | None = Field(default=None, max_length=30)
+    notes: str | None = Field(default=None, max_length=500)
+
+
+class InvoicePaymentOut(ORMModel):
+    id: int
+    invoice_id: int
+    branch_id: int
+    user_id: int
+    amount: float
+    payment_date: datetime
+    method: str | None = None
+    notes: str | None = None
+    created_at: datetime | None = None
+
+
 class UpdateInfo(BaseModel):
     latest_version: str
     min_desktop_version: str

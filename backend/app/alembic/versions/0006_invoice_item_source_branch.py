@@ -17,21 +17,27 @@ depends_on = None
 
 def upgrade() -> None:
     bind = op.get_bind()
-    op.add_column("invoice_items", sa.Column("source_branch_id", sa.Integer(), nullable=True))
-    op.execute(
-        """
-        UPDATE invoice_items
-        SET source_branch_id = (
-            SELECT invoices.branch_id
-            FROM invoices
-            WHERE invoices.id = invoice_items.invoice_id
+    if not _column_exists("invoice_items", "source_branch_id"):
+        op.add_column("invoice_items", sa.Column("source_branch_id", sa.Integer(), nullable=True))
+        op.execute(
+            """
+            UPDATE invoice_items
+            SET source_branch_id = (
+                SELECT invoices.branch_id
+                FROM invoices
+                WHERE invoices.id = invoice_items.invoice_id
+            )
+            WHERE source_branch_id IS NULL
+            """
         )
-        WHERE source_branch_id IS NULL
-        """
-    )
+    elif bind.dialect.name == "sqlite":
+        return
+    if _foreign_key_exists("invoice_items", "fk_invoice_items_source_branch_id_branches"):
+        return
     if bind.dialect.name == "sqlite":
         with op.batch_alter_table("invoice_items") as batch_op:
-            batch_op.alter_column("source_branch_id", existing_type=sa.Integer(), nullable=False)
+            if _column_exists("invoice_items", "source_branch_id"):
+                batch_op.alter_column("source_branch_id", existing_type=sa.Integer(), nullable=False)
             batch_op.create_foreign_key(
                 "fk_invoice_items_source_branch_id_branches",
                 "branches",
@@ -49,6 +55,14 @@ def upgrade() -> None:
             ["id"],
             ondelete="RESTRICT",
         )
+
+
+def _column_exists(table_name: str, column_name: str) -> bool:
+    return any(column["name"] == column_name for column in sa.inspect(op.get_bind()).get_columns(table_name))
+
+
+def _foreign_key_exists(table_name: str, constraint_name: str) -> bool:
+    return any(fk.get("name") == constraint_name for fk in sa.inspect(op.get_bind()).get_foreign_keys(table_name))
 
 
 def downgrade() -> None:

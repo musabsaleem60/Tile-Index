@@ -6,6 +6,7 @@
     ForeignKey,
     Integer,
     JSON,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -276,6 +277,7 @@ class Invoice(Base):
     user = relationship("User", foreign_keys=[user_id])
     voided_by = relationship("User", foreign_keys=[voided_by_user_id])
     items = relationship("InvoiceItem", cascade="all, delete-orphan", back_populates="invoice")
+    payments = relationship("InvoicePayment", back_populates="invoice")
 
     __table_args__ = (
         UniqueConstraint("branch_id", "invoice_number", name="uq_invoices_branch_number"),
@@ -315,6 +317,28 @@ class InvoiceItem(Base):
 
     __table_args__ = (
         CheckConstraint("item_type IN ('tile', 'accessory', 'sanitary')", name="ck_invoice_items_type"),
+    )
+
+
+class InvoicePayment(Base):
+    __tablename__ = "invoice_payments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id", ondelete="RESTRICT"), nullable=False)
+    branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric, nullable=False)
+    payment_date: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
+    method: Mapped[str | None] = mapped_column(String(30))
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    invoice = relationship("Invoice", back_populates="payments")
+    branch = relationship("Branch")
+    user = relationship("User")
+
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_invoice_payments_amount_positive"),
     )
 
 

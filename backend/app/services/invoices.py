@@ -9,6 +9,7 @@ from app.models.entities import (
     Inventory,
     Invoice,
     InvoiceItem,
+    InvoicePayment,
     Product,
     SanitaryInventory,
     SanitaryProduct,
@@ -322,6 +323,60 @@ def _build_sanitary_item(db: Session, invoice: Invoice, requested_item, user: Us
     )
 
 
+def record_invoice_payment(db: Session, invoice_id: int, payload, user: User) -> Invoice:
+    invoice = db.scalar(
+        select(Invoice)
+        .where(Invoice.id == invoice_id)
+        .options(selectinload(Invoice.items))
+        .with_for_update()
+    )
+    if not invoice:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
+    if invoice.status == "void":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invoice is void, cannot record payment")
+
+    amount = float(payload.amount)
+    if amount <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment amount must be greater than zero")
+    if amount > float(invoice.balance):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Amount exceeds remaining balance")
+
+    method = payload.method.strip().lower() if payload.method else None
+    if method and method not in {"cash", "card", "bank", "other"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payment method")
+
+    payment = InvoicePayment(
+        invoice_id=invoice.id,
+        branch_id=invoice.branch_id,
+        user_id=user.id,
+        amount=amount,
+        payment_date=payload.payment_date,
+        method=method,
+        notes=payload.notes.strip() if payload.notes else None,
+    )
+    db.add(payment)
+    invoice.paid_amount = float(invoice.paid_amount or 0) + amount
+    invoice.balance = float(invoice.grand_total or 0) - float(invoice.paid_amount or 0)
+    if abs(invoice.balance) < 0.005:
+        invoice.balance = 0
+
+    write_audit_log(
+        db,
+        user,
+        "Invoice Payment Recorded",
+        {
+            "invoice_number": invoice.invoice_number,
+            "amount": amount,
+            "payment_date": payload.payment_date.isoformat(),
+            "method": method,
+        },
+        invoice.branch_id,
+    )
+    db.flush()
+    db.refresh(invoice)
+    return invoice
+
+
 def void_invoice(db: Session, invoice_id: int, reason: str, user: User) -> Invoice:
     if user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can void invoices")
@@ -340,6 +395,14 @@ def void_invoice(db: Session, invoice_id: int, reason: str, user: User) -> Invoi
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
     if invoice.status == "void":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Invoice is already void")
+    payment_count = db.scalar(
+        select(InvoicePayment.id).where(InvoicePayment.invoice_id == invoice.id).limit(1)
+    )
+    if payment_count:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This invoice has recorded payments and cannot be voided. Record a refund/adjustment first.",
+        )
 
     for item in invoice.items:
         if item.boxes_from_boxes is None or item.pieces_from_loose is None:
