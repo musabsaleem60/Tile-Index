@@ -35,6 +35,7 @@ class ApiClient:
     def _request(self, method: str, path: str, payload: dict | None = None):
         body = None
         headers = {"Accept": "application/json"}
+        debug_payment_request = method == "POST" and path.endswith("/payments")
         if payload is not None:
             body = json.dumps(payload).encode("utf-8")
             headers["Content-Type"] = "application/json"
@@ -47,12 +48,18 @@ class ApiClient:
             headers=headers,
             method=method,
         )
+        if debug_payment_request:
+            print(f"[payment-debug] request {method} {self.base_url}{path} payload={payload}")
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 data = response.read().decode("utf-8")
+                if debug_payment_request:
+                    print(f"[payment-debug] response {response.status} body={data}")
                 return json.loads(data) if data else None
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8")
+            if debug_payment_request:
+                print(f"[payment-debug] response {exc.code} body={detail}")
             try:
                 parsed = json.loads(detail)
                 parsed_detail = parsed.get("detail")

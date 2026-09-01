@@ -220,7 +220,11 @@ class InvoiceService:
         # Calculate totals
         invoice.subtotal = subtotal
         invoice.grand_total = subtotal - discount
+        if paid_amount > invoice.grand_total:
+            raise ValueError("Paid amount exceeds invoice total")
         invoice.balance = invoice.grand_total - paid_amount
+        if abs(invoice.balance) < 0.005:
+            invoice.balance = 0
         
         # Save invoice (this will generate invoice number)
         invoice = InvoiceRepository.create(invoice)
@@ -286,6 +290,26 @@ class InvoiceService:
             raise ValueError("Invoice voiding requires the API connection")
         data = api_client.post(f"/invoices/{invoice_id}/void", {"reason": reason})
         return InvoiceService._invoice_from_api(data)
+
+    @staticmethod
+    def record_payment(invoice_id, amount, payment_date, method=None, notes=None):
+        """Record a payment against an invoice through the API."""
+        if not is_api_authenticated():
+            raise ValueError("Invoice payment tracking requires the API connection")
+        data = api_client.post(f"/invoices/{invoice_id}/payments", {
+            "amount": amount,
+            "payment_date": payment_date,
+            "method": method,
+            "notes": notes,
+        })
+        return InvoiceService._invoice_from_api(data)
+
+    @staticmethod
+    def get_payments(invoice_id):
+        """Get payment rows for an invoice through the API."""
+        if not is_api_authenticated():
+            return []
+        return api_client.get(f"/invoices/{invoice_id}/payments") or []
     
     @staticmethod
     def search_invoices(branch_id=None, invoice_number=None, customer_name=None, date_from=None, date_to=None):

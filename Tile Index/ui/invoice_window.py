@@ -714,6 +714,10 @@ class InvoiceWindow:
             
             discount = float(self.discount_entry.get() or "0")
             paid_amount = float(self.paid_entry.get() or "0")
+            subtotal = sum(item['line_total'] for item in self.invoice_items)
+            grand_total = subtotal - discount
+            if paid_amount > grand_total:
+                raise ValueError("Paid amount exceeds invoice total")
             
             # Prepare items data
             items_data = []

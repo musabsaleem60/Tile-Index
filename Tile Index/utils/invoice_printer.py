@@ -41,6 +41,10 @@ class InvoicePrintWindow:
         
         if not self.invoice:
             raise ValueError("Invoice not found")
+        try:
+            self.payments = InvoiceService.get_payments(self.invoice.id)
+        except Exception:
+            self.payments = []
         
         # Get branch, products, and accessories
         self.branch = BranchRepository.get_by_id(self.invoice.branch_id)
@@ -117,6 +121,16 @@ class InvoicePrintWindow:
         if self.branch:
             tk.Label(header_frame, text=self.branch.name, font=("Arial", 12, "bold"), 
                     bg="white", fg="#34495e").pack(pady=(10, 0))
+
+        for line in self.company_contact_lines():
+            tk.Label(
+                header_frame,
+                text=line,
+                font=("Arial", 10),
+                bg="white",
+                fg="#7f8c8d",
+                justify=tk.CENTER,
+            ).pack(pady=(8, 0) if not line else (2, 0))
         
         # Separator line
         tk.Frame(parent, height=2, bg="#34495e").pack(fill=tk.X, pady=10)
@@ -281,6 +295,28 @@ class InvoicePrintWindow:
         elif self.invoice.balance == 0:
             tk.Label(totals_right, text="Balance:          Rs. 0.00 (Paid)", 
                     font=("Arial", 11, "bold"), bg="white", anchor=tk.E, fg="#27ae60").pack(anchor=tk.E, pady=2)
+
+        if self.payments:
+            payments_frame = tk.Frame(parent, bg="white")
+            payments_frame.pack(fill=tk.X, pady=(0, 12))
+            tk.Label(
+                payments_frame,
+                text="Payment History",
+                font=("Arial", 11, "bold"),
+                bg="white",
+                anchor=tk.W,
+            ).pack(anchor=tk.W, pady=(0, 4))
+            for payment in self.payments:
+                payment_date = format_business_datetime(payment.get("payment_date"), fmt="%d-%m-%Y")
+                amount = self.money_text(payment.get("amount"))
+                method = payment.get("method") or "-"
+                tk.Label(
+                    payments_frame,
+                    text=f"{payment_date} | {amount} | {method}",
+                    font=("Arial", 10),
+                    bg="white",
+                    anchor=tk.W,
+                ).pack(anchor=tk.W)
         
         # Footer
         tk.Frame(parent, height=2, bg="#34495e").pack(fill=tk.X, pady=20)
@@ -365,6 +401,8 @@ class InvoicePrintWindow:
         ]
         if self.branch:
             story.append(Paragraph(self.escape_text(self.branch.name), subtitle_style))
+        for line in self.company_contact_lines():
+            story.append(Paragraph(self.escape_text(line) if line else "&nbsp;", subtitle_style))
         story.append(Spacer(1, 8))
 
         invoice_date = format_business_datetime(self.invoice.invoice_date, fmt="%d-%m-%Y %H:%M:%S")
@@ -472,6 +510,33 @@ class InvoicePrintWindow:
         ]))
         story.extend([totals_table, Spacer(1, 12)])
 
+        if self.payments:
+            payment_rows = [[
+                Paragraph("<b>Payment Date</b>", normal_bold),
+                Paragraph("<b>Amount</b>", normal_bold),
+                Paragraph("<b>Method</b>", normal_bold),
+            ]]
+            for payment in self.payments:
+                payment_rows.append([
+                    self.escape_text(format_business_datetime(payment.get("payment_date"), fmt="%d-%m-%Y")),
+                    self.money_text(payment.get("amount")),
+                    self.escape_text(payment.get("method") or "-"),
+                ])
+            payments_table = Table(payment_rows, colWidths=[35 * mm, 35 * mm, 35 * mm], hAlign="RIGHT")
+            payments_table.setStyle(TableStyle([
+                ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+                ("TEXTCOLOR", (0, 0), (-1, -1), colors.black),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("ALIGN", (1, 1), (1, -1), "RIGHT"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            story.extend([Paragraph("<b>Payment History</b>", normal_bold), payments_table, Spacer(1, 10)])
+
         story.append(Paragraph("Thank you for your business!", subtitle_style))
         story.append(Paragraph("Tile Index - Quality Tiles, Trusted Service", subtitle_style))
 
@@ -483,6 +548,16 @@ class InvoicePrintWindow:
         path = os.path.join(base_dir, "TileIndex", "invoices")
         os.makedirs(path, exist_ok=True)
         return path
+
+    @staticmethod
+    def company_contact_lines():
+        return [
+            "Godown # 1, Plot D-32, Gali # 2, 50-C, Korangi, Machi Morh",
+            "Godown # 2, Opp. Edhi Centre, Korangi # 5",
+            "",
+            "+92 333 0214142 (Shafaq)",
+            "+92 330 2214548 (Anas)",
+        ]
 
     def next_invoice_pdf_path(self):
         invoice_number = self.safe_filename(self.invoice.invoice_number or "invoice")

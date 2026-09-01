@@ -23,6 +23,13 @@ def format_activity_details(activity) -> str:
             _money("Total", data.get("grand_total")),
             f"Reason: {data.get('reason')}" if data.get("reason") else None,
         ])
+    if action == "Invoice Payment Recorded":
+        return _join_sentences([
+            f"Payment for invoice {data.get('invoice_number')}" if data.get("invoice_number") else "Invoice payment",
+            _money("Amount", data.get("amount")),
+            f"Date: {data.get('payment_date')}" if data.get("payment_date") else None,
+            f"Method: {data.get('method')}" if data.get("method") else None,
+        ])
     if action == "Cross-Branch Sale":
         return _join_sentences([
             data.get("description"),

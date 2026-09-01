@@ -23,6 +23,7 @@ class InvoiceSearchWindow:
         self.current_user = current_user
         
         self.branches = BranchRepository.get_all()
+        self.result_invoice_ids = {}
         self.setup_ui()
     
     def setup_ui(self):
@@ -117,14 +118,19 @@ class InvoiceSearchWindow:
         xscrollbar.grid(row=2, column=0, sticky=tk.EW, padx=(12, 0), pady=(0, 12))
 
         self.results_tree.bind('<Double-1>', self.on_invoice_double_click)
+        self.results_tree.bind('<<TreeviewSelect>>', self.on_invoice_select)
 
         # Action buttons
         btn_frame = ctk.CTkFrame(page, fg_color="transparent", corner_radius=0)
         btn_frame.pack(pady=(0, 4))
 
         self.action_button(btn_frame, "View/Print Invoice", self.view_invoice, width=190).pack(side=tk.LEFT, padx=5)
+        self.action_button(btn_frame, "Record Payment", self.record_payment, width=170).pack(side=tk.LEFT, padx=5)
         if getattr(self.current_user, 'role', '') == 'admin':
-            self.action_button(btn_frame, "Void Invoice", self.void_invoice, width=170, danger=True).pack(side=tk.LEFT, padx=5)
+            self.void_button = self.action_button(btn_frame, "Void Invoice", self.void_invoice, width=170, danger=True)
+            self.void_button.pack(side=tk.LEFT, padx=5)
+        else:
+            self.void_button = None
 
     def panel(self, parent, title):
         panel = ctk.CTkFrame(
@@ -206,6 +212,7 @@ class InvoiceSearchWindow:
             )
             
             # Clear existing results
+            self.result_invoice_ids.clear()
             for item in self.results_tree.get_children():
                 self.results_tree.delete(item)
             
@@ -231,7 +238,9 @@ class InvoiceSearchWindow:
                 ))
                 if status_text == "VOID":
                     self.results_tree.item(item_id, tags=("void",))
+                self.result_invoice_ids[item_id] = invoice.id
             self.results_tree.tag_configure("void", foreground=COLORS["danger"])
+            self.on_invoice_select()
             
             if len(invoices) == 0:
                 messagebox.showinfo("Search Results", "No invoices found matching the criteria.")
@@ -242,6 +251,20 @@ class InvoiceSearchWindow:
     def on_invoice_double_click(self, event):
         """Handle double click on invoice"""
         self.view_invoice()
+
+    def on_invoice_select(self, event=None):
+        """Disable void when the selected invoice already has payment rows."""
+        if not self.void_button:
+            return
+        invoice_id = self.selected_invoice_id()
+        if not invoice_id:
+            self.void_button.configure(state=tk.NORMAL)
+            return
+        try:
+            payments = InvoiceService.get_payments(invoice_id)
+            self.void_button.configure(state=tk.DISABLED if payments else tk.NORMAL)
+        except Exception:
+            self.void_button.configure(state=tk.NORMAL)
     
     def view_invoice(self):
         """View selected invoice"""
@@ -265,6 +288,108 @@ class InvoiceSearchWindow:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to open invoice: {str(e)}")
 
+    def selected_invoice_id(self):
+        selection = self.results_tree.selection()
+        if not selection:
+            return None
+        mapped_id = self.result_invoice_ids.get(selection[0])
+        if mapped_id is not None:
+            return int(mapped_id)
+        invoice_id_str = self.results_tree.set(selection[0], 'invoice_id')
+        try:
+            return int(invoice_id_str)
+        except (TypeError, ValueError):
+            return None
+
+    def record_payment(self):
+        """Record a payment against the selected invoice."""
+        invoice_id = self.selected_invoice_id()
+        if not invoice_id:
+            messagebox.showwarning("Warning", "Please select an invoice to record payment")
+            return
+
+        try:
+            invoice = InvoiceService.get_invoice(invoice_id)
+            if getattr(invoice, "status", "active") == "void":
+                messagebox.showerror("Record Payment", "Invoice is void, cannot record payment")
+                return
+            if float(invoice.balance or 0) <= 0:
+                messagebox.showinfo("Record Payment", "This invoice has no remaining balance.")
+                return
+        except Exception as exc:
+            messagebox.showerror("Record Payment", f"Failed to load invoice: {exc}")
+            return
+
+        dialog = ctk.CTkToplevel(self.parent)
+        dialog.title("Record Payment")
+        dialog.geometry("420x360")
+        dialog.resizable(False, False)
+        dialog.configure(fg_color=COLORS["app_bg"])
+        dialog.transient(self.parent.winfo_toplevel())
+        dialog.grab_set()
+
+        ctk.CTkLabel(
+            dialog,
+            text=f"{invoice.invoice_number} | Balance: Rs. {float(invoice.balance or 0):.2f}",
+            font=FONTS["body_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["section_label_height"],
+        ).pack(fill=tk.X, padx=16, pady=(16, 8))
+
+        form = ctk.CTkFrame(dialog, fg_color=COLORS["surface"], corner_radius=SIZES["corner_radius"], border_width=1, border_color=COLORS["border"])
+        form.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 16))
+
+        self.form_label(form, "Amount:").grid(row=0, column=0, sticky=tk.W, padx=12, pady=(14, 6))
+        amount_entry = self.form_entry(form, width=220)
+        amount_entry.grid(row=0, column=1, sticky=tk.W, padx=12, pady=(14, 6))
+
+        self.form_label(form, "Payment Date:").grid(row=1, column=0, sticky=tk.W, padx=12, pady=6)
+        date_entry = self.form_entry(form, width=220)
+        date_entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
+        date_entry.grid(row=1, column=1, sticky=tk.W, padx=12, pady=6)
+
+        self.form_label(form, "Method:").grid(row=2, column=0, sticky=tk.W, padx=12, pady=6)
+        method_var = tk.StringVar(value="cash")
+        method_combo = ttk.Combobox(form, textvariable=method_var, values=("cash", "card", "bank", "other"), width=SIZES["compact_dropdown_width"], state="readonly", font=FONTS["small"])
+        method_combo.grid(row=2, column=1, sticky=tk.W, padx=12, pady=6)
+
+        self.form_label(form, "Notes:").grid(row=3, column=0, sticky=tk.W, padx=12, pady=6)
+        notes_entry = self.form_entry(form, width=220)
+        notes_entry.grid(row=3, column=1, sticky=tk.W, padx=12, pady=6)
+
+        def save_payment():
+            try:
+                amount = float(amount_entry.get().strip())
+                payment_date = self.parse_payment_date(date_entry.get().strip())
+                updated = InvoiceService.record_payment(
+                    invoice.id,
+                    amount,
+                    payment_date,
+                    method_var.get(),
+                    notes_entry.get().strip() or None,
+                )
+                messagebox.showinfo(
+                    "Payment Recorded",
+                    f"Payment recorded.\nPaid: Rs. {updated.paid_amount:.2f}\nBalance: Rs. {updated.balance:.2f}",
+                )
+                dialog.destroy()
+                self.search_invoices()
+            except Exception as exc:
+                messagebox.showerror("Payment Failed", str(exc))
+
+        self.action_button(form, "Save Payment", save_payment, width=150).grid(row=4, column=0, columnspan=2, pady=16)
+
+    @staticmethod
+    def parse_payment_date(value):
+        if not value:
+            raise ValueError("Payment date is required")
+        if len(value) == 10:
+            return f"{value}T00:00:00+05:00"
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            return parsed.isoformat() + "+05:00"
+        return parsed.isoformat()
+
     def void_invoice(self):
         """Void selected invoice."""
         selection = self.results_tree.selection()
@@ -279,6 +404,17 @@ class InvoiceSearchWindow:
         if status_text == "VOID":
             messagebox.showinfo("Invoice Already Void", "This invoice is already marked VOID.")
             return
+
+        try:
+            payments = InvoiceService.get_payments(int(invoice_id_str))
+            if payments:
+                messagebox.showerror(
+                    "Void Failed",
+                    "This invoice has recorded payments and cannot be voided. Record a refund/adjustment first.",
+                )
+                return
+        except Exception:
+            pass
 
         reason = simpledialog.askstring(
             "Void Invoice",

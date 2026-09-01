@@ -32,6 +32,7 @@ class Invoice:
         self.voided_by_user_id = voided_by_user_id
         self.void_reason = void_reason
         self.items = []  # List of InvoiceItem objects
+        self.payments = []
     
     def __repr__(self):
         return f"Invoice(id={self.id}, number='{self.invoice_number}', branch_id={self.branch_id}, total={self.grand_total})"
