@@ -11,7 +11,7 @@ class StockTransaction:
     
     def __init__(self, id=None, user_id=None, branch_id=None, product_id=None,
                  grade=None, transaction_type=None, boxes=0, loose_pieces=0,
-                 transaction_date=None, notes=None):
+                 transaction_date=None, notes=None, dc_number=None):
         self.id = id
         self.user_id = user_id
         self.branch_id = branch_id
@@ -22,6 +22,7 @@ class StockTransaction:
         self.loose_pieces = loose_pieces
         self.transaction_date = transaction_date if transaction_date else datetime.now()
         self.notes = notes
+        self.dc_number = dc_number
     
     def __repr__(self):
         return f"StockTransaction(id={self.id}, type='{self.transaction_type}', user_id={self.user_id}, product_id={self.product_id})"
@@ -38,7 +39,8 @@ class StockTransaction:
             'boxes': self.boxes,
             'loose_pieces': self.loose_pieces,
             'transaction_date': self.transaction_date,
-            'notes': self.notes
+            'notes': self.notes,
+            'dc_number': self.dc_number
         }
     
     @classmethod
@@ -54,6 +56,7 @@ class StockTransaction:
             boxes=data.get('boxes', 0),
             loose_pieces=data.get('loose_pieces', 0),
             transaction_date=data.get('transaction_date'),
-            notes=data.get('notes')
+            notes=data.get('notes'),
+            dc_number=data.get('dc_number')
         )
 

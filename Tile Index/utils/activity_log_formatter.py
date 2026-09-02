@@ -105,6 +105,13 @@ def activity_reason(activity) -> str:
     return str(data.get("reason") or data.get("notes") or "").strip()
 
 
+def activity_dc_number(activity) -> str:
+    data = _parse_details(getattr(activity, "action_details", None))
+    if not data:
+        return ""
+    return str(data.get("dc_number") or "").strip()
+
+
 def _parse_details(raw):
     if not raw:
         return {}
@@ -126,6 +133,9 @@ def _format_tile_stock(data, include_reason):
         parts.append(str(data.get("grade")))
     parts.append(_quantity(data))
     lines = [" | ".join(part for part in parts if part)]
+    dc_line = _dc_line(data.get("dc_number"))
+    if dc_line:
+        lines.append(dc_line)
     reason = data.get("reason") or data.get("notes")
     if include_reason and reason:
         lines.append(f"Reason: {reason}")
@@ -136,6 +146,9 @@ def _format_accessory_stock(data, include_reason):
     label = data.get("accessory_name") or _accessory_name(data.get("accessory_id")) or "Accessory"
     quantity = data.get("quantity")
     lines = [f"{label} | {quantity} units" if quantity is not None else label]
+    dc_line = _dc_line(data.get("dc_number"))
+    if dc_line:
+        lines.append(dc_line)
     reason = data.get("reason") or data.get("notes")
     if include_reason and reason:
         lines.append(f"Reason: {reason}")
@@ -151,6 +164,18 @@ def _quantity(data):
     if quantity is not None:
         return f"{quantity} units"
     return ""
+
+
+def _dc_line(dc_number):
+    if not dc_number:
+        return None
+    value = str(dc_number).strip()
+    if not value:
+        return None
+    lower = value.lower()
+    if lower.startswith("dc"):
+        return value
+    return f"DC# {value}"
 
 
 def _product_name(product_id):

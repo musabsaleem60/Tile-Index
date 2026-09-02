@@ -1,31 +1,34 @@
 """
 Reports Window
-View various reports
+View and print business reports.
 """
 
+import os
 import tkinter as tk
-from tkinter import ttk, messagebox
+from datetime import date, datetime
+from tkinter import messagebox, ttk
+
 import customtkinter as ctk
-from datetime import datetime, date
+
 from repositories.branch_repository import BranchRepository
 from services.report_service import ReportService
-from utils.searchable_combobox import SearchableCombobox
 from ui.theme import COLORS, FONTS, SIZES, SPACING
+from utils.datetime_format import format_business_datetime
+from utils.report_printer import ReportPrinter
+from utils.searchable_combobox import SearchableCombobox
 
 
 class ReportWindow:
     """Reports window"""
-    
+
     def __init__(self, parent):
         self.parent = parent
-        
         self.branches = BranchRepository.get_all()
         self.selected_branch_id = None
-        
+        self.current_report = None
         self.setup_ui()
-    
+
     def setup_ui(self):
-        """Setup the reports UI"""
         header = ctk.CTkLabel(
             self.parent,
             text="Reports",
@@ -43,37 +46,52 @@ class ReportWindow:
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=False, padx=(0, 5))
 
         self.form_label(left_frame, "Select Branch:", bold=True).grid(row=1, column=0, sticky=tk.W, pady=5, padx=(12, 8))
-        self.branch_var = tk.StringVar()
-        self.branch_combo = SearchableCombobox(left_frame, textvariable=self.branch_var, width=SIZES["compact_dropdown_width"], state="normal", font=FONTS["small"])
-        self.branch_combo.set_completion_list(["All Branches"] + [f"{b.name}" for b in self.branches])
+        self.branch_var = tk.StringVar(value="All Branches")
+        self.branch_combo = SearchableCombobox(
+            left_frame,
+            textvariable=self.branch_var,
+            width=SIZES["compact_dropdown_width"],
+            state="normal",
+            font=FONTS["small"],
+        )
+        self.branch_combo.set_completion_list(["All Branches"] + [b.name for b in self.branches])
         self.branch_combo.grid(row=1, column=1, pady=5, padx=(0, 12), sticky=tk.W)
-        self.branch_combo.bind('<<ComboboxSelected>>', self.on_branch_select)
+        self.branch_combo.bind("<<ComboboxSelected>>", self.on_branch_select)
 
         self.form_label(left_frame, "Report Type:", bold=True).grid(row=2, column=0, sticky=tk.W, pady=(12, 6), padx=(12, 8))
         self.report_type_var = tk.StringVar(value="Daily Sales")
-
-        report_types = ["Daily Sales", "Branch Stock", "Complete Business Stock"]
-        for idx, rtype in enumerate(report_types):
+        report_types = ["Daily Sales", "Branch Stock", "Complete Business Stock", "Monthly Sales"]
+        for idx, report_type in enumerate(report_types):
             ctk.CTkRadioButton(
                 left_frame,
-                text=rtype,
+                text=report_type,
                 variable=self.report_type_var,
-                value=rtype,
+                value=report_type,
                 font=FONTS["small"],
                 text_color=COLORS["text"],
                 fg_color=COLORS["primary"],
                 hover_color=COLORS["primary_hover"],
                 border_color=COLORS["border"],
                 command=self.on_report_type_change,
-            ).grid(row=3+idx, column=0, columnspan=2, sticky=tk.W, pady=5, padx=12)
+            ).grid(row=3 + idx, column=0, columnspan=2, sticky=tk.W, pady=5, padx=12)
 
         self.date_frame = ctk.CTkFrame(left_frame, fg_color="transparent", corner_radius=0)
-        self.date_frame.grid(row=6, column=0, columnspan=2, pady=10, padx=12, sticky=tk.EW)
-
+        self.date_frame.grid(row=7, column=0, columnspan=2, pady=10, padx=12, sticky=tk.EW)
         self.form_label(self.date_frame, "Date:").grid(row=0, column=0, sticky=tk.W, pady=5)
         self.date_entry = self.form_entry(self.date_frame, width=170)
         self.date_entry.grid(row=0, column=1, pady=5, padx=8, sticky=tk.W)
         self.date_entry.insert(0, date.today().strftime("%Y-%m-%d"))
+
+        self.range_frame = ctk.CTkFrame(left_frame, fg_color="transparent", corner_radius=0)
+        first_day = date.today().replace(day=1)
+        self.form_label(self.range_frame, "From:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.date_from_entry = self.form_entry(self.range_frame, width=170)
+        self.date_from_entry.grid(row=0, column=1, pady=5, padx=8, sticky=tk.W)
+        self.date_from_entry.insert(0, first_day.strftime("%Y-%m-%d"))
+        self.form_label(self.range_frame, "To:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.date_to_entry = self.form_entry(self.range_frame, width=170)
+        self.date_to_entry.grid(row=1, column=1, pady=5, padx=8, sticky=tk.W)
+        self.date_to_entry.insert(0, date.today().strftime("%Y-%m-%d"))
 
         self.branch_note_label = ctk.CTkLabel(
             left_frame,
@@ -83,44 +101,50 @@ class ReportWindow:
             wraplength=230,
             height=SIZES["status_label_height"],
         )
-        self.branch_note_label.grid(row=7, column=0, columnspan=2, pady=5, padx=12)
+        self.branch_note_label.grid(row=8, column=0, columnspan=2, pady=5, padx=12)
 
-        self.action_button(left_frame, "Generate Report", self.generate_report, width=180).grid(row=8, column=0, columnspan=2, pady=15)
+        self.action_button(left_frame, "Generate Report", self.generate_report, width=180).grid(row=9, column=0, columnspan=2, pady=15)
 
         right_frame = self.panel(main_frame, "Report")
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        right_frame.grid_columnconfigure(0, weight=1)
+        right_frame.grid_rowconfigure(2, weight=1)
 
-        text_frame = ctk.CTkFrame(right_frame, fg_color=COLORS["surface"], corner_radius=SIZES["corner_radius"], border_width=1, border_color=COLORS["border"])
-        text_frame.grid(row=1, column=0, columnspan=2, sticky=tk.NSEW, padx=12, pady=(0, 10))
-        text_frame.grid_rowconfigure(0, weight=1)
-        text_frame.grid_columnconfigure(0, weight=1)
-
-        self.report_text = tk.Text(
-            text_frame,
-            wrap=tk.WORD,
-            font=("Consolas", 10),
-            state=tk.DISABLED,
-            bg=COLORS["app_bg"],
-            fg=COLORS["text"],
-            insertbackground=COLORS["text"],
-            selectbackground=COLORS["primary"],
-            selectforeground=COLORS["text"],
-            relief=tk.FLAT,
-            borderwidth=0,
-            padx=12,
-            pady=10,
+        self.summary_label = ctk.CTkLabel(
+            right_frame,
+            text="Generate a report to view results.",
+            font=FONTS["small_bold"],
+            text_color=COLORS["text"],
+            fg_color=COLORS["card"],
+            corner_radius=SIZES["corner_radius"],
+            height=38,
+            anchor=tk.W,
         )
-        scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.report_text.yview)
-        self.report_text.configure(yscrollcommand=scrollbar.set)
+        self.summary_label.grid(row=1, column=0, columnspan=2, sticky=tk.EW, padx=12, pady=(0, 10))
 
-        self.report_text.grid(row=0, column=0, sticky=tk.NSEW, padx=(1, 0), pady=1)
-        scrollbar.grid(row=0, column=1, sticky=tk.NS, pady=1)
+        table_frame = ctk.CTkFrame(
+            right_frame,
+            fg_color=COLORS["surface"],
+            corner_radius=SIZES["corner_radius"],
+            border_width=1,
+            border_color=COLORS["border"],
+        )
+        table_frame.grid(row=2, column=0, columnspan=2, sticky=tk.NSEW, padx=12, pady=(0, 10))
+        table_frame.grid_rowconfigure(0, weight=1)
+        table_frame.grid_columnconfigure(0, weight=1)
 
-        self.action_button(right_frame, "Print Report", self.print_report, width=160).grid(row=2, column=0, columnspan=2, pady=(0, 12))
+        self.report_tree = ttk.Treeview(table_frame, columns=(), show="headings", height=22)
+        yscrollbar = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=self.report_tree.yview)
+        xscrollbar = ttk.Scrollbar(table_frame, orient=tk.HORIZONTAL, command=self.report_tree.xview)
+        self.report_tree.configure(yscrollcommand=yscrollbar.set, xscrollcommand=xscrollbar.set)
+        self.report_tree.grid(row=0, column=0, sticky=tk.NSEW, padx=(1, 0), pady=(1, 0))
+        yscrollbar.grid(row=0, column=1, sticky=tk.NS, pady=(1, 0), padx=(0, 1))
+        xscrollbar.grid(row=1, column=0, sticky=tk.EW, padx=(1, 0), pady=(0, 1))
+
+        self.action_button(right_frame, "Print Report", self.print_report, width=160).grid(row=3, column=0, columnspan=2, pady=(0, 12))
 
         left_frame.grid_columnconfigure(1, weight=1)
-        right_frame.grid_columnconfigure(0, weight=1)
-        right_frame.grid_rowconfigure(1, weight=1)
+        self.on_report_type_change()
 
     def panel(self, parent, title):
         panel = ctk.CTkFrame(
@@ -174,178 +198,272 @@ class ReportWindow:
             corner_radius=SIZES["corner_radius"],
             cursor="hand2",
         )
-    
-    def on_branch_select(self, event):
-        """Handle branch selection"""
+
+    def on_branch_select(self, event=None):
         selected = self.branch_var.get()
-        if selected == "All Branches":
-            self.selected_branch_id = None
-        else:
+        self.selected_branch_id = None
+        if selected and selected != "All Branches":
             for branch in self.branches:
                 if branch.name == selected:
                     self.selected_branch_id = branch.id
                     break
-    
+
     def on_report_type_change(self):
-        """Handle report type change"""
         report_type = self.report_type_var.get()
-        
-        # Show/hide date frame based on report type
         if report_type == "Daily Sales":
             self.date_frame.grid()
-            self.branch_note_label.configure(text="")
+            self.range_frame.grid_remove()
+            self.branch_note_label.configure(text="Select one branch for daily sales.")
+        elif report_type == "Monthly Sales":
+            self.date_frame.grid_remove()
+            self.range_frame.grid(row=7, column=0, columnspan=2, pady=10, padx=12, sticky=tk.EW)
+            self.branch_note_label.configure(text="Branch is optional for monthly sales.")
         else:
             self.date_frame.grid_remove()
+            self.range_frame.grid_remove()
             if report_type == "Complete Business Stock":
-                self.branch_note_label.configure(text="Note: This report shows stock for ALL branches")
+                self.branch_note_label.configure(text="This report shows stock for all branches.")
             else:
-                self.branch_note_label.configure(text="")
-    
+                self.branch_note_label.configure(text="Select one branch for stock.")
+
     def generate_report(self):
-        """Generate the selected report"""
         try:
             report_type = self.report_type_var.get()
-            
-            self.report_text.config(state=tk.NORMAL)
-            self.report_text.delete(1.0, tk.END)
-            
             if report_type == "Daily Sales":
-                if not self.selected_branch_id:
-                    raise ValueError("Please select a branch for daily sales report")
-                
-                date_str = self.date_entry.get()
-                try:
-                    report_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-                except:
-                    raise ValueError("Invalid date format. Use YYYY-MM-DD")
-                
-                report = ReportService.get_daily_sales_report(self.selected_branch_id, report_date)
-                self.display_daily_sales_report(report)
-                
+                report = self.build_daily_sales_report()
             elif report_type == "Branch Stock":
-                if not self.selected_branch_id:
-                    raise ValueError("Please select a branch for stock report")
-                
-                report = ReportService.get_branch_stock_report(self.selected_branch_id)
-                self.display_stock_report(report)
-                
+                report = self.build_branch_stock_report()
             elif report_type == "Complete Business Stock":
-                report = ReportService.get_complete_business_stock_report()
-                self.display_complete_stock_report(report)
-            
-            self.report_text.config(state=tk.DISABLED)
-            
+                report = self.build_complete_stock_report()
+            elif report_type == "Monthly Sales":
+                report = self.build_monthly_sales_report()
+            else:
+                raise ValueError("Unknown report type")
+
+            self.current_report = report
+            self.render_report(report)
         except Exception as e:
             messagebox.showerror("Error", str(e))
-            self.report_text.config(state=tk.DISABLED)
-    
-    def display_daily_sales_report(self, report):
-        """Display daily sales report"""
-        branch = None
-        for b in self.branches:
-            if b.id == report['branch_id']:
-                branch = b
-                break
-        
-        self.report_text.insert(tk.END, "=" * 70 + "\n")
-        self.report_text.insert(tk.END, "DAILY SALES REPORT\n")
-        self.report_text.insert(tk.END, "=" * 70 + "\n\n")
-        self.report_text.insert(tk.END, f"Branch: {branch.name if branch else 'N/A'}\n")
-        self.report_text.insert(tk.END, f"Date: {report['date']}\n")
-        self.report_text.insert(tk.END, f"Total Invoices: {report['total_invoices']}\n\n")
-        self.report_text.insert(tk.END, "-" * 70 + "\n")
-        self.report_text.insert(tk.END, f"{'Invoice No':<15} {'Customer':<25} {'Total':<15} {'Paid':<15}\n")
-        self.report_text.insert(tk.END, "-" * 70 + "\n")
-        
-        for inv in report['invoices']:
-            self.report_text.insert(tk.END, f"{inv['invoice_number']:<15} {inv['customer_name']:<25} Rs. {inv['grand_total']:<12.2f} Rs. {inv['paid_amount']:<12.2f}\n")
-        
-        self.report_text.insert(tk.END, "-" * 70 + "\n")
-        self.report_text.insert(tk.END, f"\nTotal Sales: Rs. {report['total_sales']:.2f}\n")
-        self.report_text.insert(tk.END, f"Total Paid: Rs. {report['total_paid']:.2f}\n")
-        self.report_text.insert(tk.END, f"Total Balance: Rs. {report['total_balance']:.2f}\n")
-    
-    def display_stock_report(self, report):
-        """Display stock report"""
-        self.report_text.insert(tk.END, "=" * 90 + "\n")
-        self.report_text.insert(tk.END, "BRANCH STOCK REPORT\n")
-        self.report_text.insert(tk.END, "=" * 90 + "\n\n")
-        self.report_text.insert(tk.END, f"Branch: {report.get('branch_name', 'N/A')}\n\n")
-        self.report_text.insert(tk.END, "-" * 90 + "\n")
-        self.report_text.insert(tk.END, f"{'Product':<20} {'Size':<10} {'Grade':<6} {'Boxes':<8} {'Pieces':<8} {'Value (Rs.)':<15}\n")
-        self.report_text.insert(tk.END, "-" * 90 + "\n")
-        
-        for item in report['items']:
-            self.report_text.insert(tk.END, f"{item['product_name']:<20} {item['tile_size']:<10} {item['grade']:<6} "
-                                           f"{item['boxes']:<8} {item['loose_pieces']:<8} {item['stock_value']:<15.2f}\n")
 
-        sanitary_items = report.get('sanitary_items', [])
-        if sanitary_items:
-            self.report_text.insert(tk.END, "\nSANITARY STOCK\n")
-            self.report_text.insert(tk.END, "-" * 90 + "\n")
-            self.report_text.insert(tk.END, f"{'Company':<18} {'Category':<22} {'Color':<10} {'SKU':<20} {'Qty':<6} {'Value (Rs.)':<15}\n")
-            self.report_text.insert(tk.END, "-" * 90 + "\n")
+    def build_daily_sales_report(self):
+        if not self.selected_branch_id:
+            raise ValueError("Please select a branch for daily sales report")
+        report_date = self.parse_date(self.date_entry.get().strip(), "Date")
+        data = ReportService.get_daily_sales_report(self.selected_branch_id, report_date)
+        branch = self.branch_name(data.get("branch_id"))
+        rows = []
+        for invoice in data.get("invoices", []):
+            rows.append({
+                "Invoice No": invoice.get("invoice_number", ""),
+                "Customer": invoice.get("customer_name", ""),
+                "Time": self.time_text(invoice.get("invoice_date")),
+                "Total": self.money(invoice.get("grand_total")),
+                "Paid": self.money(invoice.get("paid_amount")),
+                "Balance": self.money(invoice.get("balance")),
+            })
+        return {
+            "type": "Daily Sales",
+            "title": "Daily Sales Report",
+            "columns": ["Invoice No", "Customer", "Time", "Total", "Paid", "Balance"],
+            "rows": rows,
+            "summary": [
+                f"Branch: {branch}",
+                f"Date: {data.get('date')}",
+                f"Invoices: {data.get('total_invoices', 0)}",
+                f"Sales: {self.money(data.get('total_sales'))}",
+                f"Paid: {self.money(data.get('total_paid'))}",
+                f"Balance: {self.money(data.get('total_balance'))}",
+            ],
+        }
 
-            for item in sanitary_items:
-                self.report_text.insert(
-                    tk.END,
-                    f"{item['company_name']:<18} {item['product_category']:<22} {item['color']:<10} "
-                    f"{item['sku']:<20} {item['quantity']:<6} {item['stock_value']:<15.2f}\n"
-                )
-        
-        self.report_text.insert(tk.END, "-" * 90 + "\n")
-        self.report_text.insert(tk.END, f"\nTotal Stock Value: Rs. {report['total_value']:.2f}\n")
-    
-    def display_complete_stock_report(self, report):
-        """Display complete business stock report (all branches)"""
-        self.report_text.insert(tk.END, "=" * 100 + "\n")
-        self.report_text.insert(tk.END, "COMPLETE BUSINESS STOCK REPORT\n")
-        self.report_text.insert(tk.END, "=" * 100 + "\n\n")
-        self.report_text.insert(tk.END, f"Report Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        self.report_text.insert(tk.END, f"Total Branches: {report['total_branches']}\n")
-        self.report_text.insert(tk.END, f"Total Products: {report['total_products']}\n")
-        self.report_text.insert(tk.END, f"Sanitary Stock Lines: {report.get('total_sanitary_products', 0)}\n")
-        self.report_text.insert(tk.END, f"Total Stock Value: Rs. {report['total_value']:.2f}\n\n")
-        
-        # Display by branch
-        for branch_data in report['branches']:
-            self.report_text.insert(tk.END, "\n" + "=" * 100 + "\n")
-            self.report_text.insert(tk.END, f"BRANCH: {branch_data['branch_name']}\n")
-            self.report_text.insert(tk.END, "=" * 100 + "\n\n")
-            self.report_text.insert(tk.END, f"{'Product':<25} {'Size':<12} {'Grade':<20} {'Boxes':<10} {'Pieces':<10} {'Value (Rs.)':<15}\n")
-            self.report_text.insert(tk.END, "-" * 100 + "\n")
-            
-            for item in branch_data['items']:
-                self.report_text.insert(tk.END, f"{item['product_name']:<25} {item['tile_size']:<12} {item['grade']:<20} "
-                                               f"{item['boxes']:<10} {item['loose_pieces']:<10} {item['stock_value']:<15.2f}\n")
+    def build_branch_stock_report(self):
+        if not self.selected_branch_id:
+            raise ValueError("Please select a branch for stock report")
+        data = ReportService.get_branch_stock_report(self.selected_branch_id)
+        rows = [self.stock_row(item) for item in data.get("items", [])]
+        for item in data.get("sanitary_items", []):
+            rows.append({
+                "Product": f"{item.get('company_name', '')} - {item.get('product_category', '')}".strip(" -"),
+                "Size": item.get("color", "-"),
+                "Grade": item.get("sku", "-"),
+                "Boxes": "-",
+                "Loose": "-",
+                "Total Pieces": item.get("quantity", 0),
+                "Value": item.get("value_display") or self.money(item.get("stock_value")),
+            })
+        return {
+            "type": "Branch Stock",
+            "title": "Branch Stock Report",
+            "columns": ["Product", "Size", "Grade", "Boxes", "Loose", "Total Pieces", "Value"],
+            "rows": rows,
+            "summary": [
+                f"Branch: {data.get('branch_name', self.branch_name(self.selected_branch_id))}",
+                f"Rows: {len(rows)}",
+                f"Stock Value: {self.money(data.get('total_value'))}",
+            ],
+        }
 
-            sanitary_items = branch_data.get('sanitary_items', [])
-            if sanitary_items:
-                self.report_text.insert(tk.END, "\nSANITARY STOCK\n")
-                self.report_text.insert(tk.END, f"{'Company':<18} {'Category':<22} {'Color':<10} {'SKU':<22} {'Qty':<8} {'Value (Rs.)':<15}\n")
-                self.report_text.insert(tk.END, "-" * 100 + "\n")
+    def build_complete_stock_report(self):
+        data = ReportService.get_complete_business_stock_report()
+        rows = []
+        for branch in data.get("branches", []):
+            for item in branch.get("items", []):
+                row = self.stock_row(item)
+                row["Branch"] = branch.get("branch_name", "")
+                rows.append(row)
+            for item in branch.get("sanitary_items", []):
+                rows.append({
+                    "Branch": branch.get("branch_name", ""),
+                    "Product": f"{item.get('company_name', '')} - {item.get('product_category', '')}".strip(" -"),
+                    "Size": item.get("color", "-"),
+                    "Grade": item.get("sku", "-"),
+                    "Boxes": "-",
+                    "Loose": "-",
+                    "Total Pieces": item.get("quantity", 0),
+                    "Value": item.get("value_display") or self.money(item.get("stock_value")),
+                })
+        return {
+            "type": "Complete Business Stock",
+            "title": "Complete Business Stock Report",
+            "columns": ["Branch", "Product", "Size", "Grade", "Boxes", "Loose", "Total Pieces", "Value"],
+            "rows": rows,
+            "summary": [
+                f"Branches: {data.get('total_branches', 0)}",
+                f"Rows: {len(rows)}",
+                f"Stock Value: {self.money(data.get('total_value'))}",
+            ],
+        }
 
-                for item in sanitary_items:
-                    self.report_text.insert(
-                        tk.END,
-                        f"{item['company_name']:<18} {item['product_category']:<22} {item['color']:<10} "
-                        f"{item['sku']:<22} {item['quantity']:<8} {item['stock_value']:<15.2f}\n"
-                    )
-            
-            self.report_text.insert(tk.END, "-" * 100 + "\n")
-            self.report_text.insert(tk.END, f"Branch Total Value: Rs. {branch_data['branch_total_value']:.2f}\n")
-        
-        self.report_text.insert(tk.END, "\n" + "=" * 100 + "\n")
-        self.report_text.insert(tk.END, f"GRAND TOTAL STOCK VALUE: Rs. {report['total_value']:.2f}\n")
-        self.report_text.insert(tk.END, "=" * 100 + "\n")
-    
+    def build_monthly_sales_report(self):
+        date_from = self.parse_date(self.date_from_entry.get().strip(), "From")
+        date_to = self.parse_date(self.date_to_entry.get().strip(), "To")
+        if date_to < date_from:
+            raise ValueError("Date To cannot be before Date From")
+        data = ReportService.get_monthly_sales_report(date_from, date_to, self.selected_branch_id)
+        rows = []
+        for item in data.get("items", []):
+            rows.append({
+                "Month": item.get("month", ""),
+                "Branch": item.get("branch_name", ""),
+                "Invoice Count": item.get("invoice_count", 0),
+                "Total Sales": self.money(item.get("total_sales")),
+                "Total Paid": self.money(item.get("total_paid")),
+                "Total Balance": self.money(item.get("total_balance")),
+            })
+        return {
+            "type": "Monthly Sales",
+            "title": "Monthly Sales Report",
+            "columns": ["Month", "Branch", "Invoice Count", "Total Sales", "Total Paid", "Total Balance"],
+            "rows": rows,
+            "summary": [
+                f"Date Range: {data.get('date_from')} to {data.get('date_to')}",
+                f"Branch: {self.branch_name(self.selected_branch_id) if self.selected_branch_id else 'All Branches'}",
+                f"Invoices: {data.get('total_invoices', 0)}",
+                f"Sales: {self.money(data.get('total_sales'))}",
+                f"Paid: {self.money(data.get('total_paid'))}",
+                f"Balance: {self.money(data.get('total_balance'))}",
+            ],
+        }
+
+    def render_report(self, report):
+        columns = report["columns"]
+        for item in self.report_tree.get_children():
+            self.report_tree.delete(item)
+        self.report_tree.configure(columns=columns)
+
+        widths = {
+            "Invoice No": 120,
+            "Customer": 190,
+            "Time": 100,
+            "Total": 110,
+            "Paid": 110,
+            "Balance": 110,
+            "Product": 240,
+            "Size": 90,
+            "Grade": 130,
+            "Boxes": 80,
+            "Loose": 80,
+            "Total Pieces": 105,
+            "Value": 130,
+            "Branch": 160,
+            "Month": 90,
+            "Invoice Count": 105,
+            "Total Sales": 120,
+            "Total Paid": 120,
+            "Total Balance": 120,
+        }
+        numeric_columns = {
+            "Total", "Paid", "Balance", "Boxes", "Loose", "Total Pieces", "Value",
+            "Invoice Count", "Total Sales", "Total Paid", "Total Balance",
+        }
+        for column in columns:
+            self.report_tree.heading(column, text=column)
+            self.report_tree.column(
+                column,
+                width=widths.get(column, 120),
+                anchor=tk.E if column in numeric_columns else tk.W,
+                stretch=True,
+            )
+
+        for row in report["rows"]:
+            self.report_tree.insert("", tk.END, values=[row.get(column, "") for column in columns])
+
+        self.summary_label.configure(text="   " + "   |   ".join(report["summary"]))
+
     def print_report(self):
-        """Print report"""
-        content = self.report_text.get(1.0, tk.END)
-        if not content.strip():
+        if not self.current_report:
             messagebox.showwarning("Warning", "No report to print")
             return
-        
-        # For now, show a message. In production, implement actual printing
-        messagebox.showinfo("Print", "Print functionality will send report to printer.\nThis feature can be extended with actual printer integration.")
+        try:
+            pdf_path = ReportPrinter(self.current_report).generate_pdf()
+            try:
+                os.startfile(pdf_path)
+            except Exception as e:
+                messagebox.showwarning(
+                    "Report PDF Created",
+                    "The report PDF was created, but Windows could not open a PDF viewer.\n\n"
+                    f"File path:\n{pdf_path}\n\nError: {str(e)}",
+                )
+        except Exception as e:
+            messagebox.showerror("Print Error", f"Failed to generate report PDF: {str(e)}")
 
+    @staticmethod
+    def stock_row(item):
+        return {
+            "Product": item.get("product_name", ""),
+            "Size": item.get("tile_size", ""),
+            "Grade": item.get("grade", ""),
+            "Boxes": item.get("boxes", 0),
+            "Loose": item.get("loose_pieces", 0),
+            "Total Pieces": item.get("total_pieces", 0),
+            "Value": item.get("value_display") or ReportWindow.money(item.get("stock_value")),
+        }
+
+    def branch_name(self, branch_id):
+        for branch in self.branches:
+            if branch.id == branch_id:
+                return branch.name
+        return "N/A"
+
+    @staticmethod
+    def parse_date(value, label):
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").date()
+        except Exception:
+            raise ValueError(f"Invalid {label} date format. Use YYYY-MM-DD")
+
+    @staticmethod
+    def money(value):
+        try:
+            return f"Rs. {float(value or 0):.2f}"
+        except Exception:
+            return "Rs. 0.00"
+
+    @staticmethod
+    def time_text(value):
+        if not value:
+            return ""
+        try:
+            return format_business_datetime(value, fmt="%H:%M")
+        except Exception:
+            return str(value)[11:16]

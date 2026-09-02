@@ -44,6 +44,7 @@ COLORS = {
 
 FONTS = {
     "status": ("Segoe UI", 10),
+    "stock_summary": ("Segoe UI", 15, "bold"),
     "small": ("Segoe UI", 10),
     "small_bold": ("Segoe UI", 10, "bold"),
     "body_bold": ("Segoe UI", 12, "bold"),

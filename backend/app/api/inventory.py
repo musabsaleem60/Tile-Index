@@ -33,6 +33,11 @@ def _require_stock_out_reason(notes: str | None) -> str:
     return reason
 
 
+def _clean_dc_number(dc_number: str | None) -> str | None:
+    value = (dc_number or "").strip()
+    return value or None
+
+
 @router.get("/tiles/{branch_id}", response_model=list[InventoryOut])
 def list_tile_inventory(branch_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     ensure_branch_access(current_user, branch_id)
@@ -58,6 +63,7 @@ def list_tile_inventory(branch_id: int, db: Session = Depends(get_db), current_u
 @router.post("/tiles/stock-in", response_model=InventoryOut)
 def tile_stock_in(payload: StockInRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     ensure_branch_access(current_user, payload.branch_id)
+    dc_number = _clean_dc_number(payload.dc_number)
     if payload.boxes == 0 and payload.loose_pieces == 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stock quantity is required")
 
@@ -96,6 +102,7 @@ def tile_stock_in(payload: StockInRequest, db: Session = Depends(get_db), curren
         boxes=payload.boxes,
         loose_pieces=payload.loose_pieces,
         notes=payload.notes,
+        dc_number=dc_number,
     ))
     audit_payload = {
         "branch_id": payload.branch_id,
@@ -106,6 +113,7 @@ def tile_stock_in(payload: StockInRequest, db: Session = Depends(get_db), curren
         "boxes": payload.boxes,
         "loose_pieces": payload.loose_pieces,
         "notes": payload.notes,
+        "dc_number": dc_number,
     }
     write_audit_log(db, current_user, "Stock IN", audit_payload, payload.branch_id)
     db.commit()
@@ -117,6 +125,7 @@ def tile_stock_in(payload: StockInRequest, db: Session = Depends(get_db), curren
 def tile_stock_out(payload: StockInRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     ensure_branch_access(current_user, payload.branch_id)
     reason = _require_stock_out_reason(payload.notes)
+    dc_number = _clean_dc_number(payload.dc_number)
     if payload.boxes == 0 and payload.loose_pieces == 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stock quantity is required")
 
@@ -159,6 +168,7 @@ def tile_stock_out(payload: StockInRequest, db: Session = Depends(get_db), curre
         boxes=payload.boxes,
         loose_pieces=payload.loose_pieces,
         notes=reason,
+        dc_number=dc_number,
     ))
     audit_payload = {
         "branch_id": payload.branch_id,
@@ -169,6 +179,7 @@ def tile_stock_out(payload: StockInRequest, db: Session = Depends(get_db), curre
         "boxes": payload.boxes,
         "loose_pieces": payload.loose_pieces,
         "reason": reason,
+        "dc_number": dc_number,
     }
     write_audit_log(db, current_user, "Stock OUT", audit_payload, payload.branch_id)
     db.commit()
@@ -185,6 +196,7 @@ def list_accessory_inventory(branch_id: int, db: Session = Depends(get_db), curr
 @router.post("/accessories/{accessory_id}/stock-in", response_model=AccessoryInventoryOut)
 def accessory_stock_in(accessory_id: int, payload: SimpleQuantityRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     ensure_branch_access(current_user, payload.branch_id)
+    dc_number = _clean_dc_number(payload.dc_number)
     accessory = db.get(Accessory, accessory_id)
     if not accessory:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Accessory not found")
@@ -198,6 +210,16 @@ def accessory_stock_in(accessory_id: int, payload: SimpleQuantityRequest, db: Se
         inventory = AccessoryInventory(branch_id=payload.branch_id, accessory_id=accessory_id, quantity=0)
         db.add(inventory)
     inventory.quantity += payload.quantity
+    db.add(StockTransaction(
+        user_id=current_user.id,
+        branch_id=payload.branch_id,
+        accessory_id=accessory_id,
+        item_type="accessory",
+        transaction_type="IN",
+        quantity=payload.quantity,
+        notes=payload.notes,
+        dc_number=dc_number,
+    ))
     write_audit_log(
         db,
         current_user,
@@ -206,7 +228,10 @@ def accessory_stock_in(accessory_id: int, payload: SimpleQuantityRequest, db: Se
             "accessory_id": accessory_id,
             "accessory_name": accessory_display_label(accessory),
             "category": accessory.category,
-            **payload.model_dump(),
+            "branch_id": payload.branch_id,
+            "quantity": payload.quantity,
+            "notes": payload.notes,
+            "dc_number": dc_number,
         },
         payload.branch_id,
     )
@@ -219,6 +244,7 @@ def accessory_stock_in(accessory_id: int, payload: SimpleQuantityRequest, db: Se
 def accessory_stock_out(accessory_id: int, payload: SimpleQuantityRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     ensure_branch_access(current_user, payload.branch_id)
     reason = _require_stock_out_reason(payload.notes)
+    dc_number = _clean_dc_number(payload.dc_number)
     accessory = db.get(Accessory, accessory_id)
     if not accessory:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Accessory not found")
@@ -231,6 +257,16 @@ def accessory_stock_out(accessory_id: int, payload: SimpleQuantityRequest, db: S
     if not inventory or inventory.quantity < payload.quantity:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient accessory stock")
     inventory.quantity -= payload.quantity
+    db.add(StockTransaction(
+        user_id=current_user.id,
+        branch_id=payload.branch_id,
+        accessory_id=accessory_id,
+        item_type="accessory",
+        transaction_type="OUT",
+        quantity=payload.quantity,
+        notes=reason,
+        dc_number=dc_number,
+    ))
     write_audit_log(
         db,
         current_user,
@@ -242,6 +278,7 @@ def accessory_stock_out(accessory_id: int, payload: SimpleQuantityRequest, db: S
             "branch_id": payload.branch_id,
             "quantity": payload.quantity,
             "reason": reason,
+            "dc_number": dc_number,
         },
         payload.branch_id,
     )

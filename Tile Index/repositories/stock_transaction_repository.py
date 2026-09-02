@@ -10,20 +10,35 @@ from utils.datetime_format import format_business_datetime
 
 class StockTransactionRepository:
     """Repository for stock transaction operations"""
+
+    @staticmethod
+    def _has_dc_number_column(cursor):
+        cursor.execute("PRAGMA table_info(stock_transactions)")
+        return any(row[1] == "dc_number" for row in cursor.fetchall())
     
     @staticmethod
     def create(transaction):
         """Create a new stock transaction"""
         conn = get_connection()
         cursor = conn.cursor()
-        
-        cursor.execute("""
-            INSERT INTO stock_transactions (user_id, branch_id, product_id, grade,
-                                          transaction_type, boxes, loose_pieces, transaction_date, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (transaction.user_id, transaction.branch_id, transaction.product_id,
-              transaction.grade, transaction.transaction_type, transaction.boxes,
-              transaction.loose_pieces, transaction.transaction_date, transaction.notes))
+
+        if StockTransactionRepository._has_dc_number_column(cursor):
+            cursor.execute("""
+                INSERT INTO stock_transactions (user_id, branch_id, product_id, grade,
+                                              transaction_type, boxes, loose_pieces, transaction_date, notes, dc_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (transaction.user_id, transaction.branch_id, transaction.product_id,
+                  transaction.grade, transaction.transaction_type, transaction.boxes,
+                  transaction.loose_pieces, transaction.transaction_date, transaction.notes,
+                  transaction.dc_number))
+        else:
+            cursor.execute("""
+                INSERT INTO stock_transactions (user_id, branch_id, product_id, grade,
+                                              transaction_type, boxes, loose_pieces, transaction_date, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (transaction.user_id, transaction.branch_id, transaction.product_id,
+                  transaction.grade, transaction.transaction_type, transaction.boxes,
+                  transaction.loose_pieces, transaction.transaction_date, transaction.notes))
         
         transaction.id = cursor.lastrowid
         conn.commit()
@@ -35,57 +50,66 @@ class StockTransactionRepository:
         """Get stock transactions by user"""
         conn = get_connection()
         cursor = conn.cursor()
+        has_dc_number = StockTransactionRepository._has_dc_number_column(cursor)
+        dc_select = ", dc_number" if has_dc_number else ""
         cursor.execute("""
             SELECT id, user_id, branch_id, product_id, grade, transaction_type,
-                   boxes, loose_pieces, transaction_date, notes
+                   boxes, loose_pieces, transaction_date, notes{dc_select}
             FROM stock_transactions
             WHERE user_id = ?
             ORDER BY transaction_date DESC
             LIMIT ?
-        """, (user_id, limit))
+        """.format(dc_select=dc_select), (user_id, limit))
         rows = cursor.fetchall()
         conn.close()
         
         return [StockTransaction(id=r[0], user_id=r[1], branch_id=r[2], product_id=r[3],
                                 grade=r[4], transaction_type=r[5], boxes=r[6],
-                                loose_pieces=r[7], transaction_date=format_business_datetime(r[8]), notes=r[9]) for r in rows]
+                                loose_pieces=r[7], transaction_date=format_business_datetime(r[8]), notes=r[9],
+                                dc_number=r[10] if has_dc_number else None) for r in rows]
     
     @staticmethod
     def get_by_branch(branch_id, limit=100):
         """Get stock transactions by branch"""
         conn = get_connection()
         cursor = conn.cursor()
+        has_dc_number = StockTransactionRepository._has_dc_number_column(cursor)
+        dc_select = ", dc_number" if has_dc_number else ""
         cursor.execute("""
             SELECT id, user_id, branch_id, product_id, grade, transaction_type,
-                   boxes, loose_pieces, transaction_date, notes
+                   boxes, loose_pieces, transaction_date, notes{dc_select}
             FROM stock_transactions
             WHERE branch_id = ?
             ORDER BY transaction_date DESC
             LIMIT ?
-        """, (branch_id, limit))
+        """.format(dc_select=dc_select), (branch_id, limit))
         rows = cursor.fetchall()
         conn.close()
         
         return [StockTransaction(id=r[0], user_id=r[1], branch_id=r[2], product_id=r[3],
                                 grade=r[4], transaction_type=r[5], boxes=r[6],
-                                loose_pieces=r[7], transaction_date=format_business_datetime(r[8]), notes=r[9]) for r in rows]
+                                loose_pieces=r[7], transaction_date=format_business_datetime(r[8]), notes=r[9],
+                                dc_number=r[10] if has_dc_number else None) for r in rows]
     
     @staticmethod
     def get_all(limit=100):
         """Get all stock transactions"""
         conn = get_connection()
         cursor = conn.cursor()
+        has_dc_number = StockTransactionRepository._has_dc_number_column(cursor)
+        dc_select = ", dc_number" if has_dc_number else ""
         cursor.execute("""
             SELECT id, user_id, branch_id, product_id, grade, transaction_type,
-                   boxes, loose_pieces, transaction_date, notes
+                   boxes, loose_pieces, transaction_date, notes{dc_select}
             FROM stock_transactions
             ORDER BY transaction_date DESC
             LIMIT ?
-        """, (limit,))
+        """.format(dc_select=dc_select), (limit,))
         rows = cursor.fetchall()
         conn.close()
         
         return [StockTransaction(id=r[0], user_id=r[1], branch_id=r[2], product_id=r[3],
                                 grade=r[4], transaction_type=r[5], boxes=r[6],
-                                loose_pieces=r[7], transaction_date=format_business_datetime(r[8]), notes=r[9]) for r in rows]
+                                loose_pieces=r[7], transaction_date=format_business_datetime(r[8]), notes=r[9],
+                                dc_number=r[10] if has_dc_number else None) for r in rows]
 

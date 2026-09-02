@@ -13,7 +13,7 @@ from repositories.user_repository import UserRepository
 from services.activity_log_service import ActivityLogService
 from services.auth_service import AuthenticationService
 from utils.datetime_format import format_business_datetime
-from utils.activity_log_formatter import activity_reason, format_activity_details
+from utils.activity_log_formatter import activity_dc_number, activity_reason, format_activity_details
 from ui.theme import COLORS, FONTS, SIZES, SPACING
 
 
@@ -118,7 +118,7 @@ class ActivityLogWindow:
         right_frame.grid_rowconfigure(1, weight=1)
         right_frame.grid_columnconfigure(0, weight=1)
 
-        columns = ('Date/Time', 'User', 'Role', 'Branch', 'Action', 'Reason', 'Details')
+        columns = ('Date/Time', 'User', 'Role', 'Branch', 'Action', 'DC Number', 'Reason', 'Details')
         self.activities_tree = ttk.Treeview(right_frame, columns=columns, show='headings', height=25)
 
         column_widths = {
@@ -127,8 +127,9 @@ class ActivityLogWindow:
             'Role': 80,
             'Branch': 150,
             'Action': 150,
+            'DC Number': 110,
             'Reason': 180,
-            'Details': 360,
+            'Details': 320,
         }
         for col in columns:
             self.activities_tree.heading(col, text=col)
@@ -292,6 +293,7 @@ class ActivityLogWindow:
                 details_one_line = " | ".join(details.splitlines())
                 details_short = details_one_line[:80] + "..." if len(details_one_line) > 80 else details_one_line
                 reason = activity_reason(activity)
+                dc_number = activity_dc_number(activity)
                 
                 self.activities_tree.insert('', tk.END, values=(
                     date_str,
@@ -299,6 +301,7 @@ class ActivityLogWindow:
                     activity.user_role.upper(),
                     branch_name,
                     activity.action_type,
+                    dc_number,
                     reason,
                     details_short
                 ), tags=(activity.id,))
@@ -383,6 +386,7 @@ class ActivityLogWindow:
                 details_one_line = " | ".join(details.splitlines())
                 details_short = details_one_line[:80] + "..." if len(details_one_line) > 80 else details_one_line
                 reason = activity_reason(activity)
+                dc_number = activity_dc_number(activity)
                 
                 self.activities_tree.insert('', tk.END, values=(
                     date_str,
@@ -390,6 +394,7 @@ class ActivityLogWindow:
                     activity.user_role.upper(),
                     branch_name,
                     activity.action_type,
+                    dc_number,
                     reason,
                     details_short
                 ), tags=(activity.id,))
@@ -482,11 +487,11 @@ class ActivityLogWindow:
                 f.write("TILE INDEX - ACTIVITY LOG / AUDIT TRAIL\n")
                 f.write("=" * 100 + "\n\n")
                 f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-                f.write(f"{'Date/Time':<20} {'User':<15} {'Role':<10} {'Branch':<20} {'Action':<20} {'Reason':<25} {'Details':<30}\n")
+                f.write(f"{'Date/Time':<20} {'User':<15} {'Role':<10} {'Branch':<20} {'Action':<20} {'DC Number':<12} {'Reason':<25} {'Details':<30}\n")
                 f.write("-" * 100 + "\n")
                 
                 for activity in activities:
-                    f.write(f"{activity[0]:<20} {activity[1]:<15} {activity[2]:<10} {activity[3]:<20} {activity[4]:<20} {activity[5]:<25} {activity[6]:<30}\n")
+                    f.write(f"{activity[0]:<20} {activity[1]:<15} {activity[2]:<10} {activity[3]:<20} {activity[4]:<20} {activity[5]:<12} {activity[6]:<25} {activity[7]:<30}\n")
             
             messagebox.showinfo("Success", f"Activity log exported to:\n{filename}")
         except Exception as e:

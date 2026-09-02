@@ -206,8 +206,12 @@ class InventoryWindow:
         self.form_label(stock_in_frame, "Loose Pieces:").grid(row=2, column=0, sticky=tk.W, pady=3, padx=8)
         self.stock_in_pieces_entry = self.form_entry(stock_in_frame, width=160)
         self.stock_in_pieces_entry.grid(row=2, column=1, pady=3, padx=8)
+
+        self.form_label(stock_in_frame, "DC Number:").grid(row=3, column=0, sticky=tk.W, pady=3, padx=8)
+        self.stock_in_dc_entry = self.form_entry(stock_in_frame, width=160)
+        self.stock_in_dc_entry.grid(row=3, column=1, pady=3, padx=8)
         
-        self.action_button(stock_in_frame, "Add Stock", self.add_stock, width=180).grid(row=3, column=0, columnspan=2, pady=10)
+        self.action_button(stock_in_frame, "Add Stock", self.add_stock, width=180).grid(row=4, column=0, columnspan=2, pady=10)
         
         # Stock OUT form
         stock_out_frame = self.create_subpanel(right_frame, "Stock OUT (Remove Stock)")
@@ -224,8 +228,12 @@ class InventoryWindow:
         self.form_label(stock_out_frame, "Reason/Comment:").grid(row=3, column=0, sticky=tk.W, pady=3, padx=8)
         self.stock_out_comment_entry = self.form_entry(stock_out_frame, width=160)
         self.stock_out_comment_entry.grid(row=3, column=1, pady=3, padx=8)
+
+        self.form_label(stock_out_frame, "DC Number:").grid(row=4, column=0, sticky=tk.W, pady=3, padx=8)
+        self.stock_out_dc_entry = self.form_entry(stock_out_frame, width=160)
+        self.stock_out_dc_entry.grid(row=4, column=1, pady=3, padx=8)
         
-        self.action_button(stock_out_frame, "Remove Stock", self.remove_stock, width=180, primary=False).grid(row=4, column=0, columnspan=2, pady=10)
+        self.action_button(stock_out_frame, "Remove Stock", self.remove_stock, width=180, primary=False).grid(row=5, column=0, columnspan=2, pady=10)
         
         # Current Stock Display
         stock_display_frame = self.create_subpanel(right_frame, "Current Stock")
@@ -556,6 +564,7 @@ class InventoryWindow:
             grade = validate_grade(self.grade_var.get())
             boxes = validate_integer(self.stock_in_boxes_entry.get() or "0", "Boxes")
             loose_pieces = validate_integer(self.stock_in_pieces_entry.get() or "0", "Loose Pieces")
+            dc_number = self.stock_in_dc_entry.get().strip()
             if boxes == 0 and loose_pieces == 0:
                 raise ValueError("Please enter at least some stock quantity")
             
@@ -568,12 +577,14 @@ class InventoryWindow:
                 0,
                 0,
                 0,
-                user_id=self.current_user.id
+                user_id=self.current_user.id,
+                dc_number=dc_number or None,
             )
             
             messagebox.showinfo("Success", f"Stock added successfully for {selected_product.name}!")
             self.stock_in_boxes_entry.delete(0, tk.END)
             self.stock_in_pieces_entry.delete(0, tk.END)
+            self.stock_in_dc_entry.delete(0, tk.END)
             self.selected_product_id = selected_product.id
             self.refresh_stock()
             
@@ -609,6 +620,7 @@ class InventoryWindow:
             boxes = validate_integer(self.stock_out_boxes_entry.get() or "0", "Boxes")
             loose_pieces = validate_integer(self.stock_out_pieces_entry.get() or "0", "Loose Pieces")
             comment = self.stock_out_comment_entry.get().strip()
+            dc_number = self.stock_out_dc_entry.get().strip()
             if len(comment) < 5:
                 raise ValueError("Please enter a reason for removing stock.")
             
@@ -637,6 +649,8 @@ class InventoryWindow:
             
             # Confirm removal
             confirm_msg = f"Remove {boxes} boxes + {loose_pieces} pieces of {selected_product.name} ({grade})?\n\nReason: {comment}"
+            if dc_number:
+                confirm_msg += f"\nDC Number: {dc_number}"
             if not messagebox.askyesno("Confirm Stock OUT", confirm_msg):
                 return
             
@@ -648,13 +662,15 @@ class InventoryWindow:
                 boxes,
                 loose_pieces,
                 user_id=self.current_user.id,
-                notes=comment
+                notes=comment,
+                dc_number=dc_number or None,
             )
             
             messagebox.showinfo("Success", f"Stock removed successfully for {selected_product.name}!\nReason: {comment}")
             self.stock_out_boxes_entry.delete(0, tk.END)
             self.stock_out_pieces_entry.delete(0, tk.END)
             self.stock_out_comment_entry.delete(0, tk.END)
+            self.stock_out_dc_entry.delete(0, tk.END)
             self.selected_product_id = selected_product.id
             self.refresh_stock()
             

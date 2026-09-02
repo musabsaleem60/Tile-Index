@@ -164,7 +164,11 @@ class AccessoryWindow:
         self.stock_in_qty_entry = self.form_entry(stock_in_frame, width=160)
         self.stock_in_qty_entry.grid(row=1, column=1, pady=3, padx=8, sticky=tk.W)
 
-        self.action_button(stock_in_frame, "Add Stock", self.add_stock, width=160).grid(row=2, column=0, columnspan=2, pady=10)
+        self.form_label(stock_in_frame, "DC Number:").grid(row=2, column=0, sticky=tk.W, pady=3, padx=8)
+        self.stock_in_dc_entry = self.form_entry(stock_in_frame, width=160)
+        self.stock_in_dc_entry.grid(row=2, column=1, pady=3, padx=8, sticky=tk.W)
+
+        self.action_button(stock_in_frame, "Add Stock", self.add_stock, width=160).grid(row=3, column=0, columnspan=2, pady=10)
 
         stock_out_frame = self.subpanel(right_frame, "Stock OUT (Remove Stock)")
         stock_out_frame.grid(row=4, column=0, columnspan=2, sticky=tk.EW, pady=10, padx=12)
@@ -177,7 +181,11 @@ class AccessoryWindow:
         self.stock_out_reason_entry = self.form_entry(stock_out_frame, width=160)
         self.stock_out_reason_entry.grid(row=2, column=1, pady=3, padx=8, sticky=tk.W)
 
-        self.action_button(stock_out_frame, "Remove Stock", self.remove_stock, width=160, danger=True).grid(row=3, column=0, columnspan=2, pady=10)
+        self.form_label(stock_out_frame, "DC Number:").grid(row=3, column=0, sticky=tk.W, pady=3, padx=8)
+        self.stock_out_dc_entry = self.form_entry(stock_out_frame, width=160)
+        self.stock_out_dc_entry.grid(row=3, column=1, pady=3, padx=8, sticky=tk.W)
+
+        self.action_button(stock_out_frame, "Remove Stock", self.remove_stock, width=160, danger=True).grid(row=4, column=0, columnspan=2, pady=10)
 
         stock_display_frame = self.subpanel(right_frame, "Current Stock")
         stock_display_frame.grid(row=5, column=0, columnspan=2, sticky=tk.NSEW, pady=10, padx=12)
@@ -509,19 +517,17 @@ class AccessoryWindow:
             
             if quantity <= 0:
                 raise ValueError("Quantity must be positive")
-
-            reason = self.stock_out_reason_entry.get().strip()
-            if len(reason) < 5:
-                raise ValueError("Please enter a reason for removing stock.")
+            dc_number = self.stock_in_dc_entry.get().strip()
             
             if not AuthenticationService.can_access_branch(self.current_user, self.selected_branch_id):
                 raise ValueError("You do not have access to this branch")
             
-            AccessoryService.add_stock(self.selected_branch_id, accessory.id, quantity)
+            AccessoryService.add_stock(self.selected_branch_id, accessory.id, quantity, dc_number=dc_number or None)
             label = accessory_display_label(accessory)
             messagebox.showinfo("Success", f"Added {quantity} units of {accessory.category} - {label} to stock!")
             
             self.stock_in_qty_entry.delete(0, tk.END)
+            self.stock_in_dc_entry.delete(0, tk.END)
             self.refresh_stock()
             
         except Exception as e:
@@ -554,9 +560,13 @@ class AccessoryWindow:
             
             if quantity <= 0:
                 raise ValueError("Quantity must be positive")
+            reason = self.stock_out_reason_entry.get().strip()
+            if len(reason) < 5:
+                raise ValueError("Please enter a reason for removing stock.")
             
             if not AuthenticationService.can_access_branch(self.current_user, self.selected_branch_id):
                 raise ValueError("You do not have access to this branch")
+            dc_number = self.stock_out_dc_entry.get().strip()
             
             # Check stock
             inv = AccessoryService.get_inventory(self.selected_branch_id, accessory.id)
@@ -569,16 +579,18 @@ class AccessoryWindow:
             confirm = messagebox.askyesno(
                 "Confirm Stock OUT",
                 f"Remove {quantity} units of {accessory.category} - {label}?\n\nReason: {reason}"
+                + (f"\nDC Number: {dc_number}" if dc_number else "")
             )
             
             if not confirm:
                 return
             
-            AccessoryService.deduct_stock(self.selected_branch_id, accessory.id, quantity, notes=reason)
+            AccessoryService.deduct_stock(self.selected_branch_id, accessory.id, quantity, notes=reason, dc_number=dc_number or None)
             messagebox.showinfo("Success", f"Removed {quantity} units of {accessory.category} - {label} from stock!\nReason: {reason}")
             
             self.stock_out_qty_entry.delete(0, tk.END)
             self.stock_out_reason_entry.delete(0, tk.END)
+            self.stock_out_dc_entry.delete(0, tk.END)
             self.refresh_stock()
             
         except Exception as e:

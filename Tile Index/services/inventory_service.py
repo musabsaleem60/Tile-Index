@@ -29,7 +29,7 @@ class InventoryService:
         return InventoryRepository.get_all_by_branch(branch_id)
     
     @staticmethod
-    def add_stock(branch_id, product_id, grade, boxes, loose_pieces, rate_per_sqm, rate_per_box, rate_per_piece, user_id=None):
+    def add_stock(branch_id, product_id, grade, boxes, loose_pieces, rate_per_sqm, rate_per_box, rate_per_piece, user_id=None, dc_number=None):
         """Add stock to inventory (Stock IN)"""
         if is_api_authenticated():
             data = api_client.post("/inventory/tiles/stock-in", {
@@ -42,6 +42,7 @@ class InventoryService:
                 "rate_per_box": rate_per_box,
                 "rate_per_piece": rate_per_piece,
                 "notes": "Desktop stock in",
+                "dc_number": dc_number,
             })
             return Inventory(
                 id=data["id"],
@@ -99,7 +100,8 @@ class InventoryService:
                 boxes=boxes,
                 loose_pieces=loose_pieces,
                 transaction_date=datetime.now(),
-                notes=f"Stock IN - Rate: Rs.{rate_per_box}/box, Rs.{rate_per_piece}/piece"
+                notes=f"Stock IN - Rate: Rs.{rate_per_box}/box, Rs.{rate_per_piece}/piece",
+                dc_number=dc_number,
             )
             StockTransactionRepository.create(transaction)
             
@@ -110,14 +112,14 @@ class InventoryService:
                 if user:
                     product = ProductRepository.get_by_id(product_id)
                     product_name = product.name if product else f"Product {product_id}"
-                    ActivityLogService.log_stock_in(user, branch_id, product_name, grade, boxes, loose_pieces)
+                    ActivityLogService.log_stock_in(user, branch_id, product_name, grade, boxes, loose_pieces, dc_number=dc_number)
             except:
                 pass  # Don't fail if logging fails
         
         return inventory
     
     @staticmethod
-    def deduct_stock(branch_id, product_id, grade, boxes, loose_pieces, user_id=None, notes=None):
+    def deduct_stock(branch_id, product_id, grade, boxes, loose_pieces, user_id=None, notes=None, dc_number=None):
         """Deduct stock from inventory (Stock OUT)"""
         if is_api_authenticated():
             data = api_client.post("/inventory/tiles/stock-out", {
@@ -130,6 +132,7 @@ class InventoryService:
                 "rate_per_box": 0,
                 "rate_per_piece": 0,
                 "notes": notes or "Desktop stock out",
+                "dc_number": dc_number,
             })
             return Inventory(
                 id=data["id"],
@@ -182,7 +185,8 @@ class InventoryService:
                 boxes=boxes,
                 loose_pieces=loose_pieces,
                 transaction_date=datetime.now(),
-                notes=notes or "Stock OUT"
+                notes=notes or "Stock OUT",
+                dc_number=dc_number,
             )
             StockTransactionRepository.create(transaction)
             
@@ -193,7 +197,7 @@ class InventoryService:
                 if user:
                     product = ProductRepository.get_by_id(product_id)
                     product_name = product.name if product else f"Product {product_id}"
-                    ActivityLogService.log_stock_out(user, branch_id, product_name, grade, boxes, loose_pieces, notes)
+                    ActivityLogService.log_stock_out(user, branch_id, product_name, grade, boxes, loose_pieces, notes, dc_number=dc_number)
             except:
                 pass  # Don't fail if logging fails
         

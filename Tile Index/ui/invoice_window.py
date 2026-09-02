@@ -165,8 +165,8 @@ class InvoiceWindow:
         self.stock_info_label = ctk.CTkLabel(
             item_frame,
             text="",
-            font=FONTS["status"],
-            text_color=COLORS["primary"],
+            font=FONTS["stock_summary"],
+            text_color=COLORS["primary_hover"],
             wraplength=300,
             height=SIZES["small_label_height"],
         )

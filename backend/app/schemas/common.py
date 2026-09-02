@@ -103,12 +103,14 @@ class StockInRequest(BaseModel):
     rate_per_box: float = Field(ge=0)
     rate_per_piece: float = Field(ge=0)
     notes: str | None = None
+    dc_number: str | None = Field(default=None, max_length=80)
 
 
 class SimpleQuantityRequest(BaseModel):
     branch_id: int
     quantity: int = Field(gt=0)
     notes: str | None = None
+    dc_number: str | None = Field(default=None, max_length=80)
 
 
 class InventoryOut(ORMModel):

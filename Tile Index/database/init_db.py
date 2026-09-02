@@ -183,6 +183,7 @@ def init_database():
             loose_pieces INTEGER NOT NULL DEFAULT 0,
             transaction_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             notes TEXT,
+            dc_number TEXT,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
             FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
@@ -258,6 +259,16 @@ def init_database():
     except sqlite3.OperationalError:
         # Column already exists, skip
         pass
+
+    # Add dc_number to existing local SQLite stock transaction tables.
+    # CREATE TABLE IF NOT EXISTS does not update already-created tables.
+    try:
+        cursor.execute("PRAGMA table_info(stock_transactions)")
+        columns = [col[1] for col in cursor.fetchall()]
+        if 'dc_number' not in columns:
+            cursor.execute("ALTER TABLE stock_transactions ADD COLUMN dc_number TEXT")
+    except sqlite3.OperationalError:
+        pass
     
     # Create indexes for better performance
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventory_branch_product_grade ON inventory(branch_id, product_id, grade)")
@@ -268,6 +279,7 @@ def init_database():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_stock_transactions_user ON stock_transactions(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_stock_transactions_date ON stock_transactions(transaction_date)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_stock_transactions_dc_number ON stock_transactions(dc_number)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_user ON invoices(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_activity_log_user ON activity_log(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_activity_log_date ON activity_log(action_date)")

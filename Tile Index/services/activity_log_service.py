@@ -75,26 +75,28 @@ class ActivityLogService:
             print(f"Failed to log activity: {e}")
     
     @staticmethod
-    def log_stock_in(user, branch_id, product_name, grade, boxes, loose_pieces, notes=None):
+    def log_stock_in(user, branch_id, product_name, grade, boxes, loose_pieces, notes=None, dc_number=None):
         """Log Stock IN activity"""
         details = {
             'product': product_name,
             'grade': grade,
             'boxes': boxes,
             'loose_pieces': loose_pieces,
-            'notes': notes or ''
+            'notes': notes or '',
+            'dc_number': dc_number or ''
         }
         ActivityLogService.log_activity(user, ActivityLogService.ACTION_STOCK_IN, details, branch_id)
     
     @staticmethod
-    def log_stock_out(user, branch_id, product_name, grade, boxes, loose_pieces, reason=None):
+    def log_stock_out(user, branch_id, product_name, grade, boxes, loose_pieces, reason=None, dc_number=None):
         """Log Stock OUT activity"""
         details = {
             'product': product_name,
             'grade': grade,
             'boxes': boxes,
             'loose_pieces': loose_pieces,
-            'reason': reason or ''
+            'reason': reason or '',
+            'dc_number': dc_number or ''
         }
         ActivityLogService.log_activity(user, ActivityLogService.ACTION_STOCK_OUT, details, branch_id)
     

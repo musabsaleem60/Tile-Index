@@ -12,6 +12,8 @@ from repositories.sanitary_repository import SanitaryInventoryRepository
 from repositories.sanitary_repository import SanitaryProductRepository
 from services.invoice_service import InvoiceService
 from desktop_client.remote_state import is_api_authenticated
+from desktop_client.session import api_client
+from desktop_client.api_client import ApiClientError
 
 
 class ReportService:
@@ -24,29 +26,25 @@ class ReportService:
             if not date:
                 date = datetime.now().date()
             date_str = str(date)
-            invoices = [
-                inv for inv in InvoiceService.search_invoices(branch_id=branch_id, date_from=date_str, date_to=date_str)
-                if getattr(inv, 'status', 'active') == 'active'
-            ]
-            return {
-                'date': date,
-                'branch_id': branch_id,
-                'total_invoices': len(invoices),
-                'total_sales': sum(inv.grand_total for inv in invoices),
-                'total_paid': sum(inv.paid_amount for inv in invoices),
-                'total_balance': sum(inv.balance for inv in invoices),
-                'invoices': [
+            data = api_client.get(f"/reports/daily-sales/{branch_id}?report_date={date_str}")
+            if "invoices" not in data:
+                invoices = [
+                    inv for inv in InvoiceService.search_invoices(branch_id=branch_id, date_from=date_str, date_to=date_str)
+                    if getattr(inv, 'status', 'active') == 'active'
+                ]
+                data = dict(data)
+                data["invoices"] = [
                     {
-                        'invoice_number': inv.invoice_number,
-                        'customer_name': inv.customer_name,
-                        'invoice_date': inv.invoice_date,
-                        'grand_total': inv.grand_total,
-                        'paid_amount': inv.paid_amount,
-                        'balance': inv.balance
+                        "invoice_number": inv.invoice_number,
+                        "customer_name": inv.customer_name,
+                        "invoice_date": inv.invoice_date,
+                        "grand_total": inv.grand_total,
+                        "paid_amount": inv.paid_amount,
+                        "balance": inv.balance,
                     }
                     for inv in invoices
                 ]
-            }
+            return data
 
         if not date:
             date = datetime.now().date()
@@ -97,6 +95,11 @@ class ReportService:
     @staticmethod
     def get_branch_stock_report(branch_id):
         """Get complete stock report for a branch"""
+        if is_api_authenticated():
+            data = api_client.get(f"/reports/stock/{branch_id}")
+            if "items" in data or "sanitary_items" in data:
+                return data
+
         inventory_list = InventoryRepository.get_all_by_branch(branch_id)
         products = {p.id: p for p in ProductRepository.get_all()}
         sanitary_products = {p.id: p for p in SanitaryProductRepository.get_all()} if is_api_authenticated() else {}
@@ -113,9 +116,11 @@ class ReportService:
             total_pieces = (inv.boxes * product.pieces_per_box) + inv.loose_pieces
             total_area = (inv.boxes * product.area_per_box) + (inv.loose_pieces * product.area_per_box / product.pieces_per_box)
             
-            # Calculate stock value (using rate per box and rate per piece)
-            stock_value = (inv.boxes * inv.rate_per_box) + (inv.loose_pieces * inv.rate_per_piece)
-            total_value += stock_value
+            price = ReportService._resolve_local_tile_price(product, inv.grade)
+            stock_value = None
+            if price:
+                stock_value = (inv.boxes * price["rate_per_box"]) + (inv.loose_pieces * price["rate_per_piece"])
+                total_value += stock_value
             
             report_data.append({
                 'product_id': product.id,
@@ -126,9 +131,10 @@ class ReportService:
                 'loose_pieces': inv.loose_pieces,
                 'total_pieces': total_pieces,
                 'total_area': total_area,
-                'rate_per_box': inv.rate_per_box,
-                'rate_per_piece': inv.rate_per_piece,
-                'stock_value': stock_value
+                'rate_per_box': price["rate_per_box"] if price else None,
+                'rate_per_piece': price["rate_per_piece"] if price else None,
+                'stock_value': stock_value,
+                'value_display': f"Rs. {stock_value:.2f}" if price else "No Rate Set"
             })
 
         sanitary_inventory = SanitaryInventoryRepository.get_all_by_branch(branch_id)
@@ -173,6 +179,11 @@ class ReportService:
     @staticmethod
     def get_complete_business_stock_report():
         """Get complete business stock report for all branches"""
+        if is_api_authenticated():
+            data = api_client.get("/reports/business-stock")
+            if "branches" in data:
+                return data
+
         from repositories.branch_repository import BranchRepository
         
         branches = BranchRepository.get_all()
@@ -203,9 +214,11 @@ class ReportService:
                 total_pieces = (inv.boxes * product.pieces_per_box) + inv.loose_pieces
                 total_area = (inv.boxes * product.area_per_box) + (inv.loose_pieces * product.area_per_box / product.pieces_per_box)
                 
-                # Calculate stock value
-                stock_value = (inv.boxes * inv.rate_per_box) + (inv.loose_pieces * inv.rate_per_piece)
-                branch_total_value += stock_value
+                price = ReportService._resolve_local_tile_price(product, inv.grade)
+                stock_value = None
+                if price:
+                    stock_value = (inv.boxes * price["rate_per_box"]) + (inv.loose_pieces * price["rate_per_piece"])
+                    branch_total_value += stock_value
                 
                 branch_items.append({
                     'product_id': product.id,
@@ -216,9 +229,10 @@ class ReportService:
                     'loose_pieces': inv.loose_pieces,
                     'total_pieces': total_pieces,
                     'total_area': total_area,
-                    'rate_per_box': inv.rate_per_box,
-                    'rate_per_piece': inv.rate_per_piece,
-                    'stock_value': stock_value
+                    'rate_per_box': price["rate_per_box"] if price else None,
+                    'rate_per_piece': price["rate_per_piece"] if price else None,
+                    'stock_value': stock_value,
+                    'value_display': f"Rs. {stock_value:.2f}" if price else "No Rate Set"
                 })
 
             for inv in sanitary_inventory:
@@ -258,4 +272,81 @@ class ReportService:
             report_data['total_sanitary_products'] += len(sanitary_items)
         
         return report_data
+
+    @staticmethod
+    def get_monthly_sales_report(date_from, date_to, branch_id=None):
+        """Get monthly sales totals grouped by month and branch."""
+        if is_api_authenticated():
+            path = f"/reports/monthly-sales?date_from={date_from}&date_to={date_to}"
+            if branch_id:
+                path += f"&branch_id={branch_id}"
+            try:
+                return api_client.get(path)
+            except ApiClientError:
+                pass
+
+        invoices = [
+            inv for inv in InvoiceService.search_invoices(branch_id=branch_id, date_from=str(date_from), date_to=str(date_to))
+            if getattr(inv, 'status', 'active') == 'active'
+        ]
+        branches = {branch.id: branch for branch in BranchRepository.get_all()}
+        buckets = {}
+        for inv in invoices:
+            month = str(inv.invoice_date)[:7]
+            key = (month, inv.branch_id)
+            bucket = buckets.setdefault(key, {
+                "month": month,
+                "branch_id": inv.branch_id,
+                "branch_name": branches.get(inv.branch_id).name if branches.get(inv.branch_id) else f"Branch {inv.branch_id}",
+                "invoice_count": 0,
+                "total_sales": 0,
+                "total_paid": 0,
+                "total_balance": 0,
+            })
+            bucket["invoice_count"] += 1
+            bucket["total_sales"] += inv.grand_total
+            bucket["total_paid"] += inv.paid_amount
+            bucket["total_balance"] += inv.balance
+
+        items = [buckets[key] for key in sorted(buckets)]
+        return {
+            "date_from": str(date_from),
+            "date_to": str(date_to),
+            "branch_id": branch_id,
+            "items": items,
+            "total_invoices": sum(item["invoice_count"] for item in items),
+            "total_sales": sum(item["total_sales"] for item in items),
+            "total_paid": sum(item["total_paid"] for item in items),
+            "total_balance": sum(item["total_balance"] for item in items),
+        }
+
+    @staticmethod
+    def _resolve_local_tile_price(product, grade):
+        conn = get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "SELECT rate_per_meter FROM product_rate_overrides WHERE product_id = ? AND grade = ? AND COALESCE(active, 1) = 1",
+                (product.id, grade),
+            )
+            row = cursor.fetchone()
+            if not row:
+                cursor.execute(
+                    "SELECT rate_per_meter FROM tile_rates WHERE tile_size = ? AND grade = ? AND COALESCE(active, 1) = 1",
+                    (product.tile_size, grade),
+                )
+                row = cursor.fetchone()
+            if not row:
+                return None
+            rate_per_sqm = float(row[0])
+            rate_per_box = rate_per_sqm * float(product.area_per_box)
+            return {
+                "rate_per_sqm": rate_per_sqm,
+                "rate_per_box": rate_per_box,
+                "rate_per_piece": rate_per_box / int(product.pieces_per_box),
+            }
+        except Exception:
+            return None
+        finally:
+            conn.close()
 

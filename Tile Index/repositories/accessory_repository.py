@@ -245,13 +245,14 @@ class AccessoryInventoryRepository:
         return result
     
     @staticmethod
-    def add_stock(branch_id, accessory_id, quantity_to_add):
+    def add_stock(branch_id, accessory_id, quantity_to_add, dc_number=None):
         """Add stock quantity"""
         if is_api_authenticated():
             data = api_client.post(f"/inventory/accessories/{accessory_id}/stock-in", {
                 "branch_id": branch_id,
                 "quantity": quantity_to_add,
                 "notes": "Desktop accessory stock in",
+                "dc_number": dc_number,
             })
             return AccessoryInventory(id=data["id"], branch_id=data["branch_id"],
                                       accessory_id=data["accessory_id"], quantity=data["quantity"],
@@ -263,13 +264,14 @@ class AccessoryInventoryRepository:
         return AccessoryInventoryRepository.create_or_update(branch_id, accessory_id, new_qty)
     
     @staticmethod
-    def deduct_stock(branch_id, accessory_id, quantity_to_deduct, notes=None):
+    def deduct_stock(branch_id, accessory_id, quantity_to_deduct, notes=None, dc_number=None):
         """Deduct stock quantity"""
         if is_api_authenticated():
             data = api_client.post(f"/inventory/accessories/{accessory_id}/stock-out", {
                 "branch_id": branch_id,
                 "quantity": quantity_to_deduct,
                 "notes": notes,
+                "dc_number": dc_number,
             })
             return AccessoryInventory(id=data["id"], branch_id=data["branch_id"],
                                       accessory_id=data["accessory_id"], quantity=data["quantity"],
