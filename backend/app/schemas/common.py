@@ -177,6 +177,7 @@ class InvoiceItemOut(ORMModel):
     boxes: int
     loose_pieces: int
     quantity: int
+    rate_per_sqm: float
     rate_per_box: float
     rate_per_piece: float
     unit_price: float
