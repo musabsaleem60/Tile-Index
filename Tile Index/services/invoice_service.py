@@ -25,7 +25,7 @@ class InvoiceService:
     """Service for invoice operations"""
     
     @staticmethod
-    def create_invoice(branch_id, customer_name, customer_contact, items_data, discount=0, paid_amount=0, user_id=None):
+    def create_invoice(branch_id, customer_name, customer_contact, items_data, discount=0, paid_amount=0, user_id=None, remarks=None):
         """
         Create a new invoice with items and update inventory
         
@@ -69,6 +69,7 @@ class InvoiceService:
                 "customer_contact": customer_contact,
                 "discount": discount,
                 "paid_amount": paid_amount,
+                "remarks": remarks,
                 "items": api_items,
             })
             return InvoiceService._invoice_from_api(data)
@@ -95,6 +96,7 @@ class InvoiceService:
             discount=discount,
             paid_amount=paid_amount
         )
+        invoice.remarks = remarks.strip() if remarks else None
         
         # Store user_id if provided (will be set in repository)
         if user_id:
@@ -310,6 +312,17 @@ class InvoiceService:
         if not is_api_authenticated():
             return []
         return api_client.get(f"/invoices/{invoice_id}/payments") or []
+
+    @staticmethod
+    def update_remarks(invoice_id, remarks):
+        """Update invoice-level remarks without changing invoice items or totals."""
+        if not is_api_authenticated():
+            invoice = InvoiceRepository.update_remarks(invoice_id, remarks)
+            if not invoice:
+                raise ValueError("Invoice not found")
+            return invoice
+        data = api_client.patch(f"/invoices/{invoice_id}/remarks", {"remarks": remarks})
+        return InvoiceService._invoice_from_api(data)
     
     @staticmethod
     def search_invoices(branch_id=None, invoice_number=None, customer_name=None, date_from=None, date_to=None):
@@ -346,6 +359,7 @@ class InvoiceService:
             grand_total=data.get("grand_total", 0),
             paid_amount=data.get("paid_amount", 0),
             balance=data.get("balance", 0),
+            remarks=data.get("remarks"),
             user_id=data.get("user_id"),
             status=data.get("status", "active"),
             voided_at=data.get("voided_at"),

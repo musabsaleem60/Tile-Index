@@ -29,6 +29,9 @@ class ApiClient:
     def put(self, path: str, payload: dict):
         return self._request("PUT", path, payload)
 
+    def patch(self, path: str, payload: dict):
+        return self._request("PATCH", path, payload)
+
     def delete(self, path: str):
         return self._request("DELETE", path)
 
@@ -36,6 +39,7 @@ class ApiClient:
         body = None
         headers = {"Accept": "application/json"}
         debug_payment_request = method == "POST" and path.endswith("/payments")
+        debug_remarks_request = method == "PATCH" and path.endswith("/remarks")
         if payload is not None:
             body = json.dumps(payload).encode("utf-8")
             headers["Content-Type"] = "application/json"
@@ -50,16 +54,22 @@ class ApiClient:
         )
         if debug_payment_request:
             print(f"[payment-debug] request {method} {self.base_url}{path} payload={payload}")
+        if debug_remarks_request:
+            print(f"[remarks-debug] request {method} {self.base_url}{path} payload={payload}")
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 data = response.read().decode("utf-8")
                 if debug_payment_request:
                     print(f"[payment-debug] response {response.status} body={data}")
+                if debug_remarks_request:
+                    print(f"[remarks-debug] response {response.status} body={data}")
                 return json.loads(data) if data else None
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8")
             if debug_payment_request:
                 print(f"[payment-debug] response {exc.code} body={detail}")
+            if debug_remarks_request:
+                print(f"[remarks-debug] response {exc.code} body={detail}")
             try:
                 parsed = json.loads(detail)
                 parsed_detail = parsed.get("detail")

@@ -267,6 +267,7 @@ class Invoice(Base):
     grand_total: Mapped[float] = mapped_column(Float, default=0, nullable=False)
     paid_amount: Mapped[float] = mapped_column(Float, default=0, nullable=False)
     balance: Mapped[float] = mapped_column(Float, default=0, nullable=False)
+    remarks: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
     voided_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
     voided_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))

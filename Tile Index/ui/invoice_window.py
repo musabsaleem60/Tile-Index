@@ -114,10 +114,22 @@ class InvoiceWindow:
         self.form_label(left_frame, "Date:").grid(row=4, column=0, sticky=tk.W, pady=5, padx=(12, 0))
         date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.form_label(left_frame, date_str, muted=True).grid(row=4, column=1, sticky=tk.W, pady=5, padx=(5, 12))
+
+        self.form_label(left_frame, "Remarks:").grid(row=5, column=0, sticky=tk.NW, pady=5, padx=(12, 0))
+        self.remarks_text = ctk.CTkTextbox(
+            left_frame,
+            height=72,
+            font=FONTS["small"],
+            fg_color=COLORS["app_bg"],
+            border_color=COLORS["border"],
+            text_color=COLORS["text"],
+            border_width=1,
+        )
+        self.remarks_text.grid(row=5, column=1, pady=5, padx=(5, 12), sticky=tk.EW)
         
         # Add Item section
         item_frame = self.create_subpanel(left_frame, "Add Item")
-        item_frame.grid(row=5, column=0, columnspan=2, sticky=tk.EW, pady=10, padx=12)
+        item_frame.grid(row=6, column=0, columnspan=2, sticky=tk.EW, pady=10, padx=12)
         
         self.form_label(item_frame, "Item Type:").grid(row=1, column=0, sticky=tk.W, pady=3, padx=8)
         self.item_type_var = tk.StringVar(value="Tiles")
@@ -176,7 +188,7 @@ class InvoiceWindow:
         
         # Totals section
         totals_frame = self.create_subpanel(left_frame, "Totals")
-        totals_frame.grid(row=6, column=0, columnspan=2, sticky=tk.EW, pady=10, padx=12)
+        totals_frame.grid(row=7, column=0, columnspan=2, sticky=tk.EW, pady=10, padx=12)
         
         self.form_label(totals_frame, "Sub Total:").grid(row=1, column=0, sticky=tk.W, pady=3, padx=8)
         self.subtotal_label = self.value_label(totals_frame, "Rs. 0.00", COLORS["primary"])
@@ -204,7 +216,7 @@ class InvoiceWindow:
         
         # Action buttons
         btn_frame = ctk.CTkFrame(left_frame, fg_color="transparent", corner_radius=0)
-        btn_frame.grid(row=7, column=0, columnspan=2, pady=10)
+        btn_frame.grid(row=8, column=0, columnspan=2, pady=10)
         
         self.action_button(btn_frame, "Generate Invoice", self.generate_invoice, width=140).pack(side=tk.LEFT, padx=5)
         self.action_button(btn_frame, "Clear All", self.clear_invoice, width=120, primary=False).pack(side=tk.LEFT, padx=5)
@@ -708,6 +720,7 @@ class InvoiceWindow:
             
             customer_name = validate_required(self.customer_name_entry.get(), "Customer Name")
             customer_contact = self.customer_contact_entry.get().strip() or None
+            remarks = self.remarks_text.get("1.0", tk.END).strip() or None
             
             if len(self.invoice_items) == 0:
                 raise ValueError("Please add at least one item to the invoice")
@@ -750,7 +763,8 @@ class InvoiceWindow:
                 items_data,
                 discount,
                 paid_amount,
-                user_id=self.current_user.id
+                user_id=self.current_user.id,
+                remarks=remarks,
             )
             
             messagebox.showinfo("Success", f"Invoice generated successfully!\nInvoice Number: {invoice.invoice_number}")
@@ -768,6 +782,7 @@ class InvoiceWindow:
         """Clear invoice form"""
         self.customer_name_entry.delete(0, tk.END)
         self.customer_contact_entry.delete(0, tk.END)
+        self.remarks_text.delete("1.0", tk.END)
         self.item_type_var.set("Tiles")
         self.on_item_type_change(None)
         self.product_var.set("")

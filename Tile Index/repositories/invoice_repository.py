@@ -70,21 +70,22 @@ class InvoiceRepository:
             try:
                 cursor.execute("""
                     INSERT INTO invoices (branch_id, invoice_number, customer_name, customer_contact,
-                                        invoice_date, subtotal, discount, grand_total, paid_amount, balance, user_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                        invoice_date, subtotal, discount, grand_total, paid_amount, balance, user_id, remarks)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (invoice.branch_id, invoice.invoice_number, invoice.customer_name,
                       invoice.customer_contact, invoice.invoice_date, invoice.subtotal,
                       invoice.discount, invoice.grand_total, invoice.paid_amount, invoice.balance,
-                      getattr(invoice, 'user_id', None)))
+                      getattr(invoice, 'user_id', None), getattr(invoice, 'remarks', None)))
             except sqlite3.OperationalError:
                 # user_id column doesn't exist yet, insert without it
                 cursor.execute("""
                     INSERT INTO invoices (branch_id, invoice_number, customer_name, customer_contact,
-                                        invoice_date, subtotal, discount, grand_total, paid_amount, balance)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                        invoice_date, subtotal, discount, grand_total, paid_amount, balance, remarks)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (invoice.branch_id, invoice.invoice_number, invoice.customer_name,
                       invoice.customer_contact, invoice.invoice_date, invoice.subtotal,
-                      invoice.discount, invoice.grand_total, invoice.paid_amount, invoice.balance))
+                      invoice.discount, invoice.grand_total, invoice.paid_amount, invoice.balance,
+                      getattr(invoice, 'remarks', None)))
             
             invoice.id = cursor.lastrowid
             
@@ -125,13 +126,13 @@ class InvoiceRepository:
             if has_user_id:
                 cursor.execute("""
                     SELECT id, branch_id, invoice_number, customer_name, customer_contact,
-                           invoice_date, subtotal, discount, grand_total, paid_amount, balance, created_at, user_id
+                           invoice_date, subtotal, discount, grand_total, paid_amount, balance, remarks, created_at, user_id
                     FROM invoices WHERE id = ?
                 """, (invoice_id,))
             else:
                 cursor.execute("""
                     SELECT id, branch_id, invoice_number, customer_name, customer_contact,
-                           invoice_date, subtotal, discount, grand_total, paid_amount, balance, created_at
+                           invoice_date, subtotal, discount, grand_total, paid_amount, balance, remarks, created_at
                     FROM invoices WHERE id = ?
                 """, (invoice_id,))
             
@@ -144,12 +145,14 @@ class InvoiceRepository:
                 invoice = Invoice(id=row[0], branch_id=row[1], invoice_number=row[2],
                                  customer_name=row[3], customer_contact=row[4], invoice_date=row[5],
                                  subtotal=row[6], discount=row[7], grand_total=row[8],
-                                 paid_amount=row[9], balance=row[10], created_at=row[11], user_id=row[12])
+                                 paid_amount=row[9], balance=row[10], remarks=row[11],
+                                 created_at=row[12], user_id=row[13])
             else:
                 invoice = Invoice(id=row[0], branch_id=row[1], invoice_number=row[2],
                                  customer_name=row[3], customer_contact=row[4], invoice_date=row[5],
                                  subtotal=row[6], discount=row[7], grand_total=row[8],
-                                 paid_amount=row[9], balance=row[10], created_at=row[11], user_id=None)
+                                 paid_amount=row[9], balance=row[10], remarks=row[11],
+                                 created_at=row[12], user_id=None)
             
             # Get invoice items
             cursor.execute("""
@@ -197,7 +200,7 @@ class InvoiceRepository:
         conn = get_connection()
         cursor = conn.cursor()
         
-        query = "SELECT id, branch_id, invoice_number, customer_name, customer_contact, invoice_date, subtotal, discount, grand_total, paid_amount, balance, created_at FROM invoices WHERE 1=1"
+        query = "SELECT id, branch_id, invoice_number, customer_name, customer_contact, invoice_date, subtotal, discount, grand_total, paid_amount, balance, remarks, created_at FROM invoices WHERE 1=1"
         params = []
         
         if branch_id:
@@ -229,5 +232,25 @@ class InvoiceRepository:
         return [Invoice(id=r[0], branch_id=r[1], invoice_number=r[2], customer_name=r[3],
                        customer_contact=r[4], invoice_date=r[5], subtotal=r[6],
                        discount=r[7], grand_total=r[8], paid_amount=r[9],
-                       balance=r[10], created_at=r[11]) for r in rows]
+                       balance=r[10], remarks=r[11], created_at=r[12]) for r in rows]
+
+    @staticmethod
+    def update_remarks(invoice_id, remarks):
+        """Update invoice-level remarks only."""
+        conn = get_connection()
+        cursor = conn.cursor()
+        clean_remarks = remarks.strip() if remarks else None
+        try:
+            cursor.execute("UPDATE invoices SET remarks = ? WHERE id = ?", (clean_remarks, invoice_id))
+            if cursor.rowcount == 0:
+                conn.rollback()
+                conn.close()
+                return None
+            conn.commit()
+            conn.close()
+            return InvoiceRepository.get_by_id(invoice_id)
+        except Exception as e:
+            conn.rollback()
+            conn.close()
+            raise e
 

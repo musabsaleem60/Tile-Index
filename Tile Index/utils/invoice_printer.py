@@ -317,6 +317,26 @@ class InvoicePrintWindow:
                     bg="white",
                     anchor=tk.W,
                 ).pack(anchor=tk.W)
+
+        if getattr(self.invoice, "remarks", None):
+            remarks_frame = tk.Frame(parent, bg="white")
+            remarks_frame.pack(fill=tk.X, pady=(0, 12))
+            tk.Label(
+                remarks_frame,
+                text="Remarks",
+                font=("Arial", 11, "bold"),
+                bg="white",
+                anchor=tk.W,
+            ).pack(anchor=tk.W, pady=(0, 4))
+            tk.Label(
+                remarks_frame,
+                text=self.invoice.remarks,
+                font=("Arial", 10),
+                bg="white",
+                anchor=tk.W,
+                justify=tk.LEFT,
+                wraplength=760,
+            ).pack(anchor=tk.W, fill=tk.X)
         
         # Footer
         tk.Frame(parent, height=2, bg="#34495e").pack(fill=tk.X, pady=20)
@@ -536,6 +556,13 @@ class InvoicePrintWindow:
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
             ]))
             story.extend([Paragraph("<b>Payment History</b>", normal_bold), payments_table, Spacer(1, 10)])
+
+        if getattr(self.invoice, "remarks", None):
+            story.extend([
+                Paragraph("<b>Remarks</b>", normal_bold),
+                Paragraph(self.escape_text(self.invoice.remarks), normal),
+                Spacer(1, 10),
+            ])
 
         story.append(Paragraph("Thank you for your business!", subtitle_style))
         story.append(Paragraph("Tile Index - Quality Tiles, Trusted Service", subtitle_style))

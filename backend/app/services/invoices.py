@@ -41,6 +41,7 @@ def create_invoice(db: Session, payload: InvoiceCreate, user: User) -> Invoice:
         customer_contact=payload.customer_contact.strip() if payload.customer_contact else None,
         discount=payload.discount,
         paid_amount=payload.paid_amount,
+        remarks=payload.remarks.strip() if payload.remarks else None,
     )
 
     subtotal = 0.0

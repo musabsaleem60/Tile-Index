@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.deps import ensure_branch_access, get_current_user
 from app.db.session import get_db
 from app.models.entities import Invoice, InvoicePayment, User
-from app.schemas.common import InvoiceCreate, InvoiceOut, InvoicePaymentIn, InvoicePaymentOut, InvoiceVoidRequest
+from app.schemas.common import InvoiceCreate, InvoiceOut, InvoicePaymentIn, InvoicePaymentOut, InvoiceRemarksUpdate, InvoiceVoidRequest
 from app.services.invoices import create_invoice, record_invoice_payment, void_invoice
+from app.services.audit import write_audit_log
 
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
@@ -47,6 +48,36 @@ def create_payment(
     db.commit()
     db.refresh(updated_invoice)
     return updated_invoice
+
+
+@router.patch("/{invoice_id}/remarks", response_model=InvoiceOut)
+def update_remarks(
+    invoice_id: int,
+    payload: InvoiceRemarksUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    invoice = db.scalar(select(Invoice).where(Invoice.id == invoice_id).options(selectinload(Invoice.items)))
+    if not invoice:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
+    ensure_branch_access(current_user, invoice.branch_id)
+
+    old_remarks = invoice.remarks
+    invoice.remarks = payload.remarks.strip() if payload.remarks else None
+    write_audit_log(
+        db,
+        current_user,
+        "Invoice Remarks Updated",
+        {
+            "invoice_number": invoice.invoice_number,
+            "old_remarks": old_remarks,
+            "new_remarks": invoice.remarks,
+        },
+        invoice.branch_id,
+    )
+    db.commit()
+    db.refresh(invoice)
+    return invoice
 
 
 @router.get("/{invoice_id}/payments", response_model=list[InvoicePaymentOut])

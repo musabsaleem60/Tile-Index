@@ -13,7 +13,8 @@ class Invoice:
                  customer_name=None, customer_contact=None, invoice_date=None,
                  subtotal=0, discount=0, grand_total=0, paid_amount=0,
                  balance=0, created_at=None, user_id=None, status="active",
-                 voided_at=None, voided_by_user_id=None, void_reason=None):
+                 voided_at=None, voided_by_user_id=None, void_reason=None,
+                 remarks=None):
         self.id = id
         self.branch_id = branch_id
         self.invoice_number = invoice_number
@@ -25,6 +26,7 @@ class Invoice:
         self.grand_total = grand_total
         self.paid_amount = paid_amount
         self.balance = balance
+        self.remarks = remarks
         self.created_at = created_at
         self.user_id = user_id  # User who created the invoice
         self.status = status or "active"
@@ -51,6 +53,7 @@ class Invoice:
             'grand_total': self.grand_total,
             'paid_amount': self.paid_amount,
             'balance': self.balance,
+            'remarks': self.remarks,
             'status': self.status,
             'voided_at': self.voided_at,
             'voided_by_user_id': self.voided_by_user_id,
@@ -73,6 +76,7 @@ class Invoice:
             grand_total=data.get('grand_total', 0),
             paid_amount=data.get('paid_amount', 0),
             balance=data.get('balance', 0),
+            remarks=data.get('remarks'),
             created_at=data.get('created_at'),
             status=data.get('status', 'active'),
             voided_at=data.get('voided_at'),

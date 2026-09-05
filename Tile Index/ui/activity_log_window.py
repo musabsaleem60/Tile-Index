@@ -79,6 +79,7 @@ class ActivityLogWindow:
             "Accessory Stock IN",
             "Accessory Stock OUT",
             ActivityLogService.ACTION_INVOICE_CREATED,
+            "Invoice Remarks Updated",
             "Invoice Voided",
             "Cross-Branch Sale",
             ActivityLogService.ACTION_PRODUCT_ADDED,

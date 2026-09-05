@@ -160,6 +160,7 @@ class InvoiceCreate(BaseModel):
     customer_contact: str | None = None
     discount: float = Field(default=0, ge=0)
     paid_amount: float = Field(default=0, ge=0)
+    remarks: str | None = None
     items: list[InvoiceItemIn]
 
 
@@ -197,6 +198,7 @@ class InvoiceOut(ORMModel):
     grand_total: float
     paid_amount: float
     balance: float
+    remarks: str | None = None
     status: str = "active"
     voided_at: datetime | None = None
     voided_by_user_id: int | None = None
@@ -206,6 +208,10 @@ class InvoiceOut(ORMModel):
 
 class InvoiceVoidRequest(BaseModel):
     reason: str = Field(min_length=10, max_length=500)
+
+
+class InvoiceRemarksUpdate(BaseModel):
+    remarks: str | None = None
 
 
 class InvoicePaymentIn(BaseModel):

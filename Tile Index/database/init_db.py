@@ -81,6 +81,7 @@ def init_database():
             grand_total REAL NOT NULL DEFAULT 0,
             paid_amount REAL NOT NULL DEFAULT 0,
             balance REAL NOT NULL DEFAULT 0,
+            remarks TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
             UNIQUE(branch_id, invoice_number)
@@ -258,6 +259,15 @@ def init_database():
             # Foreign key will be enforced by application logic
     except sqlite3.OperationalError:
         # Column already exists, skip
+        pass
+
+    # Add remarks to existing local SQLite invoices tables.
+    try:
+        cursor.execute("PRAGMA table_info(invoices)")
+        columns = [col[1] for col in cursor.fetchall()]
+        if 'remarks' not in columns:
+            cursor.execute("ALTER TABLE invoices ADD COLUMN remarks TEXT")
+    except sqlite3.OperationalError:
         pass
 
     # Add dc_number to existing local SQLite stock transaction tables.

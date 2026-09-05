@@ -30,6 +30,12 @@ def format_activity_details(activity) -> str:
             f"Date: {data.get('payment_date')}" if data.get("payment_date") else None,
             f"Method: {data.get('method')}" if data.get("method") else None,
         ])
+    if action == "Invoice Remarks Updated":
+        return _join_sentences([
+            f"Remarks updated for invoice {data.get('invoice_number')}" if data.get("invoice_number") else "Invoice remarks updated",
+            f"Old: {data.get('old_remarks')}" if data.get("old_remarks") else "Old: empty",
+            f"New: {data.get('new_remarks')}" if data.get("new_remarks") else "New: empty",
+        ])
     if action == "Cross-Branch Sale":
         return _join_sentences([
             data.get("description"),

@@ -126,6 +126,7 @@ class InvoiceSearchWindow:
 
         self.action_button(btn_frame, "View/Print Invoice", self.view_invoice, width=190).pack(side=tk.LEFT, padx=5)
         self.action_button(btn_frame, "Record Payment", self.record_payment, width=170).pack(side=tk.LEFT, padx=5)
+        self.action_button(btn_frame, "Edit Remarks", self.edit_remarks, width=160).pack(side=tk.LEFT, padx=5)
         if getattr(self.current_user, 'role', '') == 'admin':
             self.void_button = self.action_button(btn_frame, "Void Invoice", self.void_invoice, width=170, danger=True)
             self.void_button.pack(side=tk.LEFT, padx=5)
@@ -389,6 +390,66 @@ class InvoiceSearchWindow:
         if parsed.tzinfo is None:
             return parsed.isoformat() + "+05:00"
         return parsed.isoformat()
+
+    def edit_remarks(self):
+        """Edit invoice-level remarks without changing items, totals, or payments."""
+        invoice_id = self.selected_invoice_id()
+        if not invoice_id:
+            messagebox.showwarning("Warning", "Please select an invoice to edit remarks")
+            return
+
+        try:
+            invoice = InvoiceService.get_invoice(invoice_id)
+        except Exception as exc:
+            messagebox.showerror("Edit Remarks", f"Failed to load invoice: {exc}")
+            return
+
+        dialog = ctk.CTkToplevel(self.parent)
+        dialog.title("Edit Remarks")
+        dialog.geometry("520x360")
+        dialog.resizable(False, False)
+        dialog.configure(fg_color=COLORS["app_bg"])
+        dialog.transient(self.parent.winfo_toplevel())
+        dialog.grab_set()
+
+        ctk.CTkLabel(
+            dialog,
+            text=f"{invoice.invoice_number} | Invoice Remarks",
+            font=FONTS["body_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["section_label_height"],
+        ).pack(fill=tk.X, padx=16, pady=(16, 8))
+
+        remarks_text = ctk.CTkTextbox(
+            dialog,
+            height=190,
+            font=FONTS["small"],
+            fg_color=COLORS["surface"],
+            border_color=COLORS["border"],
+            text_color=COLORS["text"],
+            border_width=1,
+        )
+        remarks_text.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 12))
+        if getattr(invoice, "remarks", None):
+            remarks_text.insert("1.0", invoice.remarks)
+
+        btn_frame = ctk.CTkFrame(dialog, fg_color="transparent", corner_radius=0)
+        btn_frame.pack(fill=tk.X, padx=16, pady=(0, 16))
+
+        def save_remarks():
+            try:
+                updated = InvoiceService.update_remarks(
+                    invoice_id,
+                    remarks_text.get("1.0", tk.END).strip() or None,
+                )
+                messagebox.showinfo("Remarks Updated", f"Remarks updated for invoice {updated.invoice_number}.")
+                dialog.destroy()
+                self.search_invoices()
+            except Exception as exc:
+                messagebox.showerror("Update Failed", str(exc))
+
+        self.action_button(btn_frame, "Save Remarks", save_remarks, width=150).pack(side=tk.LEFT, padx=(0, 8))
+        self.action_button(btn_frame, "Cancel", dialog.destroy, width=120, danger=False).pack(side=tk.LEFT)
 
     def void_invoice(self):
         """Void selected invoice."""
