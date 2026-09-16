@@ -98,6 +98,17 @@ class Product(Base):
     )
 
 
+class ProductClientCode(Base):
+    __tablename__ = "product_client_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    client_code: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    product = relationship("Product")
+
+
 class TileSize(Base):
     __tablename__ = "tile_sizes"
 
