@@ -138,16 +138,8 @@ class SanitaryWindow:
         action_frame = tk.Frame(left_frame)
         action_frame.grid(row=10, column=0, columnspan=2, pady=5)
 
-        if AuthenticationService.is_admin(self.current_user):
-            tk.Button(action_frame, text="Edit", command=self.edit_selected, bg="#f39c12", fg="white", width=12).pack(side=tk.LEFT, padx=5)
-            tk.Button(action_frame, text="Delete", command=self.delete_selected, bg="#e74c3c", fg="white", width=12).pack(side=tk.LEFT, padx=5)
-
-        if AuthenticationService.is_employee(self.current_user):
-            for row in range(7):
-                for widget in left_frame.grid_slaves(row=row):
-                    widget.grid_remove()
-            tk.Label(left_frame, text="Sanitary product management is restricted to administrators.",
-                    font=("Arial", 10), fg="red").grid(row=0, column=0, columnspan=2, pady=20)
+        tk.Button(action_frame, text="Edit", command=self.edit_selected, bg="#f39c12", fg="white", width=12).pack(side=tk.LEFT, padx=5)
+        tk.Button(action_frame, text="Delete", command=self.delete_selected, bg="#e74c3c", fg="white", width=12).pack(side=tk.LEFT, padx=5)
 
         right_frame = tk.LabelFrame(main_frame, text="Stock Management", font=("Arial", 12, "bold"), padx=10, pady=10)
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))

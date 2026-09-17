@@ -28,6 +28,9 @@ def void(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    invoice = db.get(Invoice, invoice_id)
+    if invoice:
+        ensure_branch_access(current_user, invoice.branch_id)
     invoice = void_invoice(db, invoice_id, payload.reason, current_user)
     db.commit()
     db.refresh(invoice)
@@ -108,8 +111,9 @@ def search_invoices(
     current_user: User = Depends(get_current_user),
 ):
     query = select(Invoice).options(selectinload(Invoice.items)).order_by(Invoice.invoice_date.desc(), Invoice.id.desc())
-    if current_user.role == "employee":
-        query = query.where(Invoice.branch_id == current_user.branch_id)
-    elif branch_id:
+    if branch_id is not None:
+        ensure_branch_access(current_user, branch_id)
         query = query.where(Invoice.branch_id == branch_id)
+    elif current_user.role == "employee" and current_user.branch_id is not None:
+        query = query.where(Invoice.branch_id == current_user.branch_id)
     return db.scalars(query.limit(200)).all()

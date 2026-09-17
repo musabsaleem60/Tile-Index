@@ -19,6 +19,8 @@ class UserManagementWindow:
     def __init__(self, parent, current_user=None):
         self.parent = parent
         self.current_user = current_user  # Admin user managing others
+        if not AuthenticationService.is_admin(self.current_user):
+            raise PermissionError("Admin access required")
         
         self.branches = BranchRepository.get_all()
         self.users = UserRepository.get_all()
@@ -70,7 +72,7 @@ class UserManagementWindow:
         self.form_label(left_frame, "Branch:").grid(row=5, column=0, sticky=tk.W, pady=5, padx=(12, 8))
         self.branch_var = tk.StringVar()
         self.branch_combo = ttk.Combobox(left_frame, textvariable=self.branch_var, width=SIZES["compact_dropdown_width"], state="readonly", font=FONTS["small"])
-        self.branch_combo['values'] = [f"{b.name}" for b in self.branches]
+        self.branch_combo['values'] = ["All Branches"] + [f"{b.name}" for b in self.branches]
         self.branch_combo.grid(row=5, column=1, pady=5, padx=(0, 12), sticky=tk.W)
         self.on_role_change()  # Initialize branch visibility
 
@@ -238,15 +240,16 @@ class UserManagementWindow:
             # Get branch for employees
             branch_id = None
             if role == 'employee':
-                branch_name = self.branch_var.get()
+                branch_name = self.branch_var.get().strip()
                 if not branch_name:
                     raise ValueError("Branch is required for employees")
-                for branch in self.branches:
-                    if branch.name == branch_name:
-                        branch_id = branch.id
-                        break
-                if not branch_id:
-                    raise ValueError("Invalid branch selected")
+                if branch_name != "All Branches":
+                    for branch in self.branches:
+                        if branch.name == branch_name:
+                            branch_id = branch.id
+                            break
+                    if branch_id is None:
+                        raise ValueError("Invalid branch selected")
             
             password = self.password_entry.get()
             
@@ -322,6 +325,8 @@ class UserManagementWindow:
                     if branch.id == user.branch_id:
                         self.branch_var.set(branch.name)
                         break
+            elif user.role == "employee":
+                self.branch_var.set("All Branches")
             
             self.is_active_var.set(user.is_active)
             
@@ -443,7 +448,7 @@ class UserManagementWindow:
         self.username_entry.delete(0, tk.END)
         self.password_entry.delete(0, tk.END)
         self.role_var.set("employee")
-        self.branch_var.set("")
+        self.branch_var.set("All Branches")
         self.is_active_var.set(True)
         self.editing_user_id = None
         self.add_update_btn.configure(text="Add User", fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"])

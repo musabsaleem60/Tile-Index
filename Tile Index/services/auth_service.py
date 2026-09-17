@@ -48,11 +48,16 @@ class AuthenticationService:
         if user.role == 'admin':
             return True
         
-        # Employee can only access their assigned branch
+        # A NULL branch assignment explicitly grants an employee all branches.
         if user.role == 'employee':
-            return user.branch_id == branch_id
+            return user.branch_id is None or user.branch_id == branch_id
         
         return False
+
+    @staticmethod
+    def has_all_branch_access(user):
+        """Return whether a user can choose any branch in operational screens."""
+        return bool(user and (user.role == 'admin' or (user.role == 'employee' and user.branch_id is None)))
     
     @staticmethod
     def can_manage_products(user):
@@ -62,7 +67,7 @@ class AuthenticationService:
     @staticmethod
     def can_view_reports(user):
         """Check if user can view reports"""
-        return AuthenticationService.is_admin(user)
+        return bool(user and user.role in ('admin', 'employee'))
     
     @staticmethod
     def can_manage_users(user):

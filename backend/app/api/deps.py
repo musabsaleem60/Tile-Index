@@ -38,6 +38,8 @@ def require_product_manager(current_user: User = Depends(get_current_user)) -> U
 def ensure_branch_access(user: User, branch_id: int) -> None:
     if user.role == "admin":
         return
+    if user.role == "employee" and user.branch_id is None:
+        return
     if user.branch_id == branch_id:
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Branch access denied")

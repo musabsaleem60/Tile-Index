@@ -30,7 +30,7 @@ class AccessoryWindow:
         self.editing_accessory_id = None
         
         # Filter branches for employees
-        if AuthenticationService.is_employee(self.current_user):
+        if AuthenticationService.is_employee(self.current_user) and self.current_user.branch_id is not None:
             self.branches = [b for b in self.branches if b.id == self.current_user.branch_id]
             if self.branches:
                 self.selected_branch_id = self.branches[0].id
@@ -39,7 +39,7 @@ class AccessoryWindow:
         self.load_accessories()
         
         # Set branch if employee
-        if AuthenticationService.is_employee(self.current_user) and self.branches:
+        if AuthenticationService.is_employee(self.current_user) and self.current_user.branch_id is not None and self.branches:
             self.branch_var.set(self.branches[0].name)
             self.selected_branch_id = self.branches[0].id
     
@@ -121,21 +121,8 @@ class AccessoryWindow:
         action_frame = ctk.CTkFrame(left_frame, fg_color="transparent", corner_radius=0)
         action_frame.grid(row=8, column=0, columnspan=2, pady=(5, 12))
 
-        if AuthenticationService.is_admin(self.current_user):
-            self.action_button(action_frame, "Edit", self.edit_selected, width=110).pack(side=tk.LEFT, padx=5)
-            self.action_button(action_frame, "Delete", self.delete_selected, width=110, danger=True).pack(side=tk.LEFT, padx=5)
-
-        if AuthenticationService.is_employee(self.current_user):
-            for row in range(1, 5):
-                for widget in left_frame.grid_slaves(row=row):
-                    widget.grid_remove()
-            ctk.CTkLabel(
-                left_frame,
-                text="Accessory management is restricted to administrators.",
-                font=FONTS["small_bold"],
-                text_color=COLORS["danger"],
-                height=SIZES["small_label_height"],
-            ).grid(row=1, column=0, columnspan=2, pady=20)
+        self.action_button(action_frame, "Edit", self.edit_selected, width=110).pack(side=tk.LEFT, padx=5)
+        self.action_button(action_frame, "Delete", self.delete_selected, width=110, danger=True).pack(side=tk.LEFT, padx=5)
 
         right_frame = self.panel(main_frame, "Stock Management")
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
@@ -147,7 +134,7 @@ class AccessoryWindow:
         self.branch_combo.grid(row=1, column=1, pady=5, padx=(0, 12), sticky=tk.W)
         self.branch_combo.bind('<<ComboboxSelected>>', self.on_branch_select)
 
-        if AuthenticationService.is_employee(self.current_user):
+        if AuthenticationService.is_employee(self.current_user) and self.current_user.branch_id is not None:
             self.branch_combo.config(state="disabled")
 
         self.form_label(right_frame, "Select Accessory:", bold=True).grid(row=2, column=0, sticky=tk.W, pady=5, padx=(12, 8))

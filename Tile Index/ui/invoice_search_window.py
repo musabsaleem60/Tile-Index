@@ -9,6 +9,7 @@ import customtkinter as ctk
 from datetime import datetime, date
 from repositories.branch_repository import BranchRepository
 from services.invoice_service import InvoiceService
+from services.auth_service import AuthenticationService
 from utils.datetime_format import format_business_datetime
 from utils.invoice_printer import InvoicePrintWindow
 from utils.searchable_combobox import SearchableCombobox
@@ -23,6 +24,10 @@ class InvoiceSearchWindow:
         self.current_user = current_user
         
         self.branches = BranchRepository.get_all()
+        self.branch_scoped_employee = (
+            AuthenticationService.is_employee(self.current_user)
+            and self.current_user.branch_id is not None
+        )
         self.result_invoice_ids = {}
         self.setup_ui()
     
@@ -52,8 +57,14 @@ class InvoiceSearchWindow:
         self.form_label(search_frame, "Branch:").grid(row=1, column=0, sticky=tk.W, pady=5, padx=8)
         self.branch_var = tk.StringVar()
         self.branch_combo = SearchableCombobox(search_frame, textvariable=self.branch_var, width=SIZES["compact_dropdown_width"], state="normal", font=FONTS["small"])
-        self.branch_combo.set_completion_list(["All Branches"] + [f"{b.name}" for b in self.branches])
+        branch_options = [f"{b.name}" for b in self.branches]
+        if not self.branch_scoped_employee:
+            branch_options.insert(0, "All Branches")
+        self.branch_combo.set_completion_list(branch_options)
         self.branch_combo.grid(row=1, column=1, pady=5, padx=8, sticky=tk.W)
+        if self.branch_scoped_employee and self.branches:
+            self.branch_var.set(self.branches[0].name)
+            self.branch_combo.config(state="disabled")
 
         # Invoice number
         self.form_label(search_frame, "Invoice Number:").grid(row=1, column=2, sticky=tk.W, pady=5, padx=8)
@@ -127,11 +138,8 @@ class InvoiceSearchWindow:
         self.action_button(btn_frame, "View/Print Invoice", self.view_invoice, width=190).pack(side=tk.LEFT, padx=5)
         self.action_button(btn_frame, "Record Payment", self.record_payment, width=170).pack(side=tk.LEFT, padx=5)
         self.action_button(btn_frame, "Edit Remarks", self.edit_remarks, width=160).pack(side=tk.LEFT, padx=5)
-        if getattr(self.current_user, 'role', '') == 'admin':
-            self.void_button = self.action_button(btn_frame, "Void Invoice", self.void_invoice, width=170, danger=True)
-            self.void_button.pack(side=tk.LEFT, padx=5)
-        else:
-            self.void_button = None
+        self.void_button = self.action_button(btn_frame, "Void Invoice", self.void_invoice, width=170, danger=True)
+        self.void_button.pack(side=tk.LEFT, padx=5)
 
     def panel(self, parent, title):
         panel = ctk.CTkFrame(

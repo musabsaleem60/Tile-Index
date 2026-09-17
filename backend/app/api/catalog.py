@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.api.deps import get_current_user, require_admin, require_product_manager
+from app.api.deps import get_current_user, require_product_manager
 from app.db.session import get_db
 from app.models.entities import Accessory, Branch, Product, SanitaryProduct, User
 from app.schemas.common import (
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/catalog", tags=["catalog"])
 @router.get("/branches", response_model=list[BranchOut])
 def list_branches(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     query = select(Branch).order_by(Branch.name)
-    if current_user.role == "employee":
+    if current_user.role == "employee" and current_user.branch_id is not None:
         query = query.where(Branch.id == current_user.branch_id)
     return db.scalars(query).all()
 
@@ -86,7 +86,7 @@ def list_accessories(
     ).all()
 
 
-@router.post("/accessories", response_model=AccessoryOut, dependencies=[Depends(require_admin)])
+@router.post("/accessories", response_model=AccessoryOut, dependencies=[Depends(require_product_manager)])
 def create_accessory(payload: AccessoryIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     accessory = Accessory(**payload.model_dump())
     db.add(accessory)
@@ -96,7 +96,7 @@ def create_accessory(payload: AccessoryIn, db: Session = Depends(get_db), curren
     return accessory
 
 
-@router.put("/accessories/{accessory_id}", response_model=AccessoryOut, dependencies=[Depends(require_admin)])
+@router.put("/accessories/{accessory_id}", response_model=AccessoryOut, dependencies=[Depends(require_product_manager)])
 def update_accessory(accessory_id: int, payload: AccessoryIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     accessory = db.get(Accessory, accessory_id)
     if not accessory:
@@ -109,7 +109,7 @@ def update_accessory(accessory_id: int, payload: AccessoryIn, db: Session = Depe
     return accessory
 
 
-@router.delete("/accessories/{accessory_id}", dependencies=[Depends(require_admin)])
+@router.delete("/accessories/{accessory_id}", dependencies=[Depends(require_product_manager)])
 def delete_accessory(accessory_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     accessory = db.get(Accessory, accessory_id)
     if not accessory:
@@ -138,7 +138,7 @@ def list_sanitary_products(
     return db.scalars(query.order_by(SanitaryProduct.company_name, SanitaryProduct.product_category, SanitaryProduct.color)).all()
 
 
-@router.post("/sanitary", response_model=SanitaryProductOut, dependencies=[Depends(require_admin)])
+@router.post("/sanitary", response_model=SanitaryProductOut, dependencies=[Depends(require_product_manager)])
 def create_sanitary_product(payload: SanitaryProductIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     product = SanitaryProduct(**payload.model_dump())
     db.add(product)
@@ -148,7 +148,7 @@ def create_sanitary_product(payload: SanitaryProductIn, db: Session = Depends(ge
     return product
 
 
-@router.put("/sanitary/{sanitary_product_id}", response_model=SanitaryProductOut, dependencies=[Depends(require_admin)])
+@router.put("/sanitary/{sanitary_product_id}", response_model=SanitaryProductOut, dependencies=[Depends(require_product_manager)])
 def update_sanitary_product(sanitary_product_id: int, payload: SanitaryProductIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     product = db.get(SanitaryProduct, sanitary_product_id)
     if not product:
@@ -161,7 +161,7 @@ def update_sanitary_product(sanitary_product_id: int, payload: SanitaryProductIn
     return product
 
 
-@router.delete("/sanitary/{sanitary_product_id}", dependencies=[Depends(require_admin)])
+@router.delete("/sanitary/{sanitary_product_id}", dependencies=[Depends(require_product_manager)])
 def delete_sanitary_product(sanitary_product_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     product = db.get(SanitaryProduct, sanitary_product_id)
     if not product:

@@ -20,8 +20,11 @@ from ui.theme import COLORS, FONTS, SIZES, SPACING
 class ActivityLogWindow:
     """Activity Log window (Admin only)"""
     
-    def __init__(self, parent):
+    def __init__(self, parent, current_user=None):
         self.parent = parent
+        self.current_user = current_user
+        if not AuthenticationService.is_admin(self.current_user):
+            raise PermissionError("Admin access required")
         
         self.branches = BranchRepository.get_all()
         self.users = UserRepository.get_all()

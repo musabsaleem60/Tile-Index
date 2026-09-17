@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
-from app.api.deps import ensure_branch_access, get_current_user, require_admin
+from app.api.deps import ensure_branch_access, get_current_user
 from app.db.session import get_db
 from app.models.entities import Branch, Inventory, Invoice, SanitaryInventory, User
 from app.services.tile_pricing import resolve_tile_price
@@ -81,8 +81,8 @@ def branch_stock(branch_id: int, db: Session = Depends(get_db), current_user: Us
     }
 
 
-@router.get("/business-stock", dependencies=[Depends(require_admin)])
-def business_stock(db: Session = Depends(get_db)):
+@router.get("/business-stock")
+def business_stock(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     branches = db.scalars(select(Branch).order_by(Branch.name)).all()
     products = db.scalar(select(func.count()).select_from(Inventory)) or 0
     report_branches = []
@@ -133,9 +133,9 @@ def monthly_sales(
         ensure_branch_access(current_user, branch_id)
     branches = {branch.id: branch for branch in db.scalars(select(Branch)).all()}
     query = select(Invoice).where(Invoice.status == "active")
-    if current_user.role == "employee":
+    if current_user.role == "employee" and current_user.branch_id is not None:
         query = query.where(Invoice.branch_id == current_user.branch_id)
-    elif branch_id:
+    elif branch_id is not None:
         query = query.where(Invoice.branch_id == branch_id)
 
     rows = db.scalars(query).all()

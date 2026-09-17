@@ -383,9 +383,6 @@ def record_invoice_payment(db: Session, invoice_id: int, payload, user: User) ->
 
 
 def void_invoice(db: Session, invoice_id: int, reason: str, user: User) -> Invoice:
-    if user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can void invoices")
-
     clean_reason = reason.strip()
     if len(clean_reason) < 10:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Void reason must be at least 10 characters")

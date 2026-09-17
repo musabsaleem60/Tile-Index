@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_admin, require_product_manager
+from app.api.deps import require_product_manager
 from app.db.session import get_db
 from app.models.entities import Branch, Product, ProductRateOverride, TileRate, TileSize, User
 from app.schemas.common import (
@@ -20,7 +20,7 @@ GRADES = ("G1 Prime", "G2 Standard", "G3 Regular")
 
 
 @router.get("/card")
-def rate_card(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+def rate_card(db: Session = Depends(get_db), _: User = Depends(require_product_manager)):
     sizes = db.scalars(select(TileSize).order_by(TileSize.tile_size)).all()
     rates = db.scalars(select(TileRate).where(TileRate.active.is_(True))).all()
     rate_by_key = {(rate.tile_size, rate.grade): rate for rate in rates}
@@ -44,7 +44,7 @@ def rate_impact(
     tile_size: str = Query(min_length=1),
     grade: str = Query(min_length=1),
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_product_manager),
 ):
     return _impact(db, tile_size, grade)
 
@@ -79,7 +79,7 @@ def update_card_rate(
     grade: str,
     payload: TileRateUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_product_manager),
 ):
     if grade not in GRADES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid grade")
@@ -119,7 +119,7 @@ def update_card_rate(
 def create_tile_size(
     payload: TileSizeCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_product_manager),
 ):
     tile_size = payload.tile_size.strip()
     if db.get(TileSize, tile_size):
@@ -158,7 +158,7 @@ def create_tile_size(
 
 
 @router.get("/overrides")
-def list_overrides(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+def list_overrides(db: Session = Depends(get_db), _: User = Depends(require_product_manager)):
     overrides = db.scalars(
         select(ProductRateOverride)
         .where(ProductRateOverride.active.is_(True))
@@ -171,7 +171,7 @@ def list_overrides(db: Session = Depends(get_db), _: User = Depends(require_admi
 def save_override(
     payload: ProductRateOverrideIn,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_product_manager),
 ):
     if payload.grade not in GRADES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid grade")
@@ -223,7 +223,7 @@ def remove_override(
     grade: str,
     payload: RateRemovalReason,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_product_manager),
 ):
     override = db.scalar(
         select(ProductRateOverride).where(
@@ -260,7 +260,7 @@ def remove_override(
 def remove_override_post(
     payload: ProductRateOverrideRemove,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_product_manager),
 ):
     override = db.scalar(
         select(ProductRateOverride).where(

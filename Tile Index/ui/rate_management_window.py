@@ -1,4 +1,4 @@
-"""Admin rate-card and product override management."""
+"""Rate-card and product override management."""
 
 import tkinter as tk
 from tkinter import ttk, messagebox

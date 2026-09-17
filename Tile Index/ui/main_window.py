@@ -220,6 +220,8 @@ class MainWindow:
             ("Accessories", COLORS["accessory"], COLORS["accessory_hover"], self.open_accessories),
             ("Invoice & Billing", COLORS["success"], COLORS["success_hover"], self.open_invoice),
             ("Search Invoices", COLORS["search"], COLORS["search_hover"], self.open_invoice_search),
+            ("Rate Management", COLORS["reports"], COLORS["reports_hover"], self.open_rate_management),
+            ("Reports", COLORS["reports"], COLORS["reports_hover"], self.open_reports),
         ]
 
         for i, (text, color, hover, cmd) in enumerate(buttons):
@@ -256,8 +258,6 @@ class MainWindow:
             admin_container.pack()
 
             admin_buttons = [
-                ("Reports", COLORS["reports"], COLORS["reports_hover"], self.open_reports),
-                ("Rate Management", COLORS["reports"], COLORS["reports_hover"], self.open_rate_management),
                 ("User Management", COLORS["users"], COLORS["users_hover"], self.open_user_management),
                 ("Activity Log", COLORS["activity"], COLORS["activity_hover"], self.open_activity_log),
             ]
@@ -378,7 +378,7 @@ class MainWindow:
         self.switch_view(StockOverviewWindow, self.current_user)
 
     def open_reports(self):
-        """Open reports within the same window (Admin only)"""
+        """Open reports within the same window."""
         if not AuthenticationService.can_view_reports(self.current_user):
             messagebox.showerror("Access Denied", "You do not have permission to view reports.")
             return
@@ -397,10 +397,7 @@ class MainWindow:
         self.switch_view(UserManagementWindow, current_user=self.current_user)
 
     def open_rate_management(self):
-        """Open rate management within the same window (Admin only)"""
-        if not AuthenticationService.is_admin(self.current_user):
-            messagebox.showerror("Access Denied", "You do not have permission to manage rates.")
-            return
+        """Open rate management within the same window."""
         from ui.rate_management_window import RateManagementWindow
         self.switch_view(RateManagementWindow, current_user=self.current_user)
 
@@ -410,7 +407,7 @@ class MainWindow:
             messagebox.showerror("Access Denied", "You do not have permission to view activity logs.")
             return
         from ui.activity_log_window import ActivityLogWindow
-        self.switch_view(ActivityLogWindow)
+        self.switch_view(ActivityLogWindow, current_user=self.current_user)
 
     def logout(self):
         """Logout and return to login screen"""

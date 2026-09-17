@@ -36,7 +36,7 @@ class InventoryWindow:
         
         # Filter branches for employees
         from services.auth_service import AuthenticationService
-        if AuthenticationService.is_employee(self.current_user):
+        if AuthenticationService.is_employee(self.current_user) and self.current_user.branch_id is not None:
             # Employee can only see their assigned branch
             self.branches = [b for b in self.branches if b.id == self.current_user.branch_id]
             if self.branches:
@@ -46,7 +46,7 @@ class InventoryWindow:
         self.load_products()
         
         # Set branch if employee
-        if AuthenticationService.is_employee(self.current_user) and self.branches:
+        if AuthenticationService.is_employee(self.current_user) and self.current_user.branch_id is not None and self.branches:
             self.branch_var.set(self.branches[0].name)
             self.selected_branch_id = self.branches[0].id
     
@@ -177,7 +177,7 @@ class InventoryWindow:
         self.branch_combo.bind('<<ComboboxSelected>>', self.on_branch_select)
         
         # Disable branch selection for employees (they can only access their branch)
-        if AuthenticationService.is_employee(self.current_user):
+        if AuthenticationService.is_employee(self.current_user) and self.current_user.branch_id is not None:
             self.branch_combo.config(state="disabled")
         
         # Product selection (for Stock IN/OUT)
