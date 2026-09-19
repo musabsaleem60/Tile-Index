@@ -4,7 +4,17 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
-from app.models.entities import Accessory, AccessoryInventory, Branch, Inventory, Product, TileRate, User
+from app.models.entities import (
+    Accessory,
+    AccessoryInventory,
+    Branch,
+    Inventory,
+    Product,
+    SanitaryInventory,
+    SanitaryProduct,
+    TileRate,
+    User,
+)
 from app.services.accessory_labels import accessory_display_label
 from app.services.tile_pricing import resolve_tile_price
 
@@ -14,7 +24,7 @@ router = APIRouter(prefix="/stock", tags=["stock"])
 
 @router.get("/overview")
 def stock_overview(
-    item_type: str = Query("all", pattern="^(all|tiles|accessories)$"),
+    item_type: str = Query("all", pattern="^(all|tiles|accessories|sanitary)$"),
     q: str | None = None,
     branch_id: int | None = None,
     grade: str | None = None,
@@ -36,14 +46,18 @@ def stock_overview(
         "accessories": _accessory_rows(db, branches, search_text, branch_id, category, include_zero)
         if item_type in ("all", "accessories")
         else [],
+        "sanitary": _sanitary_rows(db, branches, search_text, branch_id, include_zero)
+        if item_type in ("all", "sanitary")
+        else [],
     }
 
 
 @router.get("/item")
 def stock_item(
-    item_type: str = Query(pattern="^(tile|accessory)$"),
+    item_type: str = Query(pattern="^(tile|accessory|sanitary)$"),
     product_id: int | None = None,
     accessory_id: int | None = None,
+    sanitary_product_id: int | None = None,
     grade: str | None = None,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -61,6 +75,20 @@ def stock_item(
         return {
             "branches": _branch_rows(branches),
             "item": _tile_item_row(db, branches, product, grade),
+        }
+
+    if item_type == "sanitary":
+        if sanitary_product_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="sanitary_product_id is required for sanitary stock",
+            )
+        product = db.get(SanitaryProduct, sanitary_product_id)
+        if not product:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sanitary product not found")
+        return {
+            "branches": _branch_rows(branches),
+            "item": _sanitary_item_row(db, branches, product),
         }
 
     if accessory_id is None:
@@ -158,6 +186,41 @@ def _accessory_item_row(db: Session, branches, accessory: Accessory):
         "product": accessory_display_label(accessory),
         "category": accessory.category,
         "unit_price": float(accessory.unit_price or 0),
+        "total_quantity": total_quantity,
+        "branches": branch_rows,
+    }
+
+
+def _sanitary_label(product: SanitaryProduct) -> str:
+    return " - ".join(part for part in (
+        product.company_name,
+        product.product_category,
+        product.color,
+    ) if part)
+
+
+def _sanitary_item_row(db: Session, branches, product: SanitaryProduct):
+    inventory_rows = db.scalars(
+        select(SanitaryInventory).where(SanitaryInventory.sanitary_product_id == product.id)
+    ).all()
+    inventory_by_branch = {inv.branch_id: inv for inv in inventory_rows}
+    branch_rows = []
+    total_quantity = 0
+    for branch in branches:
+        inv = inventory_by_branch.get(branch.id)
+        quantity = int(inv.quantity if inv else 0)
+        total_quantity += quantity
+        branch_rows.append({
+            "branch_id": branch.id,
+            "branch_name": branch.name,
+            "quantity": quantity,
+        })
+    return {
+        "kind": "sanitary",
+        "sanitary_product_id": product.id,
+        "product": _sanitary_label(product),
+        "category": product.product_category,
+        "unit_price": float(product.sale_price or 0),
         "total_quantity": total_quantity,
         "branches": branch_rows,
     }
@@ -277,6 +340,54 @@ def _accessory_rows(db: Session, branches, search_text: str, branch_id: int | No
             "product": label,
             "category": accessory.category,
             "unit_price": float(accessory.unit_price or 0),
+            "total_quantity": total_quantity,
+            "branches": branch_rows,
+        })
+    return rows
+
+
+def _sanitary_rows(db: Session, branches, search_text: str, branch_id: int | None, include_zero: bool):
+    products = db.scalars(
+        select(SanitaryProduct).order_by(
+            SanitaryProduct.company_name,
+            SanitaryProduct.product_category,
+            SanitaryProduct.color,
+        )
+    ).all()
+    inventory_rows = db.scalars(select(SanitaryInventory)).all()
+    inventory_by_key = {
+        (inv.sanitary_product_id, inv.branch_id): inv for inv in inventory_rows
+    }
+    rows = []
+    for product in products:
+        label = _sanitary_label(product)
+        if search_text and search_text not in label.lower() and search_text not in product.sku.lower():
+            continue
+        branch_rows = []
+        total_quantity = 0
+        selected_branch_has_stock = branch_id is None
+        for branch in branches:
+            inv = inventory_by_key.get((product.id, branch.id))
+            quantity = int(inv.quantity if inv else 0)
+            total_quantity += quantity
+            if branch_id == branch.id and quantity > 0:
+                selected_branch_has_stock = True
+            branch_rows.append({
+                "branch_id": branch.id,
+                "branch_name": branch.name,
+                "quantity": quantity,
+            })
+        if not include_zero and total_quantity <= 0:
+            continue
+        if branch_id is not None and not include_zero and not selected_branch_has_stock:
+            continue
+        rows.append({
+            "kind": "sanitary",
+            "sanitary_product_id": product.id,
+            "product": label,
+            "category": product.product_category,
+            "sku": product.sku,
+            "unit_price": float(product.sale_price or 0),
             "total_quantity": total_quantity,
             "branches": branch_rows,
         })
