@@ -1,6 +1,8 @@
 import json
+import socket
 import urllib.error
 import urllib.request
+from contextlib import contextmanager
 
 from .config import API_TIMEOUT_SECONDS
 
@@ -20,11 +22,11 @@ class ApiClient:
     def set_token(self, token: str):
         self.token = token
 
-    def get(self, path: str):
-        return self._request("GET", path)
+    def get(self, path: str, timeout: int | None = None):
+        return self._request("GET", path, timeout=timeout)
 
-    def post(self, path: str, payload: dict):
-        return self._request("POST", path, payload)
+    def post(self, path: str, payload: dict, timeout: int | None = None):
+        return self._request("POST", path, payload, timeout=timeout)
 
     def put(self, path: str, payload: dict):
         return self._request("PUT", path, payload)
@@ -35,7 +37,17 @@ class ApiClient:
     def delete(self, path: str):
         return self._request("DELETE", path)
 
-    def _request(self, method: str, path: str, payload: dict | None = None):
+    @contextmanager
+    def timeout_override(self, timeout: int):
+        previous = self.timeout
+        self.timeout = timeout
+        try:
+            yield
+        finally:
+            self.timeout = previous
+
+    def _request(self, method: str, path: str, payload: dict | None = None, timeout: int | None = None):
+        request_timeout = timeout or self.timeout
         body = None
         headers = {"Accept": "application/json"}
         debug_payment_request = method == "POST" and path.endswith("/payments")
@@ -57,7 +69,7 @@ class ApiClient:
         if debug_remarks_request:
             print(f"[remarks-debug] request {method} {self.base_url}{path} payload={payload}")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            with urllib.request.urlopen(request, timeout=request_timeout) as response:
                 data = response.read().decode("utf-8")
                 if debug_payment_request:
                     print(f"[payment-debug] response {response.status} body={data}")
@@ -86,4 +98,9 @@ class ApiClient:
                 f"Cannot connect to API within {self.timeout} seconds. "
                 "If this is the first open after some time, wait a minute and try again. "
                 f"Details: {reason}"
+            ) from exc
+        except (TimeoutError, socket.timeout) as exc:
+            raise ApiClientError(
+                f"The API did not respond within {request_timeout} seconds. "
+                "If this is the first open after some time, wait a minute and try again."
             ) from exc

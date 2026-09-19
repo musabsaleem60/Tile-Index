@@ -19,6 +19,15 @@ from app.services.audit import write_audit_log
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 
 
+def next_sanitary_sku(db: Session) -> str:
+    highest = 0
+    for sku in db.scalars(select(SanitaryProduct.sku).where(SanitaryProduct.sku.like("SAN-%"))):
+        suffix = sku.removeprefix("SAN-")
+        if suffix.isdigit():
+            highest = max(highest, int(suffix))
+    return f"SAN-{highest + 1:06d}"
+
+
 @router.get("/branches", response_model=list[BranchOut])
 def list_branches(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     query = select(Branch).order_by(Branch.name)
@@ -140,9 +149,15 @@ def list_sanitary_products(
 
 @router.post("/sanitary", response_model=SanitaryProductOut, dependencies=[Depends(require_product_manager)])
 def create_sanitary_product(payload: SanitaryProductIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    product = SanitaryProduct(**payload.model_dump())
+    product = SanitaryProduct(**payload.model_dump(), purchase_price=0, sku=next_sanitary_sku(db))
     db.add(product)
-    write_audit_log(db, current_user, "Sanitary Product Added", payload.model_dump(), current_user.branch_id)
+    write_audit_log(
+        db,
+        current_user,
+        "Sanitary Product Added",
+        {**payload.model_dump(), "sku": product.sku},
+        current_user.branch_id,
+    )
     db.commit()
     db.refresh(product)
     return product

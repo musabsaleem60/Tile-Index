@@ -27,3 +27,13 @@ _config = _load_config_file()
 API_BASE_URL = os.environ.get("TILE_INDEX_API_URL") or _config.get("api_base_url") or "http://localhost:8000"
 CHECK_UPDATES = bool(_config.get("check_updates", True))
 API_TIMEOUT_SECONDS = int(os.environ.get("TILE_INDEX_API_TIMEOUT_SECONDS") or _config.get("api_timeout_seconds") or 90)
+LOGIN_API_TIMEOUT_SECONDS = int(
+    os.environ.get("TILE_INDEX_LOGIN_TIMEOUT_SECONDS")
+    or _config.get("login_timeout_seconds")
+    or 120
+)
+CATALOG_PRELOAD_TIMEOUT_SECONDS = int(
+    os.environ.get("TILE_INDEX_CATALOG_PRELOAD_TIMEOUT_SECONDS")
+    or _config.get("catalog_preload_timeout_seconds")
+    or 120
+)

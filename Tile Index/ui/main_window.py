@@ -218,6 +218,7 @@ class MainWindow:
             ("Inventory Management", COLORS["primary"], COLORS["primary_hover"], self.open_inventory),
             ("Stock Overview", COLORS["search"], COLORS["search_hover"], self.open_stock_overview),
             ("Accessories", COLORS["accessory"], COLORS["accessory_hover"], self.open_accessories),
+            ("Sanitary", COLORS["accessory"], COLORS["accessory_hover"], self.open_sanitary),
             ("Invoice & Billing", COLORS["success"], COLORS["success_hover"], self.open_invoice),
             ("Search Invoices", COLORS["search"], COLORS["search_hover"], self.open_invoice_search),
             ("Rate Management", COLORS["reports"], COLORS["reports_hover"], self.open_rate_management),

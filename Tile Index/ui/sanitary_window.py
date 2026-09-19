@@ -5,12 +5,13 @@ Manage sanitary products and branch-wise stock
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+import customtkinter as ctk
 from repositories.branch_repository import BranchRepository
-from repositories.sanitary_repository import SanitaryProductRepository, SanitaryInventoryRepository
 from services.auth_service import AuthenticationService
-from services.sanitary_service import SanitaryService
 from models.sanitary import SanitaryProduct
+from desktop_client.session import api_client, invalidate_cache
 from utils.searchable_combobox import SearchableCombobox
+from ui.theme import COLORS, FONTS, SIZES, SPACING
 
 
 class SanitaryWindow:
@@ -21,12 +22,12 @@ class SanitaryWindow:
         self.current_user = current_user
 
         self.branches = BranchRepository.get_all()
-        self.products = SanitaryProductRepository.get_all()
+        self.products = self.fetch_products()
         self.selected_branch_id = None
         self.selected_product_id = None
         self.editing_product_id = None
 
-        if AuthenticationService.is_employee(self.current_user):
+        if AuthenticationService.is_employee(self.current_user) and self.current_user.branch_id is not None:
             self.branches = [b for b in self.branches if b.id == self.current_user.branch_id]
             if self.branches:
                 self.selected_branch_id = self.branches[0].id
@@ -34,94 +35,94 @@ class SanitaryWindow:
         self.setup_ui()
         self.load_products()
 
-        if AuthenticationService.is_employee(self.current_user) and self.branches:
+        if AuthenticationService.is_employee(self.current_user) and self.current_user.branch_id is not None and self.branches:
             self.branch_var.set(self.branches[0].name)
             self.selected_branch_id = self.branches[0].id
             self.refresh_stock()
 
     def setup_ui(self):
         """Setup the sanitary UI"""
-        header = tk.Label(
+        header = ctk.CTkLabel(
             self.parent,
             text="Sanitary Management",
-            font=("Arial", 18, "bold"),
-            bg="#1abc9c",
-            fg="white",
-            pady=10
+            font=FONTS["section"],
+            fg_color=COLORS["surface"],
+            text_color=COLORS["text"],
+            height=48,
         )
         header.pack(fill=tk.X)
 
-        main_frame = tk.Frame(self.parent)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        main_frame = ctk.CTkFrame(self.parent, fg_color=COLORS["app_bg"], corner_radius=0)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=SPACING["page_x"], pady=SPACING["page_y"])
 
-        left_frame = tk.LabelFrame(main_frame, text="Sanitary Product Management", font=("Arial", 12, "bold"), padx=10, pady=10)
+        left_frame = self.panel(main_frame, "Sanitary Product Management")
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
 
-        tk.Label(left_frame, text="Company:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.form_label(left_frame, "Company:").grid(row=1, column=0, sticky=tk.W, pady=5, padx=(12, 8))
         self.company_var = tk.StringVar(value=SanitaryProduct.COMPANIES[0])
-        self.company_combo = SearchableCombobox(left_frame, textvariable=self.company_var, width=27, state="normal", font=("Arial", 10))
+        self.company_combo = SearchableCombobox(left_frame, textvariable=self.company_var, width=SIZES["compact_dropdown_width"], state="normal", font=FONTS["small"])
         self.company_combo.set_completion_list(SanitaryProduct.COMPANIES)
-        self.company_combo.grid(row=0, column=1, pady=5, padx=5)
+        self.company_combo.configure(font=FONTS["small"])
+        self.company_combo.grid(row=1, column=1, pady=5, padx=(0, 12), sticky=tk.W)
         self.company_combo.bind('<<ComboboxSelected>>', self.on_company_change)
 
-        tk.Label(left_frame, text="Product Category:", font=("Arial", 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.form_label(left_frame, "Product Name/Code:").grid(row=2, column=0, sticky=tk.W, pady=5, padx=(12, 8))
         self.category_var = tk.StringVar(value=SanitaryProduct.CATEGORIES[0])
-        self.category_combo = SearchableCombobox(left_frame, textvariable=self.category_var, width=27, state="normal", font=("Arial", 10))
+        self.category_combo = SearchableCombobox(left_frame, textvariable=self.category_var, width=SIZES["compact_dropdown_width"], state="normal", font=FONTS["small"])
         self.category_combo.set_completion_list(SanitaryProduct.CATEGORIES)
-        self.category_combo.grid(row=1, column=1, pady=5, padx=5)
+        self.category_combo.configure(font=FONTS["small"])
+        self.category_combo.grid(row=2, column=1, pady=5, padx=(0, 12), sticky=tk.W)
 
-        tk.Label(left_frame, text="Color:", font=("Arial", 10)).grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.form_label(left_frame, "Color:").grid(row=3, column=0, sticky=tk.W, pady=5, padx=(12, 8))
         self.color_var = tk.StringVar(value="White")
-        self.color_combo = SearchableCombobox(left_frame, textvariable=self.color_var, width=27, state="normal", font=("Arial", 10))
+        self.color_combo = SearchableCombobox(left_frame, textvariable=self.color_var, width=SIZES["compact_dropdown_width"], state="normal", font=FONTS["small"])
         self.color_combo.set_completion_list(SanitaryProduct.DEFAULT_COLORS)
-        self.color_combo.grid(row=2, column=1, pady=5, padx=5)
+        self.color_combo.configure(font=FONTS["small"])
+        self.color_combo.grid(row=3, column=1, pady=5, padx=(0, 12), sticky=tk.W)
 
-        tk.Label(left_frame, text="SKU/Article Code:", font=("Arial", 10)).grid(row=3, column=0, sticky=tk.W, pady=5)
-        self.sku_entry = tk.Entry(left_frame, width=30, font=("Arial", 10))
-        self.sku_entry.grid(row=3, column=1, pady=5, padx=5)
+        self.form_label(left_frame, "Sale Price (Rs.):").grid(row=4, column=0, sticky=tk.W, pady=5, padx=(12, 8))
+        self.sale_entry = self.form_entry(left_frame)
+        self.sale_entry.grid(row=4, column=1, pady=5, padx=(0, 12), sticky=tk.W)
 
-        tk.Label(left_frame, text="Purchase Price (Rs.):", font=("Arial", 10)).grid(row=4, column=0, sticky=tk.W, pady=5)
-        self.purchase_entry = tk.Entry(left_frame, width=30, font=("Arial", 10))
-        self.purchase_entry.grid(row=4, column=1, pady=5, padx=5)
+        btn_frame = ctk.CTkFrame(left_frame, fg_color="transparent", corner_radius=0)
+        btn_frame.grid(row=5, column=0, columnspan=2, pady=10)
 
-        tk.Label(left_frame, text="Sale Price (Rs.):", font=("Arial", 10)).grid(row=5, column=0, sticky=tk.W, pady=5)
-        self.sale_entry = tk.Entry(left_frame, width=30, font=("Arial", 10))
-        self.sale_entry.grid(row=5, column=1, pady=5, padx=5)
-
-        btn_frame = tk.Frame(left_frame)
-        btn_frame.grid(row=6, column=0, columnspan=2, pady=10)
-
-        self.add_update_btn = tk.Button(btn_frame, text="Add Sanitary Product", command=self.add_or_update_product, bg="#3498db", fg="white", width=18)
+        self.add_update_btn = self.action_button(btn_frame, "Add Sanitary Product", self.add_or_update_product, width=180)
         self.add_update_btn.pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Clear", command=self.clear_form, bg="#95a5a6", fg="white", width=12).pack(side=tk.LEFT, padx=5)
+        self.action_button(btn_frame, "Clear", self.clear_form, width=110, primary=False).pack(side=tk.LEFT, padx=5)
 
-        filter_frame = tk.LabelFrame(left_frame, text="Filters", font=("Arial", 10, "bold"), padx=5, pady=5)
-        filter_frame.grid(row=7, column=0, columnspan=2, sticky=tk.EW, pady=(10, 0))
+        filter_frame = self.subpanel(left_frame, "Filters")
+        filter_frame.grid(row=6, column=0, columnspan=2, sticky=tk.EW, pady=(10, 0), padx=12)
 
         self.filter_company_var = tk.StringVar(value="All")
-        self.filter_company_combo = SearchableCombobox(filter_frame, textvariable=self.filter_company_var, width=20, state="normal", font=("Arial", 9))
+        self.filter_company_combo = SearchableCombobox(filter_frame, textvariable=self.filter_company_var, width=18, state="normal", font=FONTS["small"])
         self.filter_company_combo.set_completion_list(["All"] + SanitaryProduct.COMPANIES)
-        self.filter_company_combo.grid(row=0, column=0, padx=3, pady=3)
+        self.filter_company_combo.configure(font=FONTS["small"])
+        self.filter_company_combo.grid(row=1, column=0, padx=5, pady=(0, 8))
         self.filter_company_combo.bind('<<ComboboxSelected>>', self.on_filter_change)
 
         self.filter_category_var = tk.StringVar(value="All")
-        self.filter_category_combo = SearchableCombobox(filter_frame, textvariable=self.filter_category_var, width=20, state="normal", font=("Arial", 9))
+        self.filter_category_combo = SearchableCombobox(filter_frame, textvariable=self.filter_category_var, width=18, state="normal", font=FONTS["small"])
         self.filter_category_combo.set_completion_list(["All"] + SanitaryProduct.CATEGORIES)
-        self.filter_category_combo.grid(row=0, column=1, padx=3, pady=3)
+        self.filter_category_combo.configure(font=FONTS["small"])
+        self.filter_category_combo.grid(row=1, column=1, padx=5, pady=(0, 8))
         self.filter_category_combo.bind('<<ComboboxSelected>>', self.on_filter_change)
 
         self.filter_color_var = tk.StringVar(value="All")
-        self.filter_color_combo = SearchableCombobox(filter_frame, textvariable=self.filter_color_var, width=16, state="normal", font=("Arial", 9))
+        self.filter_color_combo = SearchableCombobox(filter_frame, textvariable=self.filter_color_var, width=14, state="normal", font=FONTS["small"])
         self.filter_color_combo.set_completion_list(["All"] + SanitaryProduct.ORIENT_COLORS)
-        self.filter_color_combo.grid(row=0, column=2, padx=3, pady=3)
+        self.filter_color_combo.configure(font=FONTS["small"])
+        self.filter_color_combo.grid(row=1, column=2, padx=5, pady=(0, 8))
         self.filter_color_combo.bind('<<ComboboxSelected>>', self.on_filter_change)
 
-        tk.Label(left_frame, text="Sanitary Products List:", font=("Arial", 10, "bold")).grid(row=8, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
+        self.form_label(left_frame, "Sanitary Products List:", bold=True).grid(row=7, column=0, columnspan=2, sticky=tk.W, pady=(10, 5), padx=12)
 
-        tree_frame = tk.Frame(left_frame)
-        tree_frame.grid(row=9, column=0, columnspan=2, sticky=tk.NSEW, pady=5)
+        tree_frame = ctk.CTkFrame(left_frame, fg_color=COLORS["surface"], corner_radius=SIZES["corner_radius"], border_width=1, border_color=COLORS["border"])
+        tree_frame.grid(row=8, column=0, columnspan=2, sticky=tk.NSEW, pady=5, padx=12)
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
 
-        columns = ('S.No', 'Company', 'Category', 'Color', 'SKU', 'Purchase', 'Sale')
+        columns = ('S.No', 'Company', 'Category', 'Color', 'SKU', 'Sale')
         self.products_tree = ttk.Treeview(tree_frame, columns=columns, show='headings', height=12)
         for col in columns:
             self.products_tree.heading(col, text=col)
@@ -131,51 +132,55 @@ class SanitaryWindow:
 
         tree_scroll = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.products_tree.yview)
         self.products_tree.configure(yscrollcommand=tree_scroll.set)
-        self.products_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.products_tree.grid(row=0, column=0, sticky=tk.NSEW, padx=(1, 0), pady=1)
+        tree_scroll.grid(row=0, column=1, sticky=tk.NS, pady=1)
         self.products_tree.bind('<<TreeviewSelect>>', self.on_product_select)
 
-        action_frame = tk.Frame(left_frame)
-        action_frame.grid(row=10, column=0, columnspan=2, pady=5)
+        action_frame = ctk.CTkFrame(left_frame, fg_color="transparent", corner_radius=0)
+        action_frame.grid(row=9, column=0, columnspan=2, pady=(5, 12))
 
-        tk.Button(action_frame, text="Edit", command=self.edit_selected, bg="#f39c12", fg="white", width=12).pack(side=tk.LEFT, padx=5)
-        tk.Button(action_frame, text="Delete", command=self.delete_selected, bg="#e74c3c", fg="white", width=12).pack(side=tk.LEFT, padx=5)
+        self.action_button(action_frame, "Edit", self.edit_selected, width=110).pack(side=tk.LEFT, padx=5)
+        self.action_button(action_frame, "Delete", self.delete_selected, width=110, danger=True).pack(side=tk.LEFT, padx=5)
 
-        right_frame = tk.LabelFrame(main_frame, text="Stock Management", font=("Arial", 12, "bold"), padx=10, pady=10)
+        right_frame = self.panel(main_frame, "Stock Management")
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
 
-        tk.Label(right_frame, text="Select Branch:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.form_label(right_frame, "Select Branch:", bold=True).grid(row=1, column=0, sticky=tk.W, pady=5, padx=(12, 8))
         self.branch_var = tk.StringVar()
-        self.branch_combo = SearchableCombobox(right_frame, textvariable=self.branch_var, width=27, state="normal", font=("Arial", 10))
+        self.branch_combo = SearchableCombobox(right_frame, textvariable=self.branch_var, width=SIZES["compact_dropdown_width"], state="normal", font=FONTS["small"])
         self.branch_combo.set_completion_list([b.name for b in self.branches])
-        self.branch_combo.grid(row=0, column=1, pady=5, padx=5, sticky=tk.W)
+        self.branch_combo.configure(font=FONTS["small"])
+        self.branch_combo.grid(row=1, column=1, pady=5, padx=(0, 12), sticky=tk.W)
         self.branch_combo.bind('<<ComboboxSelected>>', self.on_branch_select)
 
-        if AuthenticationService.is_employee(self.current_user):
+        if AuthenticationService.is_employee(self.current_user) and self.current_user.branch_id is not None:
             self.branch_combo.config(state="disabled")
 
-        tk.Label(right_frame, text="Select Sanitary Product:", font=("Arial", 10, "bold")).grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.form_label(right_frame, "Select Sanitary Product:", bold=True).grid(row=2, column=0, sticky=tk.W, pady=5, padx=(12, 8))
         self.stock_product_var = tk.StringVar()
-        self.stock_product_combo = SearchableCombobox(right_frame, textvariable=self.stock_product_var, width=55, state="normal", font=("Arial", 10))
-        self.stock_product_combo.grid(row=1, column=1, pady=5, padx=5, sticky=tk.W)
+        self.stock_product_combo = SearchableCombobox(right_frame, textvariable=self.stock_product_var, width=SIZES["dropdown_width"], state="normal", font=FONTS["small"])
+        self.stock_product_combo.configure(font=FONTS["small"])
+        self.stock_product_combo.grid(row=2, column=1, pady=5, padx=(0, 12), sticky=tk.W)
         self.stock_product_combo.bind('<<ComboboxSelected>>', self.on_stock_product_select)
 
-        stock_in_frame = tk.LabelFrame(right_frame, text="Stock IN (Purchase Entry)", font=("Arial", 10, "bold"), padx=5, pady=5)
-        stock_in_frame.grid(row=2, column=0, columnspan=2, sticky=tk.EW, pady=10)
-        tk.Label(stock_in_frame, text="Quantity:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=3)
-        self.stock_in_qty_entry = tk.Entry(stock_in_frame, width=20, font=("Arial", 9))
-        self.stock_in_qty_entry.grid(row=0, column=1, pady=3, padx=5)
-        tk.Button(stock_in_frame, text="Add Stock", command=self.add_stock, bg="#27ae60", fg="white", width=20).grid(row=1, column=0, columnspan=2, pady=10)
+        stock_in_frame = self.subpanel(right_frame, "Stock IN")
+        stock_in_frame.grid(row=3, column=0, columnspan=2, sticky=tk.EW, pady=10, padx=12)
+        self.form_label(stock_in_frame, "Quantity:").grid(row=1, column=0, sticky=tk.W, pady=3, padx=8)
+        self.stock_in_qty_entry = self.form_entry(stock_in_frame, width=160)
+        self.stock_in_qty_entry.grid(row=1, column=1, pady=3, padx=8, sticky=tk.W)
+        self.action_button(stock_in_frame, "Add Stock", self.add_stock, width=160).grid(row=2, column=0, columnspan=2, pady=10)
 
-        stock_out_frame = tk.LabelFrame(right_frame, text="Stock OUT (Sales/Adjustment Entry)", font=("Arial", 10, "bold"), padx=5, pady=5)
-        stock_out_frame.grid(row=3, column=0, columnspan=2, sticky=tk.EW, pady=10)
-        tk.Label(stock_out_frame, text="Quantity:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=3)
-        self.stock_out_qty_entry = tk.Entry(stock_out_frame, width=20, font=("Arial", 9))
-        self.stock_out_qty_entry.grid(row=0, column=1, pady=3, padx=5)
-        tk.Button(stock_out_frame, text="Remove Stock", command=self.remove_stock, bg="#e74c3c", fg="white", width=20).grid(row=1, column=0, columnspan=2, pady=10)
+        stock_out_frame = self.subpanel(right_frame, "Stock OUT")
+        stock_out_frame.grid(row=4, column=0, columnspan=2, sticky=tk.EW, pady=10, padx=12)
+        self.form_label(stock_out_frame, "Quantity:").grid(row=1, column=0, sticky=tk.W, pady=3, padx=8)
+        self.stock_out_qty_entry = self.form_entry(stock_out_frame, width=160)
+        self.stock_out_qty_entry.grid(row=1, column=1, pady=3, padx=8, sticky=tk.W)
+        self.action_button(stock_out_frame, "Remove Stock", self.remove_stock, width=160, danger=True).grid(row=2, column=0, columnspan=2, pady=10)
 
-        stock_display_frame = tk.LabelFrame(right_frame, text="Current Sanitary Stock", font=("Arial", 10, "bold"), padx=5, pady=5)
-        stock_display_frame.grid(row=4, column=0, columnspan=2, sticky=tk.NSEW, pady=10)
+        stock_display_frame = self.subpanel(right_frame, "Current Sanitary Stock")
+        stock_display_frame.grid(row=5, column=0, columnspan=2, sticky=tk.NSEW, pady=10, padx=12)
+        stock_display_frame.grid_rowconfigure(1, weight=1)
+        stock_display_frame.grid_columnconfigure(0, weight=1)
 
         stock_columns = ('S.No', 'Company', 'Category', 'Color', 'SKU', 'Sale', 'Qty', 'Value')
         self.stock_tree = ttk.Treeview(stock_display_frame, columns=stock_columns, show='headings', height=10)
@@ -187,19 +192,97 @@ class SanitaryWindow:
 
         stock_scroll = ttk.Scrollbar(stock_display_frame, orient=tk.VERTICAL, command=self.stock_tree.yview)
         self.stock_tree.configure(yscrollcommand=stock_scroll.set)
-        self.stock_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        stock_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.stock_tree.grid(row=1, column=0, sticky=tk.NSEW, padx=(8, 0), pady=(0, 8))
+        stock_scroll.grid(row=1, column=1, sticky=tk.NS, padx=(0, 8), pady=(0, 8))
 
-        tk.Button(right_frame, text="Refresh Stock", command=self.refresh_stock, bg="#3498db", fg="white", width=20).grid(row=5, column=0, columnspan=2, pady=5)
+        self.action_button(right_frame, "Refresh Stock", self.refresh_stock, width=160).grid(row=6, column=0, columnspan=2, pady=(5, 12))
 
-        left_frame.grid_rowconfigure(9, weight=1)
+        left_frame.grid_rowconfigure(8, weight=1)
         left_frame.grid_columnconfigure(1, weight=1)
         right_frame.grid_columnconfigure(1, weight=1)
-        right_frame.grid_rowconfigure(4, weight=1)
+        right_frame.grid_rowconfigure(5, weight=1)
+
+    def panel(self, parent, title):
+        panel = ctk.CTkFrame(
+            parent,
+            fg_color=COLORS["surface"],
+            corner_radius=SIZES["corner_radius"],
+            border_width=1,
+            border_color=COLORS["border"],
+        )
+        ctk.CTkLabel(
+            panel,
+            text=title,
+            font=FONTS["body_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["section_label_height"],
+        ).grid(row=0, column=0, columnspan=2, sticky=tk.EW, padx=12, pady=(10, 8))
+        return panel
+
+    def subpanel(self, parent, title):
+        panel = ctk.CTkFrame(
+            parent,
+            fg_color=COLORS["card"],
+            corner_radius=SIZES["corner_radius"],
+            border_width=1,
+            border_color=COLORS["border"],
+        )
+        ctk.CTkLabel(
+            panel,
+            text=title,
+            font=FONTS["small_bold"],
+            text_color=COLORS["text"],
+            height=SIZES["small_label_height"],
+        ).grid(row=0, column=0, columnspan=3, sticky=tk.EW, padx=8, pady=(8, 4))
+        return panel
+
+    def form_label(self, parent, text, bold=False):
+        return ctk.CTkLabel(
+            parent,
+            text=text,
+            font=FONTS["small_bold"] if bold else FONTS["small"],
+            text_color=COLORS["text"],
+            height=SIZES["small_label_height"],
+            anchor=tk.W,
+        )
+
+    def form_entry(self, parent, width=220):
+        return ctk.CTkEntry(
+            parent,
+            width=width,
+            height=SIZES["input_height"],
+            font=FONTS["small"],
+            fg_color=COLORS["app_bg"],
+            border_color=COLORS["border"],
+            text_color=COLORS["text"],
+        )
+
+    def action_button(self, parent, text, command, width=140, primary=True, danger=False):
+        if danger:
+            fg_color, hover_color = COLORS["danger"], COLORS["danger_hover"]
+        elif primary:
+            fg_color, hover_color = COLORS["primary"], COLORS["primary_hover"]
+        else:
+            fg_color, hover_color = COLORS["card"], COLORS["card_hover"]
+        return ctk.CTkButton(
+            parent,
+            text=text,
+            command=command,
+            width=width,
+            height=34,
+            fg_color=fg_color,
+            hover_color=hover_color,
+            text_color=COLORS["text"],
+            font=FONTS["small_bold"],
+            border_width=0 if primary or danger else 1,
+            border_color=COLORS["border"],
+            corner_radius=SIZES["corner_radius"],
+            cursor="hand2",
+        )
 
     def load_products(self):
         """Load sanitary products into treeview and dropdown"""
-        self.products = SanitaryProductRepository.get_all(
+        self.products = self.fetch_products(
             self.filter_company_var.get() if hasattr(self, 'filter_company_var') else 'All',
             self.filter_category_var.get() if hasattr(self, 'filter_category_var') else 'All',
             self.filter_color_var.get() if hasattr(self, 'filter_color_var') else 'All',
@@ -216,7 +299,6 @@ class SanitaryWindow:
                     product.product_category,
                     product.color,
                     product.sku,
-                    f"Rs. {product.purchase_price:.0f}",
                     f"Rs. {product.sale_price:.0f}"
                 ))
 
@@ -226,7 +308,7 @@ class SanitaryWindow:
     def update_stock_dropdown(self):
         """Update stock product dropdown"""
         if hasattr(self, 'stock_product_combo'):
-            all_products = SanitaryProductRepository.get_all()
+            all_products = self.fetch_products()
             values = [self.format_product(product) for product in all_products]
             self.stock_product_combo.set_completion_list(values)
             self._stock_products = all_products
@@ -274,21 +356,31 @@ class SanitaryWindow:
             company = self.company_var.get().strip()
             category = self.category_var.get().strip()
             color = self.color_var.get().strip()
-            sku = self.sku_entry.get().strip()
-            purchase_price = float(self.purchase_entry.get().strip() or "0")
             sale_price = float(self.sale_entry.get().strip() or "0")
 
             if self.editing_product_id:
-                SanitaryService.update_product(
-                    self.editing_product_id, company, category, color,
-                    purchase_price, sale_price, sku
-                )
+                api_client.put(f"/catalog/sanitary/{self.editing_product_id}", {
+                    "company_name": company,
+                    "product_category": category,
+                    "color": color,
+                    "sale_price": sale_price,
+                })
                 messagebox.showinfo("Success", "Sanitary product updated successfully!")
                 self.editing_product_id = None
-                self.add_update_btn.config(text="Add Sanitary Product", bg="#3498db")
+                self.add_update_btn.configure(
+                    text="Add Sanitary Product",
+                    fg_color=COLORS["primary"],
+                    hover_color=COLORS["primary_hover"],
+                )
             else:
-                SanitaryService.add_product(company, category, color, purchase_price, sale_price, sku)
+                api_client.post("/catalog/sanitary", {
+                    "company_name": company,
+                    "product_category": category,
+                    "color": color,
+                    "sale_price": sale_price,
+                })
                 messagebox.showinfo("Success", "Sanitary product added successfully!")
+            invalidate_cache("sanitary")
 
             self.clear_form()
             self.load_products()
@@ -314,15 +406,15 @@ class SanitaryWindow:
         self.on_company_change(None)
         self.category_var.set(product.product_category)
         self.color_var.set(product.color)
-        self.sku_entry.delete(0, tk.END)
-        self.sku_entry.insert(0, product.sku)
-        self.purchase_entry.delete(0, tk.END)
-        self.purchase_entry.insert(0, str(int(product.purchase_price)))
         self.sale_entry.delete(0, tk.END)
         self.sale_entry.insert(0, str(int(product.sale_price)))
 
         self.editing_product_id = product.id
-        self.add_update_btn.config(text="Update Sanitary Product", bg="#f39c12")
+        self.add_update_btn.configure(
+            text="Update Sanitary Product",
+            fg_color=COLORS["warning"],
+            hover_color=COLORS["warning_hover"],
+        )
 
     def delete_selected(self):
         """Delete selected sanitary product"""
@@ -345,7 +437,8 @@ class SanitaryWindow:
         )
         if confirm:
             try:
-                SanitaryService.delete_product(product.id)
+                api_client.delete(f"/catalog/sanitary/{product.id}")
+                invalidate_cache("sanitary")
                 messagebox.showinfo("Success", "Sanitary product deleted successfully!")
                 self.clear_form()
                 self.load_products()
@@ -357,11 +450,13 @@ class SanitaryWindow:
         self.company_var.set(SanitaryProduct.COMPANIES[0])
         self.category_var.set(SanitaryProduct.CATEGORIES[0])
         self.color_var.set("White")
-        self.sku_entry.delete(0, tk.END)
-        self.purchase_entry.delete(0, tk.END)
         self.sale_entry.delete(0, tk.END)
         self.editing_product_id = None
-        self.add_update_btn.config(text="Add Sanitary Product", bg="#3498db")
+        self.add_update_btn.configure(
+            text="Add Sanitary Product",
+            fg_color=COLORS["primary"],
+            hover_color=COLORS["primary_hover"],
+        )
 
     def add_stock(self):
         """Add stock for a sanitary product"""
@@ -370,7 +465,11 @@ class SanitaryWindow:
             if not AuthenticationService.can_access_branch(self.current_user, branch_id):
                 raise ValueError("You do not have access to this branch")
 
-            SanitaryService.add_stock(branch_id, product.id, quantity, user_id=self.current_user.id)
+            api_client.post(f"/inventory/sanitary/{product.id}/stock-in", {
+                "branch_id": branch_id,
+                "quantity": quantity,
+                "notes": "Desktop sanitary stock in",
+            })
             messagebox.showinfo("Success", f"Added {quantity} units to sanitary stock!")
             self.stock_in_qty_entry.delete(0, tk.END)
             self.refresh_stock()
@@ -384,8 +483,9 @@ class SanitaryWindow:
             if not AuthenticationService.can_access_branch(self.current_user, branch_id):
                 raise ValueError("You do not have access to this branch")
 
-            inv = SanitaryService.get_inventory(branch_id, product.id)
-            available = inv.quantity if inv else 0
+            inventory = self.fetch_inventory(branch_id)
+            inv = next((row for row in inventory if row["sanitary_product_id"] == product.id), None)
+            available = int(inv["quantity"]) if inv else 0
             if quantity > available:
                 raise ValueError(f"Insufficient stock. Available: {available}, Requested: {quantity}")
 
@@ -396,7 +496,11 @@ class SanitaryWindow:
             if not confirm:
                 return
 
-            SanitaryService.deduct_stock(branch_id, product.id, quantity, user_id=self.current_user.id)
+            api_client.post(f"/inventory/sanitary/{product.id}/stock-out", {
+                "branch_id": branch_id,
+                "quantity": quantity,
+                "notes": "Desktop sanitary stock out",
+            })
             messagebox.showinfo("Success", f"Removed {quantity} units from sanitary stock!")
             self.stock_out_qty_entry.delete(0, tk.END)
             self.refresh_stock()
@@ -429,15 +533,19 @@ class SanitaryWindow:
         if not self.selected_branch_id:
             return
 
-        all_products = SanitaryProductRepository.get_all(
+        all_products = self.fetch_products(
             self.filter_company_var.get(),
             self.filter_category_var.get(),
             self.filter_color_var.get()
         )
 
+        inventory_by_product = {
+            row["sanitary_product_id"]: row for row in self.fetch_inventory(self.selected_branch_id)
+        }
+
         for idx, product in enumerate(all_products, 1):
-            inv = SanitaryInventoryRepository.get_by_branch_product(self.selected_branch_id, product.id)
-            qty = inv.quantity if inv else 0
+            inv = inventory_by_product.get(product.id)
+            qty = int(inv["quantity"]) if inv else 0
             total_value = qty * product.sale_price
 
             self.stock_tree.insert('', tk.END, values=(
@@ -458,3 +566,23 @@ class SanitaryWindow:
             f"{product.company_name} - {product.product_category} - "
             f"{product.color} ({product.sku}) Rs. {product.sale_price:.0f}"
         )
+
+    @staticmethod
+    def fetch_products(company="All", category="All", color="All"):
+        from urllib.parse import urlencode
+
+        params = {}
+        if company and company != "All":
+            params["company"] = company
+        if category and category != "All":
+            params["category"] = category
+        if color and color != "All":
+            params["color"] = color
+        path = "/catalog/sanitary"
+        if params:
+            path += "?" + urlencode(params)
+        return [SanitaryProduct.from_dict(row) for row in api_client.get(path)]
+
+    @staticmethod
+    def fetch_inventory(branch_id):
+        return api_client.get(f"/inventory/sanitary/{branch_id}")

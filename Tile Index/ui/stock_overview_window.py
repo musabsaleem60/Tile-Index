@@ -24,6 +24,7 @@ class StockOverviewWindow:
         self.branches = []
         self.tiles = []
         self.accessories = []
+        self.sanitary = []
         self.rows_by_iid = {}
 
         self.setup_ui()
@@ -54,7 +55,7 @@ class StockOverviewWindow:
 
         self.tab_control = ctk.CTkSegmentedButton(
             controls,
-            values=["Tiles", "Accessories"],
+            values=["Tiles", "Accessories", "Sanitary"],
             command=self.on_tab_change,
             selected_color=COLORS["primary"],
             selected_hover_color=COLORS["primary_hover"],
@@ -208,7 +209,11 @@ class StockOverviewWindow:
         )
 
     def on_tab_change(self, value):
-        self.active_tab = "tiles" if value == "Tiles" else "accessories"
+        self.active_tab = {
+            "Tiles": "tiles",
+            "Accessories": "accessories",
+            "Sanitary": "sanitary",
+        }[value]
         self.configure_for_tab()
         self.populate_table()
 
@@ -238,10 +243,10 @@ class StockOverviewWindow:
             breakdown_widths = {"branch": 190, "boxes": 65, "loose": 65, "pieces": 70}
         else:
             self.grade_combo.configure(state="disabled")
-            self.category_combo.configure(state="readonly")
+            self.category_combo.configure(state="readonly" if self.active_tab == "accessories" else "disabled")
             columns = ("product", "category", "total_quantity")
             headings = {
-                "product": "Accessory",
+                "product": "Accessory" if self.active_tab == "accessories" else "Sanitary Product",
                 "category": "Category",
                 "total_quantity": "Total Qty",
             }
@@ -291,6 +296,7 @@ class StockOverviewWindow:
             self.branches = data.get("branches", [])
             self.tiles = data.get("tiles", [])
             self.accessories = data.get("accessories", [])
+            self.sanitary = data.get("sanitary", [])
             self.update_branch_filter()
             self.populate_table()
         except ApiClientError as exc:
@@ -317,7 +323,11 @@ class StockOverviewWindow:
         for item in self.tree.get_children():
             self.tree.delete(item)
 
-        rows = self.tiles if self.active_tab == "tiles" else self.accessories
+        rows = {
+            "tiles": self.tiles,
+            "accessories": self.accessories,
+            "sanitary": self.sanitary,
+        }[self.active_tab]
         for index, row in enumerate(rows):
             iid = str(index)
             self.rows_by_iid[iid] = row
@@ -338,7 +348,11 @@ class StockOverviewWindow:
                 )
             self.tree.insert("", tk.END, iid=iid, values=values)
 
-        noun = "tile rows" if self.active_tab == "tiles" else "accessory rows"
+        noun = {
+            "tiles": "tile rows",
+            "accessories": "accessory rows",
+            "sanitary": "sanitary rows",
+        }[self.active_tab]
         if rows:
             self.status_label.configure(text=f"{len(rows)} {noun} found")
         elif self.show_all_var.get():

@@ -8,6 +8,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 from desktop_client.api_client import ApiClientError
 from desktop_client.catalog_preload import preload_catalogues
+from desktop_client.config import LOGIN_API_TIMEOUT_SECONDS
 from desktop_client.config import API_BASE_URL, CHECK_UPDATES
 from desktop_client.machine_status import report_desktop_status
 from desktop_client.session import api_client, set_authenticated_session, set_update_warning
@@ -202,7 +203,7 @@ class LoginWindow:
             response = api_client.post("/auth/login", {
                 "username": username,
                 "password": password
-            })
+            }, timeout=LOGIN_API_TIMEOUT_SECONDS)
             set_authenticated_session(response["access_token"])
 
             api_user = response["user"]

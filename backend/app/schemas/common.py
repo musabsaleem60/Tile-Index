@@ -56,13 +56,13 @@ class SanitaryProductIn(BaseModel):
     company_name: str = Field(min_length=1, max_length=160)
     product_category: str = Field(min_length=1, max_length=160)
     color: str = Field(min_length=1, max_length=80)
-    purchase_price: float = Field(ge=0)
     sale_price: float = Field(ge=0)
-    sku: str = Field(min_length=1, max_length=160)
 
 
 class SanitaryProductOut(SanitaryProductIn, ORMModel):
     id: int
+    purchase_price: float
+    sku: str
     created_at: datetime | None = None
 
 
