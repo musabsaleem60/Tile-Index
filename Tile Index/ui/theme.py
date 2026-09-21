@@ -101,6 +101,7 @@ def apply_ttk_theme():
         pass
 
     _install_combobox_arrow(style)
+    _install_combobox_mousewheel_passthrough(style.master)
 
     style.configure(
         "TCombobox",
@@ -259,3 +260,55 @@ def _install_combobox_arrow(style):
         )
     except tk.TclError:
         pass
+
+
+def _install_combobox_mousewheel_passthrough(root):
+    """Keep a closed combobox inert while forwarding wheel input to its page."""
+    root.bind_class("TCombobox", "<MouseWheel>", _on_combobox_mousewheel)
+    root.bind_class("TCombobox", "<Button-4>", _on_combobox_mousewheel)
+    root.bind_class("TCombobox", "<Button-5>", _on_combobox_mousewheel)
+
+
+def _on_combobox_mousewheel(event):
+    widget = event.widget
+    if _combobox_popdown_is_open(widget):
+        return None
+
+    for canvas in _scrollable_ancestor_canvases(widget):
+        try:
+            if canvas.yview() == (0.0, 1.0):
+                continue
+            if getattr(event, "num", None) in (4, 5):
+                units = -1 if event.num == 4 else 1
+            else:
+                delta = getattr(event, "delta", 0)
+                units = -1 if delta > 0 else 1 if delta < 0 else 0
+            if units:
+                canvas.yview_scroll(units, "units")
+            break
+        except (AttributeError, tk.TclError):
+            continue
+    return "break"
+
+
+def _combobox_popdown_is_open(widget):
+    try:
+        popdown = widget.tk.call("ttk::combobox::PopdownWindow", str(widget))
+        return bool(int(widget.tk.call("winfo", "ismapped", popdown)))
+    except (AttributeError, tk.TclError, ValueError):
+        return False
+
+
+def _scrollable_ancestor_canvases(widget):
+    """Yield inner-to-outer vertical canvases that contain a widget."""
+    seen = set()
+    parent = getattr(widget, "master", None)
+    while parent is not None:
+        canvas = getattr(parent, "_parent_canvas", None)
+        if isinstance(canvas, tk.Canvas) and str(canvas) not in seen:
+            seen.add(str(canvas))
+            yield canvas
+        if isinstance(parent, tk.Canvas) and str(parent) not in seen:
+            seen.add(str(parent))
+            yield parent
+        parent = getattr(parent, "master", None)
