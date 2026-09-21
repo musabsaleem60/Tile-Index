@@ -14,15 +14,17 @@ def validate_positive_number(value, field_name="Value"):
         raise ValueError(f"{field_name} must be a valid number")
 
 
-def validate_integer(value, field_name="Value", min_value=0):
+def validate_integer(value, field_name="Value", min_value=0, max_value=None):
     """Validate that a value is a non-negative integer"""
     try:
         num = int(value)
-        if num < min_value:
-            raise ValueError(f"{field_name} must be at least {min_value}")
-        return num
     except (ValueError, TypeError):
         raise ValueError(f"{field_name} must be a valid integer")
+    if num < min_value:
+        raise ValueError(f"{field_name} must be at least {min_value}")
+    if max_value is not None and num > max_value:
+        raise ValueError(f"{field_name} must be no more than {max_value}")
+    return num
 
 
 def validate_required(value, field_name="Field"):

@@ -26,7 +26,7 @@ class ProductIn(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     tile_size: str = Field(min_length=1, max_length=80)
     area_per_box: float = Field(gt=0)
-    pieces_per_box: int = Field(gt=0)
+    pieces_per_box: int = Field(ge=1, le=100)
 
 
 class ProductOut(ProductIn, ORMModel):

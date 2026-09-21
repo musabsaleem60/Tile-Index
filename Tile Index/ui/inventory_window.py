@@ -374,7 +374,12 @@ class InventoryWindow:
             name = validate_required(self.product_name_entry.get(), "Product Name")
             tile_size = validate_required(self.tile_size_entry.get(), "Tile Size")
             area_per_box = validate_positive_number(self.area_per_box_entry.get(), "Area per Box")
-            pieces_per_box = validate_integer(self.pieces_per_box_entry.get(), "Pieces per Box", min_value=1)
+            pieces_per_box = validate_integer(
+                self.pieces_per_box_entry.get(),
+                "Pieces per Box",
+                min_value=1,
+                max_value=100,
+            )
             if not self.confirm_rate_card_exists(tile_size):
                 return
             
