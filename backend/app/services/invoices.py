@@ -10,6 +10,7 @@ from app.models.entities import (
     Invoice,
     InvoiceItem,
     InvoicePayment,
+    InvoiceReturn,
     Product,
     SanitaryInventory,
     SanitaryProduct,
@@ -404,6 +405,16 @@ def void_invoice(db: Session, invoice_id: int, reason: str, user: User) -> Invoi
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="This invoice has recorded payments and cannot be voided. Record a refund/adjustment first.",
+        )
+    completed_return = db.scalar(
+        select(InvoiceReturn.id)
+        .where(InvoiceReturn.invoice_id == invoice.id, InvoiceReturn.status == "completed")
+        .limit(1)
+    )
+    if completed_return:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This invoice has a completed return and cannot be voided.",
         )
 
     for item in invoice.items:

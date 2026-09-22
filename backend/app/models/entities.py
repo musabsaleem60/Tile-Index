@@ -354,6 +354,87 @@ class InvoicePayment(Base):
     )
 
 
+class InvoiceReturn(Base):
+    __tablename__ = "invoice_returns"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    return_number: Mapped[str | None] = mapped_column(String(40), unique=True)
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id", ondelete="RESTRICT"), nullable=False)
+    branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    return_date: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    returned_value: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
+    exchange_value: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
+    difference_amount: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="completed", nullable=False)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    return_items = relationship("InvoiceReturnItem", cascade="all, delete-orphan")
+    exchange_items = relationship("ReturnExchangeItem", cascade="all, delete-orphan")
+    settlements = relationship("ReturnSettlement")
+
+
+class InvoiceReturnItem(Base):
+    __tablename__ = "invoice_return_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    return_id: Mapped[int] = mapped_column(ForeignKey("invoice_returns.id", ondelete="CASCADE"), nullable=False)
+    invoice_item_id: Mapped[int] = mapped_column(ForeignKey("invoice_items.id", ondelete="RESTRICT"), nullable=False)
+    source_branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), nullable=False)
+    item_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    boxes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    loose_pieces: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    rate_per_sqm: Mapped[float] = mapped_column(Numeric(14, 4), default=0, nullable=False)
+    rate_per_box: Mapped[float] = mapped_column(Numeric(14, 4), default=0, nullable=False)
+    rate_per_piece: Mapped[float] = mapped_column(Numeric(14, 4), default=0, nullable=False)
+    unit_price: Mapped[float] = mapped_column(Numeric(14, 4), default=0, nullable=False)
+    discounted_line_total: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
+    boxes_restored_to_boxes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    pieces_restored_to_loose: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
+class ReturnExchangeItem(Base):
+    __tablename__ = "return_exchange_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    return_id: Mapped[int] = mapped_column(ForeignKey("invoice_returns.id", ondelete="CASCADE"), nullable=False)
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"))
+    accessory_id: Mapped[int | None] = mapped_column(ForeignKey("accessories.id", ondelete="RESTRICT"))
+    sanitary_product_id: Mapped[int | None] = mapped_column(ForeignKey("sanitary_products.id", ondelete="RESTRICT"))
+    source_branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), nullable=False)
+    item_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    description: Mapped[str] = mapped_column(String(255), nullable=False)
+    tile_size: Mapped[str | None] = mapped_column(String(80))
+    grade: Mapped[str | None] = mapped_column(String(80))
+    boxes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    loose_pieces: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    rate_per_sqm: Mapped[float] = mapped_column(Numeric(14, 4), default=0, nullable=False)
+    rate_per_box: Mapped[float] = mapped_column(Numeric(14, 4), default=0, nullable=False)
+    rate_per_piece: Mapped[float] = mapped_column(Numeric(14, 4), default=0, nullable=False)
+    unit_price: Mapped[float] = mapped_column(Numeric(14, 4), default=0, nullable=False)
+    line_total: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
+    boxes_from_boxes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    pieces_from_loose: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
+class ReturnSettlement(Base):
+    __tablename__ = "return_settlements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    return_id: Mapped[int] = mapped_column(ForeignKey("invoice_returns.id", ondelete="RESTRICT"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), nullable=False)
+    direction: Mapped[str] = mapped_column(String(30), nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
+    method: Mapped[str | None] = mapped_column(String(30))
+    settlement_date: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class StockTransaction(Base):
     __tablename__ = "stock_transactions"
 

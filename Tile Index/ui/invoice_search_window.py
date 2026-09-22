@@ -14,6 +14,7 @@ from utils.datetime_format import format_business_datetime
 from utils.invoice_printer import InvoicePrintWindow
 from utils.searchable_combobox import SearchableCombobox
 from ui.theme import COLORS, FONTS, SIZES, SPACING
+from ui.invoice_return_dialog import InvoiceReturnDialog
 
 
 class InvoiceSearchWindow:
@@ -138,6 +139,7 @@ class InvoiceSearchWindow:
         self.action_button(btn_frame, "View/Print Invoice", self.view_invoice, width=190).pack(side=tk.LEFT, padx=5)
         self.action_button(btn_frame, "Record Payment", self.record_payment, width=170).pack(side=tk.LEFT, padx=5)
         self.action_button(btn_frame, "Edit Remarks", self.edit_remarks, width=160).pack(side=tk.LEFT, padx=5)
+        self.action_button(btn_frame, "Return / Exchange", self.return_exchange, width=180).pack(side=tk.LEFT, padx=5)
         self.void_button = self.action_button(btn_frame, "Void Invoice", self.void_invoice, width=170, danger=True)
         self.void_button.pack(side=tk.LEFT, padx=5)
 
@@ -262,7 +264,7 @@ class InvoiceSearchWindow:
         self.view_invoice()
 
     def on_invoice_select(self, event=None):
-        """Disable void when the selected invoice already has payment rows."""
+        """Disable void when payments or completed returns exist."""
         if not self.void_button:
             return
         invoice_id = self.selected_invoice_id()
@@ -271,26 +273,20 @@ class InvoiceSearchWindow:
             return
         try:
             payments = InvoiceService.get_payments(invoice_id)
-            self.void_button.configure(state=tk.DISABLED if payments else tk.NORMAL)
+            returns = InvoiceService.get_returns(invoice_id).get("returns", [])
+            completed_return = any(row.get("status") == "completed" for row in returns)
+            self.void_button.configure(state=tk.DISABLED if payments or completed_return else tk.NORMAL)
         except Exception:
             self.void_button.configure(state=tk.NORMAL)
     
     def view_invoice(self):
         """View selected invoice"""
-        selection = self.results_tree.selection()
-        if not selection:
+        invoice_id = self.selected_invoice_id()
+        if not invoice_id:
             messagebox.showwarning("Warning", "Please select an invoice to view")
             return
-        
-        item_id = selection[0]
-        invoice_id_str = self.results_tree.set(item_id, 'invoice_id')
-        
-        if not invoice_id_str:
-            messagebox.showerror("Error", "Could not retrieve invoice ID")
-            return
-        
+
         try:
-            invoice_id = int(invoice_id_str)
             # Open invoice print window
             print_window = tk.Toplevel(self.parent)
             InvoicePrintWindow(print_window, invoice_id=invoice_id)
@@ -371,7 +367,7 @@ class InvoiceSearchWindow:
                 amount = float(amount_entry.get().strip())
                 payment_date = self.parse_payment_date(date_entry.get().strip())
                 updated = InvoiceService.record_payment(
-                    invoice.id,
+                    invoice_id,
                     amount,
                     payment_date,
                     method_var.get(),
@@ -459,15 +455,33 @@ class InvoiceSearchWindow:
         self.action_button(btn_frame, "Save Remarks", save_remarks, width=150).pack(side=tk.LEFT, padx=(0, 8))
         self.action_button(btn_frame, "Cancel", dialog.destroy, width=120, danger=False).pack(side=tk.LEFT)
 
+    def return_exchange(self):
+        invoice_id = self.selected_invoice_id()
+        if not invoice_id:
+            messagebox.showwarning("Return / Exchange", "Please select an invoice.")
+            return
+        try:
+            invoice = InvoiceService.get_invoice(invoice_id)
+        except Exception as exc:
+            messagebox.showerror("Return / Exchange", f"Failed to load invoice: {exc}")
+            return
+        if invoice.status == "void":
+            messagebox.showerror("Return / Exchange", "A void invoice cannot be returned.")
+            return
+        try:
+            InvoiceReturnDialog(self.parent, invoice, on_complete=lambda _result: self.search_invoices())
+        except Exception as exc:
+            messagebox.showerror("Return / Exchange", f"Failed to load return history: {exc}")
+
     def void_invoice(self):
         """Void selected invoice."""
+        invoice_id = self.selected_invoice_id()
         selection = self.results_tree.selection()
-        if not selection:
+        if not invoice_id or not selection:
             messagebox.showwarning("Warning", "Please select an invoice to void")
             return
 
         item_id = selection[0]
-        invoice_id_str = self.results_tree.set(item_id, 'invoice_id')
         invoice_number = self.results_tree.set(item_id, 'Invoice No')
         status_text = self.results_tree.set(item_id, 'Status')
         if status_text == "VOID":
@@ -475,7 +489,7 @@ class InvoiceSearchWindow:
             return
 
         try:
-            payments = InvoiceService.get_payments(int(invoice_id_str))
+            payments = InvoiceService.get_payments(invoice_id)
             if payments:
                 messagebox.showerror(
                     "Void Failed",
@@ -503,7 +517,7 @@ class InvoiceSearchWindow:
             return
 
         try:
-            InvoiceService.void_invoice(int(invoice_id_str), reason)
+            InvoiceService.void_invoice(invoice_id, reason)
             messagebox.showinfo("Invoice Voided", f"Invoice {invoice_number} has been marked VOID.")
             self.search_invoices()
         except Exception as e:

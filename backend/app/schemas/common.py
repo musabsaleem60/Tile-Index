@@ -234,6 +234,107 @@ class InvoicePaymentOut(ORMModel):
     created_at: datetime | None = None
 
 
+class ReturnItemIn(BaseModel):
+    invoice_item_id: int
+    boxes: int = Field(default=0, ge=0)
+    loose_pieces: int = Field(default=0, ge=0)
+    quantity: int = Field(default=0, ge=0)
+
+
+class ReturnSettlementIn(BaseModel):
+    amount: float = Field(gt=0)
+    direction: str
+    settlement_date: datetime
+    method: str | None = Field(default=None, max_length=30)
+    notes: str | None = Field(default=None, max_length=500)
+
+
+class InvoiceReturnCreate(BaseModel):
+    return_date: datetime
+    reason: str = Field(min_length=5, max_length=500)
+    return_items: list[ReturnItemIn]
+    exchange_items: list[InvoiceItemIn] = Field(default_factory=list)
+    settlement: ReturnSettlementIn | None = None
+
+
+class ReturnItemOut(ORMModel):
+    id: int
+    invoice_item_id: int
+    source_branch_id: int
+    item_type: str
+    boxes: int
+    loose_pieces: int
+    quantity: int
+    rate_per_sqm: float
+    rate_per_box: float
+    rate_per_piece: float
+    unit_price: float
+    discounted_line_total: float
+    boxes_restored_to_boxes: int
+    pieces_restored_to_loose: int
+
+
+class ReturnExchangeItemOut(ORMModel):
+    id: int
+    product_id: int | None = None
+    accessory_id: int | None = None
+    sanitary_product_id: int | None = None
+    source_branch_id: int
+    item_type: str
+    description: str
+    tile_size: str | None = None
+    grade: str | None = None
+    boxes: int
+    loose_pieces: int
+    quantity: int
+    rate_per_sqm: float
+    rate_per_box: float
+    rate_per_piece: float
+    unit_price: float
+    line_total: float
+    boxes_from_boxes: int
+    pieces_from_loose: int
+
+
+class ReturnSettlementOut(ORMModel):
+    id: int
+    return_id: int
+    user_id: int
+    branch_id: int
+    direction: str
+    amount: float
+    method: str | None = None
+    settlement_date: datetime
+    notes: str | None = None
+    created_at: datetime
+
+
+class InvoiceReturnOut(ORMModel):
+    id: int
+    return_number: str
+    invoice_id: int
+    branch_id: int
+    user_id: int
+    return_date: datetime
+    reason: str
+    returned_value: float
+    exchange_value: float
+    difference_amount: float
+    status: str
+    created_at: datetime
+    return_items: list[ReturnItemOut] = Field(default_factory=list)
+    exchange_items: list[ReturnExchangeItemOut] = Field(default_factory=list)
+    settlements: list[ReturnSettlementOut] = Field(default_factory=list)
+    settled_amount: float = 0
+    outstanding_amount: float = 0
+    difference_direction: str = "even"
+
+
+class InvoiceReturnHistoryOut(BaseModel):
+    returns: list[InvoiceReturnOut]
+    remaining_by_item: dict[int, dict]
+
+
 class UpdateInfo(BaseModel):
     latest_version: str
     min_desktop_version: str

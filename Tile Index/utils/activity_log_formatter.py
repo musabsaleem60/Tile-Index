@@ -36,6 +36,30 @@ def format_activity_details(activity) -> str:
             f"Old: {data.get('old_remarks')}" if data.get("old_remarks") else "Old: empty",
             f"New: {data.get('new_remarks')}" if data.get("new_remarks") else "New: empty",
         ])
+    if action == "Invoice Return Processed":
+        returned = data.get("returned_items") or []
+        exchanged = data.get("exchange_items") or []
+        lines = [
+            f"Return {data.get('return_number')} against invoice {data.get('invoice_number')}",
+            *[f"Returned: {row.get('description')} | {_quantity(row)} | Rs. {float(row.get('value', 0)):.2f}" for row in returned],
+            *[f"Exchange: {row.get('description')} | {_quantity(row)} | Rs. {float(row.get('value', 0)):.2f}" for row in exchanged],
+            _money("Returned value", data.get("returned_value")),
+            _money("Exchange value", data.get("exchange_value")),
+            _money("Difference", data.get("difference_amount")),
+            f"Reason: {data.get('reason')}" if data.get("reason") else None,
+        ]
+        settlement = data.get("settlement") or {}
+        if settlement:
+            lines.append(f"Settlement: {settlement.get('direction')} | Rs. {float(settlement.get('amount', 0)):.2f} | {settlement.get('method') or 'unspecified'}")
+        return _join_sentences(lines)
+    if action == "Return Settlement Recorded":
+        return _join_sentences([
+            f"Settlement for return {data.get('return_number')}",
+            f"Direction: {data.get('direction')}" if data.get("direction") else None,
+            _money("Amount", data.get("amount")),
+            f"Method: {data.get('method')}" if data.get("method") else None,
+            f"Date: {data.get('settlement_date')}" if data.get("settlement_date") else None,
+        ])
     if action == "Cross-Branch Sale":
         return _join_sentences([
             data.get("description"),

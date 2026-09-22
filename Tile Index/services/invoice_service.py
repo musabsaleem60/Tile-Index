@@ -280,6 +280,7 @@ class InvoiceService:
     @staticmethod
     def get_invoice(invoice_id):
         """Get invoice by ID"""
+        invoice_id = InvoiceService._numeric_invoice_id(invoice_id)
         if is_api_authenticated():
             return InvoiceService._invoice_from_api(api_client.get(f"/invoices/{invoice_id}"))
 
@@ -290,6 +291,7 @@ class InvoiceService:
         """Void an invoice through the API."""
         if not is_api_authenticated():
             raise ValueError("Invoice voiding requires the API connection")
+        invoice_id = InvoiceService._numeric_invoice_id(invoice_id)
         data = api_client.post(f"/invoices/{invoice_id}/void", {"reason": reason})
         return InvoiceService._invoice_from_api(data)
 
@@ -298,6 +300,7 @@ class InvoiceService:
         """Record a payment against an invoice through the API."""
         if not is_api_authenticated():
             raise ValueError("Invoice payment tracking requires the API connection")
+        invoice_id = InvoiceService._numeric_invoice_id(invoice_id)
         data = api_client.post(f"/invoices/{invoice_id}/payments", {
             "amount": amount,
             "payment_date": payment_date,
@@ -311,7 +314,28 @@ class InvoiceService:
         """Get payment rows for an invoice through the API."""
         if not is_api_authenticated():
             return []
+        invoice_id = InvoiceService._numeric_invoice_id(invoice_id)
         return api_client.get(f"/invoices/{invoice_id}/payments") or []
+
+    @staticmethod
+    def get_returns(invoice_id):
+        if not is_api_authenticated():
+            return {"returns": [], "remaining_by_item": {}}
+        invoice_id = InvoiceService._numeric_invoice_id(invoice_id)
+        return api_client.get(f"/invoices/{invoice_id}/returns")
+
+    @staticmethod
+    def create_return(invoice_id, payload):
+        if not is_api_authenticated():
+            raise ValueError("Invoice returns require the API connection")
+        invoice_id = InvoiceService._numeric_invoice_id(invoice_id)
+        return api_client.post(f"/invoices/{invoice_id}/returns", payload)
+
+    @staticmethod
+    def add_return_settlement(return_id, payload):
+        if not is_api_authenticated():
+            raise ValueError("Return settlements require the API connection")
+        return api_client.post(f"/returns/{return_id}/settlements", payload)
 
     @staticmethod
     def update_remarks(invoice_id, remarks):
@@ -321,8 +345,22 @@ class InvoiceService:
             if not invoice:
                 raise ValueError("Invoice not found")
             return invoice
+        invoice_id = InvoiceService._numeric_invoice_id(invoice_id)
         data = api_client.patch(f"/invoices/{invoice_id}/remarks", {"remarks": remarks})
         return InvoiceService._invoice_from_api(data)
+
+    @staticmethod
+    def _numeric_invoice_id(invoice_id):
+        """Reject invoice numbers and stale display values at the service boundary."""
+        if isinstance(invoice_id, bool):
+            raise ValueError("Invalid invoice database ID")
+        try:
+            numeric_id = int(invoice_id)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Invalid invoice database ID") from exc
+        if numeric_id <= 0:
+            raise ValueError("Invalid invoice database ID")
+        return numeric_id
     
     @staticmethod
     def search_invoices(branch_id=None, invoice_number=None, customer_name=None, date_from=None, date_to=None):
@@ -383,7 +421,11 @@ class InvoiceService:
                 rate_per_piece=item.get("rate_per_piece", 0),
                 line_total=item.get("line_total", 0),
                 boxes_from_boxes=item.get("boxes_from_boxes"),
-                pieces_from_loose=item.get("pieces_from_loose")
+                pieces_from_loose=item.get("pieces_from_loose"),
+                item_type=item.get("item_type"),
+                description=item.get("description"),
+                quantity=item.get("quantity", 0),
+                unit_price=item.get("unit_price", 0),
             ))
         return invoice
 

@@ -10,7 +10,7 @@ class InvoiceItem:
     def __init__(self, id=None, invoice_id=None, product_id=None, accessory_id=None,
                  sanitary_product_id=None, tile_size=None, grade=None, boxes=0, loose_pieces=0, rate_per_sqm=0,
                  rate_per_box=0, rate_per_piece=0, line_total=0, boxes_from_boxes=None, pieces_from_loose=None,
-                 source_branch_id=None):
+                 source_branch_id=None, item_type=None, description=None, quantity=0, unit_price=0):
         self.id = id
         self.invoice_id = invoice_id
         self.product_id = product_id
@@ -27,6 +27,10 @@ class InvoiceItem:
         self.boxes_from_boxes = boxes_from_boxes
         self.pieces_from_loose = pieces_from_loose
         self.source_branch_id = source_branch_id
+        self.item_type = item_type
+        self.description = description
+        self.quantity = quantity
+        self.unit_price = unit_price
     
     def __repr__(self):
         return f"InvoiceItem(id={self.id}, invoice_id={self.invoice_id}, product_id={self.product_id}, accessory_id={self.accessory_id}, sanitary_product_id={self.sanitary_product_id}, grade='{self.grade}', total={self.line_total})"
@@ -49,7 +53,11 @@ class InvoiceItem:
             'line_total': self.line_total,
             'boxes_from_boxes': self.boxes_from_boxes,
             'pieces_from_loose': self.pieces_from_loose,
-            'source_branch_id': self.source_branch_id
+            'source_branch_id': self.source_branch_id,
+            'item_type': self.item_type,
+            'description': self.description,
+            'quantity': self.quantity,
+            'unit_price': self.unit_price,
         }
     
     @classmethod
@@ -71,6 +79,10 @@ class InvoiceItem:
             line_total=data.get('line_total', 0),
             boxes_from_boxes=data.get('boxes_from_boxes'),
             pieces_from_loose=data.get('pieces_from_loose'),
-            source_branch_id=data.get('source_branch_id')
+            source_branch_id=data.get('source_branch_id'),
+            item_type=data.get('item_type'),
+            description=data.get('description'),
+            quantity=data.get('quantity', 0),
+            unit_price=data.get('unit_price', 0),
         )
 

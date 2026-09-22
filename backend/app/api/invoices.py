@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.deps import ensure_branch_access, get_current_user
 from app.db.session import get_db
 from app.models.entities import Invoice, InvoicePayment, User
-from app.schemas.common import InvoiceCreate, InvoiceOut, InvoicePaymentIn, InvoicePaymentOut, InvoiceRemarksUpdate, InvoiceVoidRequest
+from app.schemas.common import InvoiceCreate, InvoiceOut, InvoicePaymentIn, InvoicePaymentOut, InvoiceRemarksUpdate, InvoiceVoidRequest, InvoiceReturnCreate, InvoiceReturnHistoryOut, InvoiceReturnOut
 from app.services.invoices import create_invoice, record_invoice_payment, void_invoice
+from app.services.returns import create_return, invoice_return_history
 from app.services.audit import write_audit_log
 
 
@@ -94,6 +95,30 @@ def list_payments(invoice_id: int, db: Session = Depends(get_db), current_user: 
         .where(InvoicePayment.invoice_id == invoice_id)
         .order_by(InvoicePayment.payment_date.desc(), InvoicePayment.id.desc())
     ).all()
+
+
+@router.post("/{invoice_id}/returns", response_model=InvoiceReturnOut)
+def process_return(
+    invoice_id: int,
+    payload: InvoiceReturnCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    invoice = db.get(Invoice, invoice_id)
+    if invoice:
+        ensure_branch_access(current_user, invoice.branch_id)
+    result = create_return(db, invoice_id, payload, current_user)
+    db.commit()
+    return result
+
+
+@router.get("/{invoice_id}/returns", response_model=InvoiceReturnHistoryOut)
+def list_returns(invoice_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    invoice = db.scalar(select(Invoice).where(Invoice.id == invoice_id).options(selectinload(Invoice.items)))
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    ensure_branch_access(current_user, invoice.branch_id)
+    return invoice_return_history(db, invoice)
 
 
 @router.get("/{invoice_id}", response_model=InvoiceOut)
