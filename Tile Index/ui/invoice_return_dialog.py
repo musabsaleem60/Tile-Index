@@ -126,7 +126,7 @@ class InvoiceReturnDialog:
             kind = self.exchange_type.get()
             plural = {"tile": "tiles", "accessory": "accessories", "sanitary": "sanitary"}[kind]
             data = api_client.get(f"/stock/overview?item_type={plural}&include_zero=false")
-            self.catalog_rows = data.get("rows", [])
+            self.catalog_rows = self._catalog_rows_from_response(data, kind)
             labels = []
             for row in self.catalog_rows:
                 label = row.get("product", "")
@@ -137,15 +137,46 @@ class InvoiceReturnDialog:
             self.product_combo["values"] = labels
             self.exchange_product.set(labels[0] if labels else "")
             self._select_exchange_product()
+            if not labels:
+                messagebox.showinfo(
+                    "Exchange Items",
+                    f"No in-stock {plural} are available for exchange.",
+                    parent=self.window,
+                )
         except Exception as exc:
+            self.catalog_rows = []
+            self.branch_rows = []
+            self.product_combo["values"] = ()
+            self.branch_combo["values"] = ()
+            self.exchange_product.set("")
+            self.exchange_branch.set("")
             messagebox.showerror("Exchange Items", f"Could not load stock: {exc}", parent=self.window)
 
     def _select_exchange_product(self):
         row = next((r for r in self.catalog_rows if r.get("_label") == self.exchange_product.get()), None)
-        self.branch_rows = [b for b in (row or {}).get("branches", []) if b.get("total_pieces", b.get("quantity", 0)) > 0]
+        self.branch_rows = self._stocked_branches(row)
         names = [b["branch_name"] for b in self.branch_rows]
         self.branch_combo["values"] = names
         self.exchange_branch.set(names[0] if names else "")
+
+    @staticmethod
+    def _catalog_rows_from_response(data, kind):
+        """Map the stock-overview response to the selected catalogue."""
+        key = {"tile": "tiles", "accessory": "accessories", "sanitary": "sanitary"}[kind]
+        rows = data.get(key)
+        if not isinstance(rows, list):
+            raise ValueError(f"Stock overview response is missing the '{key}' list")
+        return rows
+
+    @staticmethod
+    def _stocked_branches(row):
+        if not row:
+            return []
+        return [
+            branch
+            for branch in row.get("branches", [])
+            if int(branch.get("total_pieces", branch.get("quantity", 0)) or 0) > 0
+        ]
 
     def _add_exchange(self):
         row = next((r for r in self.catalog_rows if r.get("_label") == self.exchange_product.get()), None)

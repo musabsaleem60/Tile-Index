@@ -168,3 +168,20 @@ def test_employee_branch_access_is_enforced_by_api_dependency(seeded):
     ensure_branch_access(user, branch.id)
     with pytest.raises(HTTPException, match="Branch access denied"):
         ensure_branch_access(user, other.id)
+
+
+def test_exchange_dialog_maps_overview_collections_and_stocked_branches():
+    from ui.invoice_return_dialog import InvoiceReturnDialog
+
+    tile = {
+        "product": "Example Tile",
+        "branches": [
+            {"branch_id": 1, "branch_name": "Empty", "total_pieces": 0},
+            {"branch_id": 2, "branch_name": "Stocked", "total_pieces": 24},
+        ],
+    }
+    payload = {"tiles": [tile], "accessories": [], "sanitary": []}
+    assert InvoiceReturnDialog._catalog_rows_from_response(payload, "tile") == [tile]
+    assert [row["branch_name"] for row in InvoiceReturnDialog._stocked_branches(tile)] == ["Stocked"]
+    with pytest.raises(ValueError, match="missing the 'tiles' list"):
+        InvoiceReturnDialog._catalog_rows_from_response({"rows": [tile]}, "tile")

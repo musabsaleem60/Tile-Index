@@ -22,6 +22,7 @@ from utils.invoice_printer import InvoicePrintWindow
 from utils.grade_constants import VALID_GRADES, GRADE_1
 from utils.searchable_combobox import SearchableCombobox
 from utils.accessory_labels import accessory_display_label
+from utils.invoice_draft_store import DRAFT_SCHEMA_VERSION, InvoiceDraftStore
 from ui.theme import COLORS, FONTS, SIZES, SPACING
 
 
@@ -40,6 +41,8 @@ class InvoiceWindow:
         self.invoice_items = []  # List of item dicts
         self.source_branch_options = []
         self.current_stock_overview_row = None
+        self.resumed_from_draft = False
+        self.draft_store = InvoiceDraftStore(self.current_user.id)
         
         # Filter branches for employees
         from services.auth_service import AuthenticationService
@@ -54,6 +57,8 @@ class InvoiceWindow:
         # Set branch if employee
         if AuthenticationService.is_employee(self.current_user) and self.current_user.branch_id is not None and self.branches:
             self.branch_var.set(self.branches[0].name)
+
+        self.parent.after_idle(self.offer_resume_draft)
     
     def setup_ui(self):
         """Setup the invoice UI"""
@@ -220,9 +225,10 @@ class InvoiceWindow:
         btn_frame = ctk.CTkFrame(left_frame, fg_color="transparent", corner_radius=0)
         btn_frame.grid(row=8, column=0, columnspan=2, pady=10)
         
-        self.action_button(btn_frame, "Generate Invoice", self.generate_invoice, width=140).pack(side=tk.LEFT, padx=5)
-        self.action_button(btn_frame, "Clear All", self.clear_invoice, width=120, primary=False).pack(side=tk.LEFT, padx=5)
-        self.action_button(btn_frame, "Print Invoice", self.print_invoice, width=120).pack(side=tk.LEFT, padx=5)
+        self.action_button(btn_frame, "Generate Invoice", self.generate_invoice, width=140).pack(side=tk.LEFT, padx=4)
+        self.action_button(btn_frame, "Save Draft", self.save_draft, width=105, primary=False).pack(side=tk.LEFT, padx=4)
+        self.action_button(btn_frame, "Clear All", self.clear_invoice, width=105, primary=False).pack(side=tk.LEFT, padx=4)
+        self.action_button(btn_frame, "Print Invoice", self.print_invoice, width=115).pack(side=tk.LEFT, padx=4)
         
         # Right panel - Invoice Items Table
         right_frame = ctk.CTkFrame(
@@ -248,6 +254,7 @@ class InvoiceWindow:
         table_frame.grid_rowconfigure(0, weight=1)
         table_frame.grid_columnconfigure(0, weight=1)
         self.items_tree = ttk.Treeview(table_frame, columns=columns, show='headings', height=20)
+        self.items_tree.tag_configure('draft_error', foreground=COLORS["danger"])
 
         column_widths = {
             'S.No': 55,
@@ -758,18 +765,21 @@ class InvoiceWindow:
         
         # Add items
         for idx, item in enumerate(self.invoice_items, 1):
+            product_name = item.get('product_name', item.get('display_label', 'Unavailable item'))
+            if item.get('draft_error'):
+                product_name = f"{product_name} [DRAFT ERROR: {item['draft_error']}]"
             self.items_tree.insert('', tk.END, values=(
                 idx,
-                item['product_name'],
+                product_name,
                 item.get('source_branch_name', self.invoice_branch_name()),
-                item['tile_size'],
-                item['grade'],
-                item['boxes'],
-                item['loose_pieces'],
-                f"Rs. {item['rate_per_box']:.2f}",
-                f"Rs. {item['rate_per_piece']:.2f}",
-                f"Rs. {item['line_total']:.2f}"
-            ))
+                item.get('tile_size', '-'),
+                item.get('grade') or '-',
+                item.get('boxes', 0),
+                item.get('loose_pieces', 0),
+                f"Rs. {float(item.get('rate_per_box') or 0):.2f}",
+                f"Rs. {float(item.get('rate_per_piece') or 0):.2f}",
+                f"Rs. {float(item.get('line_total') or 0):.2f}"
+            ), tags=('draft_error',) if item.get('draft_error') else ())
     
     def update_totals(self, event=None):
         """Update invoice totals"""
@@ -791,10 +801,319 @@ class InvoiceWindow:
         self.subtotal_label.configure(text=f"Rs. {subtotal:.2f}")
         self.grand_total_label.configure(text=f"Rs. {grand_total:.2f}")
         self.balance_label.configure(text=f"Rs. {balance:.2f}")
+
+    def _draft_item_payload(self, item):
+        item_type = item.get('type', '').lower()
+        if item_type == 'tiles':
+            item_type = 'tile'
+        return {
+            'item_type': item_type,
+            'product_id': item.get('product_id'),
+            'accessory_id': item.get('accessory_id'),
+            'sanitary_product_id': item.get('sanitary_product_id'),
+            'source_branch_id': item.get('source_branch_id'),
+            'grade': item.get('grade') if item_type == 'tile' else None,
+            'boxes': item.get('boxes', 0) if item_type == 'tile' else 0,
+            'loose_pieces': item.get('loose_pieces', 0) if item_type == 'tile' else 0,
+            'quantity': item.get('boxes', 0) if item_type != 'tile' else 0,
+            'display_label': item.get('product_name', ''),
+            'rate_per_box': item.get('rate_per_box'),
+            'rate_per_piece': item.get('rate_per_piece'),
+            'line_total': item.get('line_total'),
+        }
+
+    def _draft_payload(self):
+        return {
+            'schema_version': DRAFT_SCHEMA_VERSION,
+            'saved_at': datetime.now().astimezone().isoformat(timespec='seconds'),
+            'user_id': self.current_user.id,
+            'branch_id': self.selected_branch_id,
+            'customer_name': self.customer_name_entry.get().strip(),
+            'customer_contact': self.customer_contact_entry.get().strip(),
+            'remarks': self.remarks_text.get("1.0", tk.END).strip(),
+            'discount': self.discount_entry.get().strip() or '0',
+            'paid_amount': self.paid_entry.get().strip() or '0',
+            'items': [self._draft_item_payload(item) for item in self.invoice_items],
+        }
+
+    def save_draft(self):
+        """Save the current form locally without reserving stock."""
+        try:
+            if not self.selected_branch_id:
+                raise ValueError("Please select a branch before saving the draft")
+            if self.draft_store.exists() and not messagebox.askyesno(
+                "Replace Invoice Draft",
+                "A saved invoice draft already exists for this user on this machine. Replace it?",
+            ):
+                return
+            path = self.draft_store.save(self._draft_payload())
+            messagebox.showinfo(
+                "Draft Saved",
+                f"Invoice draft saved on this machine.\n\n{path}",
+            )
+        except Exception as exc:
+            messagebox.showerror("Draft Save Failed", str(exc))
+
+    def offer_resume_draft(self):
+        """Offer to resume or discard this user's saved local draft."""
+        if not self.draft_store.exists():
+            return
+        try:
+            draft = self.draft_store.load()
+        except Exception as exc:
+            if messagebox.askyesno(
+                "Invoice Draft Unavailable",
+                f"The saved invoice draft cannot be read:\n{exc}\n\nDiscard it?",
+            ):
+                self.draft_store.delete()
+            return
+
+        saved_at = str(draft.get('saved_at') or 'an unknown time').replace('T', ' ')
+        decision = self._show_draft_choice(saved_at)
+        if decision == 'resume':
+            self.resume_draft(draft)
+        elif decision == 'discard':
+            self.draft_store.delete()
+
+    def _show_draft_choice(self, saved_at):
+        """Show explicit Resume and Discard choices for a saved draft."""
+        dialog = ctk.CTkToplevel(self.parent)
+        dialog.title("Invoice Draft Available")
+        dialog.geometry("500x210")
+        dialog.resizable(False, False)
+        dialog.transient(self.parent.winfo_toplevel())
+        dialog.configure(fg_color=COLORS["app_bg"])
+        result = {'value': None}
+
+        ctk.CTkLabel(
+            dialog,
+            text=f"An invoice draft saved at {saved_at} is available.\nResume it?",
+            font=FONTS["body_bold"],
+            text_color=COLORS["text"],
+            wraplength=440,
+            justify=tk.CENTER,
+        ).pack(fill=tk.X, padx=24, pady=(32, 22))
+
+        buttons = ctk.CTkFrame(dialog, fg_color="transparent")
+        buttons.pack(pady=8)
+
+        def choose(value):
+            result['value'] = value
+            dialog.destroy()
+
+        self.action_button(buttons, "Resume", lambda: choose('resume'), width=130).pack(side=tk.LEFT, padx=8)
+        self.action_button(
+            buttons, "Discard", lambda: choose('discard'), width=130, primary=False
+        ).pack(side=tk.LEFT, padx=8)
+        dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
+        dialog.grab_set()
+        dialog.wait_window()
+        return result['value']
+
+    def _branch_by_id(self, branch_id):
+        return next((branch for branch in self.branches if branch.id == branch_id), None)
+
+    @staticmethod
+    def _overview_branch(overview_row, branch_id):
+        if not overview_row:
+            return None
+        return next(
+            (branch for branch in overview_row.get('branches', []) if branch.get('branch_id') == branch_id),
+            None,
+        )
+
+    def _invalid_draft_item(self, saved, reason):
+        item_type = str(saved.get('item_type') or '').lower()
+        quantity = int(saved.get('quantity') or 0)
+        return {
+            'type': {'tile': 'Tiles', 'accessory': 'Accessory', 'sanitary': 'Sanitary'}.get(item_type, item_type.title()),
+            'product_id': saved.get('product_id'),
+            'accessory_id': saved.get('accessory_id'),
+            'sanitary_product_id': saved.get('sanitary_product_id'),
+            'source_branch_id': saved.get('source_branch_id'),
+            'source_branch_name': saved.get('source_branch_name', 'Unavailable branch'),
+            'product_name': saved.get('display_label') or 'Unavailable item',
+            'tile_size': saved.get('tile_size', '-'),
+            'grade': saved.get('grade') or '-',
+            'boxes': int(saved.get('boxes') or 0) if item_type == 'tile' else quantity,
+            'loose_pieces': int(saved.get('loose_pieces') or 0) if item_type == 'tile' else 0,
+            'rate_per_box': float(saved.get('rate_per_box') or 0),
+            'rate_per_piece': float(saved.get('rate_per_piece') or 0),
+            'line_total': float(saved.get('line_total') or 0),
+            'draft_error': reason,
+        }
+
+    def _rebuild_draft_item(self, saved):
+        """Rebuild one saved line from current catalogue, stock, and pricing."""
+        item_type = str(saved.get('item_type') or '').lower()
+        source_branch_id = saved.get('source_branch_id')
+        source_branch = self._branch_by_id(source_branch_id)
+        if not source_branch:
+            return self._invalid_draft_item(saved, "Source branch is no longer available")
+
+        if item_type == 'tile':
+            product = next((p for p in self.products if p.id == saved.get('product_id')), None)
+            if not product:
+                return self._invalid_draft_item(saved, "Product was deleted or is unavailable")
+            grade = saved.get('grade')
+            overview = self.load_stock_overview_row('tiles', product.id, grade)
+            stock = self._overview_branch(overview, source_branch_id)
+            if not stock:
+                return self._invalid_draft_item(saved, "Saved source branch is no longer valid for this product")
+            if stock.get('rate_missing') or stock.get('rate_per_box') is None or stock.get('rate_per_piece') is None:
+                return self._invalid_draft_item(saved, "No rate set for this size and grade")
+            boxes = int(saved.get('boxes') or 0)
+            loose = int(saved.get('loose_pieces') or 0)
+            requested = boxes * int(product.pieces_per_box) + loose
+            if requested > int(stock.get('total_pieces') or 0):
+                return self._invalid_draft_item(
+                    saved,
+                    f"Insufficient stock at {source_branch.name}: requested {requested} pieces, "
+                    f"available {int(stock.get('total_pieces') or 0)}",
+                )
+            rate_box = float(stock['rate_per_box'])
+            rate_piece = float(stock['rate_per_piece'])
+            return {
+                'type': 'Tiles', 'product_id': product.id,
+                'source_branch_id': source_branch_id, 'source_branch_name': source_branch.name,
+                'product_name': product.name, 'tile_size': product.tile_size, 'grade': grade,
+                'boxes': boxes, 'loose_pieces': loose, 'rate_per_box': rate_box,
+                'rate_per_piece': rate_piece, 'line_total': boxes * rate_box + loose * rate_piece,
+                '_draft_requested_units': requested,
+                '_draft_available_units': int(stock.get('total_pieces') or 0),
+            }
+
+        if item_type == 'accessory':
+            product = next((a for a in self.accessories if a.id == saved.get('accessory_id')), None)
+            if not product:
+                return self._invalid_draft_item(saved, "Accessory was deleted or is unavailable")
+            overview = self.load_stock_overview_row('accessories', product.id)
+            stock = self._overview_branch(overview, source_branch_id)
+            quantity = int(saved.get('quantity') or 0)
+            if not stock:
+                return self._invalid_draft_item(saved, "Saved source branch is no longer valid for this accessory")
+            if quantity > int(stock.get('quantity') or 0):
+                return self._invalid_draft_item(
+                    saved,
+                    f"Insufficient stock at {source_branch.name}: requested {quantity}, "
+                    f"available {int(stock.get('quantity') or 0)}",
+                )
+            rate = float(product.unit_price)
+            return {
+                'type': 'Accessory', 'accessory_id': product.id,
+                'source_branch_id': source_branch_id, 'source_branch_name': source_branch.name,
+                'product_name': accessory_display_label(product), 'tile_size': product.category,
+                'grade': '-', 'boxes': quantity, 'loose_pieces': 0,
+                'rate_per_box': rate, 'rate_per_piece': 0, 'line_total': quantity * rate,
+                '_draft_requested_units': quantity,
+                '_draft_available_units': int(stock.get('quantity') or 0),
+            }
+
+        if item_type == 'sanitary':
+            product = next((p for p in self.sanitary_products if p.id == saved.get('sanitary_product_id')), None)
+            if not product:
+                return self._invalid_draft_item(saved, "Sanitary product was deleted or is unavailable")
+            overview = self.load_stock_overview_row('sanitary', product.id)
+            stock = self._overview_branch(overview, source_branch_id)
+            quantity = int(saved.get('quantity') or 0)
+            if not stock:
+                return self._invalid_draft_item(saved, "Saved source branch is no longer valid for this sanitary product")
+            if quantity > int(stock.get('quantity') or 0):
+                return self._invalid_draft_item(
+                    saved,
+                    f"Insufficient stock at {source_branch.name}: requested {quantity}, "
+                    f"available {int(stock.get('quantity') or 0)}",
+                )
+            rate = float(product.sale_price)
+            return {
+                'type': 'Sanitary', 'sanitary_product_id': product.id,
+                'source_branch_id': source_branch_id, 'source_branch_name': source_branch.name,
+                'product_name': self.format_sanitary(product), 'tile_size': product.color,
+                'grade': product.sku, 'boxes': quantity, 'loose_pieces': 0,
+                'rate_per_box': rate, 'rate_per_piece': 0, 'line_total': quantity * rate,
+                '_draft_requested_units': quantity,
+                '_draft_available_units': int(stock.get('quantity') or 0),
+            }
+
+        return self._invalid_draft_item(saved, "Unknown item type")
+
+    @staticmethod
+    def _flag_combined_draft_shortages(items):
+        """Catch repeated lines that individually fit but exceed stock together."""
+        running = {}
+        for item in items:
+            if item.get('draft_error'):
+                continue
+            item_type = item.get('type')
+            item_id = item.get('product_id') or item.get('accessory_id') or item.get('sanitary_product_id')
+            key = (item_type, item_id, item.get('source_branch_id'), item.get('grade'))
+            running[key] = running.get(key, 0) + int(item.get('_draft_requested_units') or 0)
+            available = int(item.get('_draft_available_units') or 0)
+            if running[key] > available:
+                item['draft_error'] = (
+                    f"Combined draft quantity exceeds current stock at {item.get('source_branch_name')}: "
+                    f"requested {running[key]}, available {available}"
+                )
+        return items
+
+    def refresh_resumed_draft_lines(self, show_result=False):
+        saved_items = [self._draft_item_payload(item) for item in self.invoice_items]
+        self.invoice_items = self._flag_combined_draft_shortages(
+            [self._rebuild_draft_item(item) for item in saved_items]
+        )
+        self.update_items_table()
+        self.update_totals()
+        errors = [item['draft_error'] for item in self.invoice_items if item.get('draft_error')]
+        if show_result and errors:
+            messagebox.showwarning(
+                "Draft Needs Attention",
+                "Some draft lines cannot be submitted with current data:\n\n- " + "\n- ".join(errors) +
+                "\n\nRemove and add those lines again, or correct the stock/rate and retry.",
+            )
+        return errors
+
+    def resume_draft(self, draft):
+        try:
+            branch = self._branch_by_id(draft.get('branch_id'))
+            if not branch:
+                raise ValueError("The draft branch is unavailable or is not accessible to this user")
+
+            self.clear_invoice(prompt_for_saved_draft=False)
+            self.branch_var.set(branch.name)
+            self.on_branch_select(None)
+            self.customer_name_entry.insert(0, draft.get('customer_name') or '')
+            self.customer_contact_entry.insert(0, draft.get('customer_contact') or '')
+            self.remarks_text.insert('1.0', draft.get('remarks') or '')
+            self.discount_entry.delete(0, tk.END)
+            self.discount_entry.insert(0, str(draft.get('discount') or '0'))
+            self.paid_entry.delete(0, tk.END)
+            self.paid_entry.insert(0, str(draft.get('paid_amount') or '0'))
+            self.invoice_items = self._flag_combined_draft_shortages(
+                [self._rebuild_draft_item(item) for item in draft.get('items', [])]
+            )
+            self.resumed_from_draft = True
+            self.update_items_table()
+            self.update_totals()
+            errors = [item['draft_error'] for item in self.invoice_items if item.get('draft_error')]
+            if errors:
+                messagebox.showwarning(
+                    "Draft Resumed With Changes Required",
+                    "The draft was restored using current prices and stock. These lines need attention:\n\n- " +
+                    "\n- ".join(errors) +
+                    "\n\nThey must be fixed or removed before the invoice can be generated.",
+                )
+            else:
+                messagebox.showinfo("Draft Resumed", "The draft was restored using current prices and stock.")
+        except Exception as exc:
+            messagebox.showerror("Draft Resume Failed", str(exc))
     
     def generate_invoice(self):
         """Generate and save invoice"""
         try:
+            if self.resumed_from_draft:
+                draft_errors = self.refresh_resumed_draft_lines(show_result=True)
+                if draft_errors:
+                    raise ValueError("Resolve or remove all flagged draft lines before generating the invoice")
             if not self.selected_branch_id:
                 raise ValueError("Please select a branch")
             
@@ -858,14 +1177,22 @@ class InvoiceWindow:
             # Open invoice print window
             print_window = tk.Toplevel(self.parent)
             InvoicePrintWindow(print_window, invoice_id=invoice.id)
-            
-            self.clear_invoice()
+
+            self.draft_store.delete()
+            self.clear_invoice(prompt_for_saved_draft=False)
             
         except Exception as e:
             messagebox.showerror("Error", str(e))
     
-    def clear_invoice(self):
+    def clear_invoice(self, prompt_for_saved_draft=True):
         """Clear invoice form"""
+        if prompt_for_saved_draft and self.draft_store.exists():
+            if messagebox.askyesno(
+                "Discard Saved Draft",
+                "Clear the current form and also discard this user's saved invoice draft?\n\n"
+                "Choose No to keep the saved draft for later.",
+            ):
+                self.draft_store.delete()
         self.customer_name_entry.delete(0, tk.END)
         self.customer_contact_entry.delete(0, tk.END)
         self.remarks_text.delete("1.0", tk.END)
@@ -877,6 +1204,7 @@ class InvoiceWindow:
         self.paid_entry.delete(0, tk.END)
         self.paid_entry.insert(0, "0")
         self.invoice_items = []
+        self.resumed_from_draft = False
         self.update_items_table()
         self.update_totals()
     

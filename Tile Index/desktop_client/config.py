@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 
-APP_VERSION = "1.14.0"
+APP_VERSION = "1.15.0"
 
 
 def _runtime_dir():
