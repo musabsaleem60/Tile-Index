@@ -6,6 +6,7 @@ Create and manage invoices
 import tkinter as tk
 from tkinter import ttk, messagebox
 import customtkinter as ctk
+import logging
 from datetime import datetime
 from urllib.parse import urlencode
 from repositories.branch_repository import BranchRepository
@@ -26,6 +27,9 @@ from utils.invoice_draft_store import DRAFT_SCHEMA_VERSION, InvoiceDraftStore
 from ui.theme import COLORS, FONTS, SIZES, SPACING
 
 
+logger = logging.getLogger(__name__)
+
+
 class InvoiceWindow:
     """Invoice creation window"""
     
@@ -41,6 +45,7 @@ class InvoiceWindow:
         self.invoice_items = []  # List of item dicts
         self.source_branch_options = []
         self.current_stock_overview_row = None
+        self.stock_lookup_confirmed = False
         self.resumed_from_draft = False
         self.draft_store = InvoiceDraftStore(self.current_user.id)
         
@@ -191,7 +196,8 @@ class InvoiceWindow:
         )
         self.stock_info_label.grid(row=7, column=0, columnspan=2, pady=5)
         
-        self.action_button(item_frame, "Add to Invoice", self.add_item, width=180).grid(row=8, column=0, columnspan=2, pady=10)
+        self.add_item_button = self.action_button(item_frame, "Add to Invoice", self.add_item, width=180)
+        self.add_item_button.grid(row=8, column=0, columnspan=2, pady=10)
         
         # Totals section
         totals_frame = self.create_subpanel(left_frame, "Totals")
@@ -415,6 +421,11 @@ class InvoiceWindow:
             item_str = self.product_var.get()
             
             if not item_str or not self.selected_branch_id:
+                self.stock_lookup_confirmed = False
+                self.current_stock_overview_row = None
+                self.update_source_branch_options(None)
+                self.source_branch_combo.configure(state="readonly")
+                self.add_item_button.configure(state="normal")
                 self.stock_info_label.configure(text="")
                 return
             
@@ -432,7 +443,10 @@ class InvoiceWindow:
                 grade = self.grade_var.get()
                 overview_row = self.load_stock_overview_row("tiles", product.id, grade=grade)
                 self.current_stock_overview_row = overview_row
-                if overview_row:
+                self.stock_lookup_confirmed = True
+                self.source_branch_combo.configure(state="readonly")
+                self.add_item_button.configure(state="normal")
+                if int(overview_row.get("total_pieces") or 0) > 0:
                     self.update_source_branch_options(overview_row)
                     selected_stock = self.selected_source_stock()
                     branch_lines = [
@@ -473,7 +487,10 @@ class InvoiceWindow:
                 
                 overview_row = self.load_stock_overview_row("accessories", accessory.id)
                 self.current_stock_overview_row = overview_row
-                if overview_row:
+                self.stock_lookup_confirmed = True
+                self.source_branch_combo.configure(state="readonly")
+                self.add_item_button.configure(state="normal")
+                if int(overview_row.get("total_quantity") or 0) > 0:
                     self.update_source_branch_options(overview_row)
                     branch_lines = [
                         f"{b['branch_name']}: {b.get('quantity', 0)} items"
@@ -485,8 +502,11 @@ class InvoiceWindow:
                     branch_lines = []
                     available = 0
                 self.stock_info_label.configure(
-                    text="\n".join(branch_lines + [f"Selected source: {available} items | Unit Price: Rs. {accessory.unit_price:.2f}"]),
-                    text_color=COLORS["primary"]
+                    text=(
+                        "\n".join(branch_lines + [f"Selected source: {available} items | Unit Price: Rs. {accessory.unit_price:.2f}"])
+                        if branch_lines else "No stock available"
+                    ),
+                    text_color=COLORS["primary"] if branch_lines else COLORS["danger"]
                 )
             elif item_type == "Sanitary":
                 product = next(
@@ -498,7 +518,10 @@ class InvoiceWindow:
                     return
                 overview_row = self.load_stock_overview_row("sanitary", product.id)
                 self.current_stock_overview_row = overview_row
-                if overview_row:
+                self.stock_lookup_confirmed = True
+                self.source_branch_combo.configure(state="readonly")
+                self.add_item_button.configure(state="normal")
+                if int(overview_row.get("total_quantity") or 0) > 0:
                     self.update_source_branch_options(overview_row)
                     branch_lines = [
                         f"{b['branch_name']}: {b.get('quantity', 0)} items"
@@ -511,35 +534,50 @@ class InvoiceWindow:
                     branch_lines = []
                     available = 0
                 self.stock_info_label.configure(
-                    text="\n".join(branch_lines + [
-                        f"Selected source: {available} items | Unit Price: Rs. {product.sale_price:.2f}"
-                    ]),
-                    text_color=COLORS["primary"],
+                    text=(
+                        "\n".join(branch_lines + [
+                            f"Selected source: {available} items | Unit Price: Rs. {product.sale_price:.2f}"
+                        ]) if branch_lines else "No stock available"
+                    ),
+                    text_color=COLORS["primary"] if branch_lines else COLORS["danger"],
                 )
-        except:
-            self.stock_info_label.configure(text="")
+        except ApiClientError as exc:
+            logger.warning("Stock lookup failed: %s", exc, exc_info=True)
+            self.set_stock_lookup_failed()
+        except Exception:
+            logger.exception("Unexpected error while updating invoice stock information")
+            self.set_stock_lookup_failed()
+
+    def set_stock_lookup_failed(self):
+        """Show an unknown-stock state that cannot be mistaken for zero stock."""
+        self.stock_lookup_confirmed = False
+        self.current_stock_overview_row = None
+        self.update_source_branch_options(None)
+        self.source_branch_combo.configure(state="disabled")
+        self.add_item_button.configure(state="disabled")
+        self.stock_info_label.configure(
+            text="Could not check stock - check connection and try again",
+            text_color=COLORS["warning"],
+        )
 
     def load_stock_overview_row(self, item_type, item_id, grade=None):
-        try:
-            params = {"item_type": {
-                "tiles": "tile",
-                "accessories": "accessory",
-                "sanitary": "sanitary",
-            }[item_type]}
-            if item_type == "tiles":
-                params["product_id"] = str(item_id)
-                params["grade"] = grade
-            elif item_type == "accessories":
-                params["accessory_id"] = str(item_id)
-            else:
-                params["sanitary_product_id"] = str(item_id)
-            data = api_client.get(f"/stock/item?{urlencode(params)}")
-            return data.get("item")
-        except ApiClientError:
-            return None
-        except Exception:
-            return None
-        return None
+        params = {"item_type": {
+            "tiles": "tile",
+            "accessories": "accessory",
+            "sanitary": "sanitary",
+        }[item_type]}
+        if item_type == "tiles":
+            params["product_id"] = str(item_id)
+            params["grade"] = grade
+        elif item_type == "accessories":
+            params["accessory_id"] = str(item_id)
+        else:
+            params["sanitary_product_id"] = str(item_id)
+        data = api_client.get(f"/stock/item?{urlencode(params)}")
+        item = data.get("item")
+        if item is None:
+            raise ApiClientError("Stock response did not include item data")
+        return item
 
     def update_source_branch_options(self, overview_row):
         branches = overview_row.get("branches", []) if overview_row else []
@@ -591,6 +629,8 @@ class InvoiceWindow:
             item_str = self.product_var.get()
             if not item_str:
                 raise ValueError(f"Please select a {self.item_type_var.get().lower()} item")
+            if not self.stock_lookup_confirmed:
+                raise ValueError("Could not check stock - check connection and try again")
             
             if item_type == "Tiles":
                 # Find product
