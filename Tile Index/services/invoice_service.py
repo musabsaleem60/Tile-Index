@@ -15,6 +15,7 @@ from services.sanitary_service import SanitaryService
 from models.invoice import Invoice
 from models.invoice_item import InvoiceItem
 from datetime import datetime, timezone
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 from desktop_client.remote_state import is_api_authenticated
 from desktop_client.session import api_client
@@ -366,18 +367,21 @@ class InvoiceService:
     def search_invoices(branch_id=None, invoice_number=None, customer_name=None, date_from=None, date_to=None):
         """Search invoices with filters"""
         if is_api_authenticated():
-            path = "/invoices"
-            if branch_id:
-                path += f"?branch_id={branch_id}"
-            invoices = [InvoiceService._invoice_from_api(item) for item in api_client.get(path)]
+            params = {}
+            if branch_id is not None:
+                params["branch_id"] = branch_id
             if invoice_number:
-                invoices = [inv for inv in invoices if invoice_number.lower() in inv.invoice_number.lower()]
+                params["invoice_number"] = invoice_number
             if customer_name:
-                invoices = [inv for inv in invoices if customer_name.lower() in inv.customer_name.lower()]
+                params["customer"] = customer_name
             if date_from:
-                invoices = [inv for inv in invoices if InvoiceService._business_date(inv.invoice_date) >= date_from]
+                params["date_from"] = date_from
             if date_to:
-                invoices = [inv for inv in invoices if InvoiceService._business_date(inv.invoice_date) <= date_to]
+                params["date_to"] = date_to
+            path = "/invoices"
+            if params:
+                path += f"?{urlencode(params)}"
+            invoices = [InvoiceService._invoice_from_api(item) for item in api_client.get(path)]
             return invoices
 
         return InvoiceRepository.search(branch_id, invoice_number, customer_name, date_from, date_to)

@@ -12,11 +12,14 @@ from app.models.entities import (
     Product,
     SanitaryInventory,
     SanitaryProduct,
-    TileRate,
     User,
 )
 from app.services.accessory_labels import accessory_display_label
-from app.services.tile_pricing import resolve_tile_price
+from app.services.tile_pricing import (
+    load_tile_price_context,
+    resolve_tile_price,
+    resolve_tile_price_from_context,
+)
 
 
 router = APIRouter(prefix="/stock", tags=["stock"])
@@ -228,25 +231,27 @@ def _sanitary_item_row(db: Session, branches, product: SanitaryProduct):
 
 def _tile_rows(db: Session, branches, search_text: str, branch_id: int | None, grade_filter: str | None, include_zero: bool):
     products = db.scalars(select(Product).where(Product.active.is_(True)).order_by(Product.name, Product.tile_size)).all()
-    rates = db.scalars(select(TileRate).where(TileRate.active.is_(True))).all()
+    price_context = load_tile_price_context(db)
     grades_by_size: dict[str, set[str]] = {}
-    for rate in rates:
-        grades_by_size.setdefault(rate.tile_size, set()).add(rate.grade)
+    for tile_size, rate_grade in price_context.card_rates:
+        grades_by_size.setdefault(tile_size, set()).add(rate_grade)
 
     inventory_rows = db.scalars(select(Inventory)).all()
     inventory_by_key: dict[tuple[int, str, int], Inventory] = {}
+    inventory_grades_by_product: dict[int, set[str]] = {}
     for inv in inventory_rows:
         inventory_by_key[(inv.product_id, inv.grade, inv.branch_id)] = inv
+        inventory_grades_by_product.setdefault(inv.product_id, set()).add(inv.grade)
 
     rows = []
     for product in products:
         if search_text and search_text not in product.name.lower() and search_text not in product.tile_size.lower():
             continue
-        grades = sorted(grades_by_size.get(product.tile_size) or {inv.grade for inv in inventory_rows if inv.product_id == product.id})
+        grades = sorted(grades_by_size.get(product.tile_size) or inventory_grades_by_product.get(product.id, set()))
         if grade_filter:
             grades = [g for g in grades if g == grade_filter]
         for grade in grades:
-            price = resolve_tile_price(db, product, grade)
+            price = resolve_tile_price_from_context(price_context, product, grade)
             branch_rows = []
             total_boxes = 0
             total_loose = 0

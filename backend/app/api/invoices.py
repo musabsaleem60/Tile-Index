@@ -1,3 +1,6 @@
+from datetime import date, datetime, time, timezone
+from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -132,6 +135,10 @@ def get_invoice(invoice_id: int, db: Session = Depends(get_db), current_user: Us
 @router.get("", response_model=list[InvoiceOut])
 def search_invoices(
     branch_id: int | None = None,
+    invoice_number: str | None = None,
+    customer: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -141,4 +148,16 @@ def search_invoices(
         query = query.where(Invoice.branch_id == branch_id)
     elif current_user.role == "employee" and current_user.branch_id is not None:
         query = query.where(Invoice.branch_id == current_user.branch_id)
+    if invoice_number and invoice_number.strip():
+        query = query.where(Invoice.invoice_number.ilike(f"%{invoice_number.strip()}%"))
+    if customer and customer.strip():
+        query = query.where(Invoice.customer_name.ilike(f"%{customer.strip()}%"))
+
+    business_tz = ZoneInfo("Asia/Karachi")
+    if date_from is not None:
+        start_utc = datetime.combine(date_from, time.min, tzinfo=business_tz).astimezone(timezone.utc)
+        query = query.where(Invoice.invoice_date >= start_utc)
+    if date_to is not None:
+        end_utc = datetime.combine(date_to, time.max, tzinfo=business_tz).astimezone(timezone.utc)
+        query = query.where(Invoice.invoice_date <= end_utc)
     return db.scalars(query.limit(200)).all()
