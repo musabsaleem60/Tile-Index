@@ -63,6 +63,16 @@ class InvoicePrintWindow:
         except Exception:
             pass
 
+    def company_heading(self):
+        """Return the customer-facing trading name for the invoice branch."""
+        branch_name = (getattr(self.branch, "name", "") or "").strip()
+        return {
+            "DHA": "Tile Index DHA",
+            "Tile Index - Korangi": "Tile Index Korangi",
+            "Tile Cera - Korangi": "Tile Cera",
+            "Machi Mor": "Machi Mor",
+        }.get(branch_name, branch_name or "Tile Index")
+
     def set_window_geometry(self, geometry):
         try:
             window = self.parent.winfo_toplevel()
@@ -110,18 +120,11 @@ class InvoicePrintWindow:
         header_frame = tk.Frame(parent, bg="white")
         header_frame.pack(fill=tk.X, pady=(0, 20))
         
-        tk.Label(header_frame, text="TILE INDEX", font=("Arial", 24, "bold"), 
+        tk.Label(header_frame, text=self.company_heading(), font=("Arial", 24, "bold"),
                 bg="white", fg="#2c3e50").pack()
-        tk.Label(header_frame, text="Tiles Trading Company", font=("Arial", 14), 
-                bg="white", fg="#7f8c8d").pack()
         tk.Label(header_frame, text="Pakistan", font=("Arial", 12), 
                 bg="white", fg="#7f8c8d").pack(pady=(5, 0))
         
-        # Branch name
-        if self.branch:
-            tk.Label(header_frame, text=self.branch.name, font=("Arial", 12, "bold"), 
-                    bg="white", fg="#34495e").pack(pady=(10, 0))
-
         for line in self.company_contact_lines():
             tk.Label(
                 header_frame,
@@ -415,12 +418,9 @@ class InvoicePrintWindow:
         )
 
         story = [
-            Paragraph("TILE INDEX", title_style),
-            Paragraph("Tiles Trading Company", subtitle_style),
+            Paragraph(self.escape_text(self.company_heading()), title_style),
             Paragraph("Pakistan", subtitle_style),
         ]
-        if self.branch:
-            story.append(Paragraph(self.escape_text(self.branch.name), subtitle_style))
         for line in self.company_contact_lines():
             story.append(Paragraph(self.escape_text(line) if line else "&nbsp;", subtitle_style))
         story.append(Spacer(1, 8))
@@ -582,8 +582,7 @@ class InvoicePrintWindow:
             "Godown # 1, Plot D-32, Gali # 2, 50-C, Korangi, Machi Morh",
             "Godown # 2, Opp. Edhi Centre, Korangi # 5",
             "",
-            "+92 333 0214142 (Shafaq)",
-            "+92 330 2214548 (Anas)",
+            "Cell# 03330214142  Qaim",
         ]
 
     def next_invoice_pdf_path(self):

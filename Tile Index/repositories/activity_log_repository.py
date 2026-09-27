@@ -39,7 +39,9 @@ class ActivityLogRepository:
             conn.close()
     
     @staticmethod
-    def search(user_id=None, action_type=None, branch_id=None, date_from=None, date_to=None, limit=1000):
+    def search(user_id=None, action_type=None, branch_id=None, date_from=None, date_to=None,
+               view="business", event_category=None, product_id=None,
+               invoice_number=None, return_number=None, limit=1000):
         """Search activity logs with filters"""
         if is_api_authenticated():
             params = {"limit": limit}
@@ -53,6 +55,16 @@ class ActivityLogRepository:
                 params["date_from"] = date_from
             if date_to:
                 params["date_to"] = date_to
+            if view:
+                params["view"] = view
+            if event_category:
+                params["event_category"] = event_category
+            if product_id:
+                params["product_id"] = product_id
+            if invoice_number:
+                params["invoice_number"] = invoice_number
+            if return_number:
+                params["return_number"] = return_number
             rows = api_client.get(f"/activity-log?{urlencode(params)}")
             return [ActivityLog.from_dict(row) for row in rows]
 
@@ -98,11 +110,38 @@ class ActivityLogRepository:
 
             rows = rows[:limit]
 
+            if view == "business":
+                rows = [row for row in rows if row[6] not in ("Login", "Logout")]
+            elif view == "access":
+                rows = [row for row in rows if row[6] in ("Login", "Logout")]
+
             return [ActivityLog(id=r[0], user_id=r[1], username=r[2], user_role=r[3],
                               branch_id=r[4], branch_name=r[5], action_type=r[6],
                               action_details=r[7], action_date=r[8], ip_address=r[9]) for r in rows]
         finally:
             conn.close()
+
+    @staticmethod
+    def action_options():
+        if is_api_authenticated():
+            return api_client.get("/activity-log/actions")
+        return {}
+
+    @staticmethod
+    def product_options():
+        if is_api_authenticated():
+            return api_client.get("/activity-log/products")
+        return []
+
+    @staticmethod
+    def product_history(product_id, date_from=None, date_to=None):
+        params = {}
+        if date_from:
+            params["date_from"] = date_from
+        if date_to:
+            params["date_to"] = date_to
+        suffix = f"?{urlencode(params)}" if params else ""
+        return api_client.get(f"/activity-log/product-history/{product_id}{suffix}")
     
     @staticmethod
     def get_all(limit=1000):

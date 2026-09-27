@@ -339,6 +339,26 @@ class InvoiceService:
         return api_client.post(f"/returns/{return_id}/settlements", payload)
 
     @staticmethod
+    def search_returns(branch_id=None, date_from=None, date_to=None, return_number=None, invoice_number=None):
+        if not is_api_authenticated():
+            raise ValueError("Return search requires the API connection")
+        params = {
+            "branch_id": branch_id,
+            "date_from": date_from,
+            "date_to": date_to,
+            "return_number": return_number,
+            "invoice_number": invoice_number,
+        }
+        query = urlencode({key: value for key, value in params.items() if value not in (None, "")})
+        return api_client.get(f"/returns?{query}" if query else "/returns") or []
+
+    @staticmethod
+    def get_return(return_id):
+        if not is_api_authenticated():
+            raise ValueError("Return details require the API connection")
+        return api_client.get(f"/returns/{int(return_id)}")
+
+    @staticmethod
     def update_remarks(invoice_id, remarks):
         """Update invoice-level remarks without changing invoice items or totals."""
         if not is_api_authenticated():

@@ -11,6 +11,7 @@ from ui.accessory_window import AccessoryWindow
 from ui.sanitary_window import SanitaryWindow
 from ui.invoice_window import InvoiceWindow
 from ui.invoice_search_window import InvoiceSearchWindow
+from ui.returns_window import ReturnsWindow
 from ui.stock_overview_window import StockOverviewWindow
 from ui.report_window import ReportWindow
 from services.auth_service import AuthenticationService
@@ -221,6 +222,7 @@ class MainWindow:
             ("Sanitary", COLORS["accessory"], COLORS["accessory_hover"], self.open_sanitary),
             ("Invoice & Billing", COLORS["success"], COLORS["success_hover"], self.open_invoice),
             ("Search Invoices", COLORS["search"], COLORS["search_hover"], self.open_invoice_search),
+            ("Returns", COLORS["search"], COLORS["search_hover"], self.open_returns),
             ("Rate Management", COLORS["reports"], COLORS["reports_hover"], self.open_rate_management),
             ("Reports", COLORS["reports"], COLORS["reports_hover"], self.open_reports),
         ]
@@ -355,8 +357,23 @@ class MainWindow:
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # Initialize the view class into the scrollable frame
-        self.current_view = view_class(scrollable_frame, *args, **kwargs)
+        # Initialize the view class into the scrollable frame. A constructor
+        # failure must remain visible instead of leaving an empty content area.
+        try:
+            self.current_view = view_class(scrollable_frame, *args, **kwargs)
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            self.current_view = None
+            ctk.CTkLabel(
+                scrollable_frame,
+                text=f"Could not open this screen.\n\n{exc}",
+                font=FONTS["body_bold"],
+                text_color=COLORS["danger"],
+                justify=tk.CENTER,
+                wraplength=720,
+            ).pack(fill=tk.X, padx=40, pady=60)
+            messagebox.showerror("Screen Error", f"Could not open this screen:\n\n{exc}")
 
     def open_inventory(self):
         """Open inventory management within the same window"""
@@ -388,6 +405,10 @@ class MainWindow:
     def open_invoice_search(self):
         """Open invoice search within the same window"""
         self.switch_view(InvoiceSearchWindow, self.current_user)
+
+    def open_returns(self):
+        """Open return and exchange search."""
+        self.switch_view(ReturnsWindow, self.current_user)
 
     def open_user_management(self):
         """Open user management within the same window (Admin only)"""

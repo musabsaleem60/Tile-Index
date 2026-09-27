@@ -11,7 +11,9 @@ class ActivityLog:
     
     def __init__(self, id=None, user_id=None, username=None, user_role=None,
                  branch_id=None, branch_name=None, action_type=None,
-                 action_details=None, action_date=None, ip_address=None):
+                 action_details=None, action_date=None, ip_address=None,
+                 event_category=None, product_id=None, accessory_id=None,
+                 sanitary_product_id=None, invoice_id=None, return_id=None):
         self.id = id
         self.user_id = user_id
         self.username = username
@@ -22,6 +24,12 @@ class ActivityLog:
         self.action_details = action_details  # JSON string or text with details
         self.action_date = action_date if action_date else datetime.now()
         self.ip_address = ip_address
+        self.event_category = event_category
+        self.product_id = product_id
+        self.accessory_id = accessory_id
+        self.sanitary_product_id = sanitary_product_id
+        self.invoice_id = invoice_id
+        self.return_id = return_id
     
     def __repr__(self):
         return f"ActivityLog(id={self.id}, user='{self.username}', action='{self.action_type}', date={self.action_date})"
@@ -38,7 +46,13 @@ class ActivityLog:
             'action_type': self.action_type,
             'action_details': self.action_details,
             'action_date': self.action_date,
-            'ip_address': self.ip_address
+            'ip_address': self.ip_address,
+            'event_category': self.event_category,
+            'product_id': self.product_id,
+            'accessory_id': self.accessory_id,
+            'sanitary_product_id': self.sanitary_product_id,
+            'invoice_id': self.invoice_id,
+            'return_id': self.return_id,
         }
     
     @classmethod
@@ -54,6 +68,12 @@ class ActivityLog:
             action_type=data.get('action_type'),
             action_details=data.get('action_details'),
             action_date=data.get('action_date'),
-            ip_address=data.get('ip_address')
+            ip_address=data.get('ip_address'),
+            event_category=data.get('event_category'),
+            product_id=data.get('product_id'),
+            accessory_id=data.get('accessory_id'),
+            sanitary_product_id=data.get('sanitary_product_id'),
+            invoice_id=data.get('invoice_id'),
+            return_id=data.get('return_id')
         )
 

@@ -113,6 +113,14 @@ class InvoiceDraftResumeTests(unittest.TestCase):
         self.assertNotIn("draft_error", items[0])
         self.assertIn("Combined draft quantity exceeds", items[1]["draft_error"])
 
+    def test_in_screen_resume_loads_saved_draft_after_startup_prompt_was_dismissed(self):
+        draft = {"schema_version": 1, "user_id": 3, "branch_id": 1, "items": []}
+        self.window.draft_store = SimpleNamespace(exists=lambda: True, load=lambda: draft)
+        self.window.invoice_items = []
+        self.window.resume_draft = Mock()
+        self.window.resume_saved_draft()
+        self.window.resume_draft.assert_called_once_with(draft)
+
     @patch("ui.invoice_window.InvoicePrintWindow")
     @patch("ui.invoice_window.tk.Toplevel", return_value=object())
     @patch("ui.invoice_window.messagebox.showinfo")

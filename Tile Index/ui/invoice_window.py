@@ -233,8 +233,13 @@ class InvoiceWindow:
         
         self.action_button(btn_frame, "Generate Invoice", self.generate_invoice, width=140).pack(side=tk.LEFT, padx=4)
         self.action_button(btn_frame, "Save Draft", self.save_draft, width=105, primary=False).pack(side=tk.LEFT, padx=4)
+        self.resume_draft_button = self.action_button(
+            btn_frame, "Resume Draft", self.resume_saved_draft, width=115, primary=False
+        )
+        self.resume_draft_button.pack(side=tk.LEFT, padx=4)
         self.action_button(btn_frame, "Clear All", self.clear_invoice, width=105, primary=False).pack(side=tk.LEFT, padx=4)
         self.action_button(btn_frame, "Print Invoice", self.print_invoice, width=115).pack(side=tk.LEFT, padx=4)
+        self.refresh_draft_button()
         
         # Right panel - Invoice Items Table
         right_frame = ctk.CTkFrame(
@@ -362,6 +367,7 @@ class InvoiceWindow:
         """Handle item type change"""
         item_type = self.item_type_var.get()
         self.product_var.set("")
+        self.product_combo.configure(state="normal")
         
         if item_type == "Tiles":
             self.product_label.configure(text="Product:")
@@ -408,6 +414,9 @@ class InvoiceWindow:
     
     def on_product_select(self, event):
         """Handle product selection"""
+        # A newly selected line defaults to the invoice branch. Staff may
+        # still override this after stock has loaded for cross-branch sales.
+        self.source_branch_var.set(self.invoice_branch_name())
         self.update_stock_info()
     
     def on_grade_select(self, event):
@@ -887,12 +896,37 @@ class InvoiceWindow:
             ):
                 return
             path = self.draft_store.save(self._draft_payload())
+            self.refresh_draft_button()
             messagebox.showinfo(
                 "Draft Saved",
                 f"Invoice draft saved on this machine.\n\n{path}",
             )
         except Exception as exc:
             messagebox.showerror("Draft Save Failed", str(exc))
+
+    def refresh_draft_button(self):
+        if hasattr(self, "resume_draft_button"):
+            self.resume_draft_button.configure(
+                state=tk.NORMAL if self.draft_store.exists() else tk.DISABLED
+            )
+
+    def resume_saved_draft(self):
+        """Resume the current user's saved draft at any point in the session."""
+        if not self.draft_store.exists():
+            self.refresh_draft_button()
+            messagebox.showinfo("Resume Draft", "No saved invoice draft is available.")
+            return
+        try:
+            draft = self.draft_store.load()
+        except Exception as exc:
+            messagebox.showerror("Draft Resume Failed", str(exc))
+            return
+        if self.invoice_items and not messagebox.askyesno(
+            "Replace Current Invoice",
+            "Resuming the saved draft will replace the invoice currently on screen. Continue?",
+        ):
+            return
+        self.resume_draft(draft)
 
     def offer_resume_draft(self):
         """Offer to resume or discard this user's saved local draft."""
@@ -906,6 +940,7 @@ class InvoiceWindow:
                 f"The saved invoice draft cannot be read:\n{exc}\n\nDiscard it?",
             ):
                 self.draft_store.delete()
+                self.refresh_draft_button()
             return
 
         saved_at = str(draft.get('saved_at') or 'an unknown time').replace('T', ' ')
@@ -914,6 +949,7 @@ class InvoiceWindow:
             self.resume_draft(draft)
         elif decision == 'discard':
             self.draft_store.delete()
+            self.refresh_draft_button()
 
     def _show_draft_choice(self, saved_at):
         """Show explicit Resume and Discard choices for a saved draft."""
@@ -1219,6 +1255,7 @@ class InvoiceWindow:
             InvoicePrintWindow(print_window, invoice_id=invoice.id)
 
             self.draft_store.delete()
+            self.refresh_draft_button()
             self.clear_invoice(prompt_for_saved_draft=False)
             
         except Exception as e:

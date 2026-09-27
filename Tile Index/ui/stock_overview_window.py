@@ -215,7 +215,7 @@ class StockOverviewWindow:
             "Sanitary": "sanitary",
         }[value]
         self.configure_for_tab()
-        self.populate_table()
+        self.refresh_data()
 
     def configure_for_tab(self):
         if self.active_tab == "tiles":

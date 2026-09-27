@@ -11,15 +11,25 @@ class SearchableCombobox(ttk.Combobox):
         kwargs['state'] = 'normal'
         super().__init__(master, **kwargs)
         self._all_values = []
+        self._last_committed_value = ""
+        self._typed_commit_job = None
         
         # Bind events
         self.bind('<KeyRelease>', self._on_keyrelease)
         self.bind('<FocusOut>', self._on_focus_out)
+        self.bind('<Return>', self._commit_typed_value)
         self.bind('<<ComboboxSelected>>', self._on_select)
 
     def set_completion_list(self, completion_list):
-        """Set the source list for search."""
+        """Replace the source list and discard filtering state from the old list."""
+        if self._typed_commit_job is not None:
+            try:
+                self.after_cancel(self._typed_commit_job)
+            except tk.TclError:
+                pass
+            self._typed_commit_job = None
         self._all_values = sorted([str(i) for i in completion_list])
+        self._last_committed_value = ""
         self['values'] = self._all_values
 
     def _on_keyrelease(self, event):
@@ -32,6 +42,12 @@ class SearchableCombobox(ttk.Combobox):
         query = self.get().lower()
         
         if not query:
+            if self._typed_commit_job is not None:
+                try:
+                    self.after_cancel(self._typed_commit_job)
+                except tk.TclError:
+                    pass
+                self._typed_commit_job = None
             self['values'] = self._all_values
             return
 
@@ -51,14 +67,30 @@ class SearchableCombobox(ttk.Combobox):
             self.selection_range(pos, tk.END)
             # Keep cursor at original typing position
             self.icursor(pos)
+            if self._typed_commit_job is not None:
+                self.after_cancel(self._typed_commit_job)
+            self._typed_commit_job = self.after(250, self._commit_typed_value)
             
     def _on_select(self, event):
         """Reset values to full list after a selection is made."""
+        self._last_committed_value = self.get()
         self.after(100, lambda: self.configure(values=self._all_values))
 
     def _on_focus_out(self, event):
         """Validate input when focus is lost."""
         val = self.get()
+        if val in self._all_values and val != self._last_committed_value:
+            self._last_committed_value = val
+            self.event_generate('<<ComboboxSelected>>')
         # Optional: if you want to force selection from list:
         # if val and val not in self._all_values:
         #    self.set('')
+
+    def _commit_typed_value(self, event=None):
+        """Commit an exact/autocompleted typed value like a list selection."""
+        value = self.get()
+        if value in self._all_values and value != self._last_committed_value:
+            self._last_committed_value = value
+            self.event_generate('<<ComboboxSelected>>')
+        self._typed_commit_job = None
+        return "break"

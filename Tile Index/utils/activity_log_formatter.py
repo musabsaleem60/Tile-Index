@@ -1,5 +1,40 @@
 import json
 
+CATEGORY_RULES = (
+    ("Returns", ("return", "refund", "settlement")),
+    ("Stock", ("stock", "inventory")),
+    ("Pricing", ("rate", "price", "tile size")),
+    ("Users", ("user", "password")),
+    ("Sales", ("invoice", "payment", "sale", "void", "remarks")),
+)
+
+def activity_category(activity) -> str:
+    stored = getattr(activity, "event_category", None)
+    if stored:
+        return stored
+    action = (getattr(activity, "action_type", "") or "").lower()
+    if "login" in action or "logout" in action or action == "access" or action.startswith("access "):
+        return "Access"
+    for category, markers in CATEGORY_RULES:
+        if any(marker in action for marker in markers):
+            return category
+    return "Catalogue"
+
+def activity_reference(activity) -> str:
+    data = _parse_details(getattr(activity, "action_details", None)) or {}
+    return str(data.get("return_number") or data.get("invoice_number") or data.get("item_code") or
+               data.get("sku") or data.get("dc_number") or data.get("product_name") or
+               data.get("accessory_name") or data.get("name") or "")
+
+def activity_summary(activity) -> str:
+    lines = format_activity_details(activity).splitlines()
+    return lines[0] if lines else ""
+
+def raw_activity_json(activity) -> str:
+    raw = getattr(activity, "action_details", None)
+    parsed = _parse_details(raw)
+    return raw or "" if parsed is None else json.dumps(parsed, ensure_ascii=False, indent=2, sort_keys=True)
+
 
 def format_activity_details(activity) -> str:
     action = getattr(activity, "action_type", "") or ""
