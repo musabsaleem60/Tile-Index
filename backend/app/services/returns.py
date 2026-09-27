@@ -205,6 +205,8 @@ def create_return(db: Session, invoice_id: int, payload, user: User) -> dict:
             "reason": clean_reason,
         },
         invoice.branch_id,
+        invoice_id=invoice.id,
+        return_id=record.id,
     )
     db.flush()
     return serialize_return(_load_return(db, record.id))
@@ -363,6 +365,8 @@ def add_settlement(db: Session, return_id: int, payload, user: User) -> dict:
             "settlement_date": payload.settlement_date.isoformat(),
         },
         record.branch_id,
+        invoice_id=record.invoice_id,
+        return_id=record.id,
     )
     db.flush()
     return serialize_return(_load_return(db, return_id))

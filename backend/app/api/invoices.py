@@ -81,6 +81,7 @@ def update_remarks(
             "new_remarks": invoice.remarks,
         },
         invoice.branch_id,
+        invoice_id=invoice.id,
     )
     db.commit()
     db.refresh(invoice)

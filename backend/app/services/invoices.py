@@ -66,6 +66,7 @@ def create_invoice(db: Session, payload: InvoiceCreate, user: User) -> Invoice:
         invoice.balance = 0
 
     db.add(invoice)
+    db.flush()
     write_audit_log(
         db,
         user,
@@ -76,6 +77,7 @@ def create_invoice(db: Session, payload: InvoiceCreate, user: User) -> Invoice:
             "grand_total": invoice.grand_total,
         },
         payload.branch_id,
+        invoice_id=invoice.id,
     )
     for item in cross_branch_lines:
         source_branch = db.get(Branch, item.source_branch_id)
@@ -96,6 +98,10 @@ def create_invoice(db: Session, payload: InvoiceCreate, user: User) -> Invoice:
                 "quantity": item.quantity,
             },
             item.source_branch_id,
+            product_id=item.product_id,
+            accessory_id=item.accessory_id,
+            sanitary_product_id=item.sanitary_product_id,
+            invoice_id=invoice.id,
         )
     db.flush()
     db.refresh(invoice)
@@ -377,6 +383,7 @@ def record_invoice_payment(db: Session, invoice_id: int, payload, user: User) ->
             "method": method,
         },
         invoice.branch_id,
+        invoice_id=invoice.id,
     )
     db.flush()
     db.refresh(invoice)
@@ -446,6 +453,7 @@ def void_invoice(db: Session, invoice_id: int, reason: str, user: User) -> Invoi
             "grand_total": invoice.grand_total,
         },
         invoice.branch_id,
+        invoice_id=invoice.id,
     )
     db.flush()
     db.refresh(invoice)

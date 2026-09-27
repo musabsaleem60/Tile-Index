@@ -386,6 +386,12 @@ class ActivityLogOut(ORMModel):
     action_details: str | None = None
     action_date: datetime
     ip_address: str | None = None
+    event_category: str | None = None
+    product_id: int | None = None
+    accessory_id: int | None = None
+    sanitary_product_id: int | None = None
+    invoice_id: int | None = None
+    return_id: int | None = None
 
 
 class TileRateUpdate(BaseModel):
