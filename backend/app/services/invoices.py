@@ -23,6 +23,7 @@ from app.schemas.common import InvoiceCreate
 from app.services.audit import write_audit_log
 from app.services.accessory_labels import accessory_display_label
 from app.services.tile_pricing import resolve_tile_price
+from app.core.currency import clamp_currency_zero
 from stock_math import deduct_verbatim_stock_with_delta, total_pieces
 
 
@@ -58,12 +59,10 @@ def create_invoice(db: Session, payload: InvoiceCreate, user: User) -> Invoice:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invoice must have valid items")
 
     invoice.subtotal = subtotal
-    invoice.grand_total = subtotal - payload.discount
-    if payload.paid_amount > invoice.grand_total:
+    invoice.grand_total = clamp_currency_zero(subtotal - payload.discount)
+    invoice.balance = clamp_currency_zero(invoice.grand_total - payload.paid_amount)
+    if invoice.balance < 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Paid amount exceeds invoice total")
-    invoice.balance = invoice.grand_total - payload.paid_amount
-    if abs(invoice.balance) < 0.005:
-        invoice.balance = 0
 
     db.add(invoice)
     db.flush()
@@ -350,7 +349,8 @@ def record_invoice_payment(db: Session, invoice_id: int, payload, user: User) ->
     amount = float(payload.amount)
     if amount <= 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment amount must be greater than zero")
-    if amount > float(invoice.balance):
+    remaining_balance = clamp_currency_zero(float(invoice.balance) - amount)
+    if remaining_balance < 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Amount exceeds remaining balance")
 
     method = payload.method.strip().lower() if payload.method else None
@@ -368,9 +368,7 @@ def record_invoice_payment(db: Session, invoice_id: int, payload, user: User) ->
     )
     db.add(payment)
     invoice.paid_amount = float(invoice.paid_amount or 0) + amount
-    invoice.balance = float(invoice.grand_total or 0) - float(invoice.paid_amount or 0)
-    if abs(invoice.balance) < 0.005:
-        invoice.balance = 0
+    invoice.balance = clamp_currency_zero(float(invoice.grand_total or 0) - float(invoice.paid_amount or 0))
 
     write_audit_log(
         db,

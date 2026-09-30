@@ -20,6 +20,7 @@ from repositories.accessory_repository import AccessoryRepository
 from repositories.sanitary_repository import SanitaryProductRepository
 from services.invoice_service import InvoiceService
 from utils.accessory_labels import accessory_display_label
+from utils.currency import format_currency, normalize_display_amount
 from utils.datetime_format import format_business_datetime
 
 
@@ -201,9 +202,9 @@ class InvoicePrintWindow:
                 grade = item.grade
                 qty_main = str(item.boxes)
                 qty_loose = str(item.loose_pieces)
-                rate_sqm = f"Rs. {item.rate_per_sqm:.2f}"
-                rate_main = f"Rs. {item.rate_per_box:.2f}"
-                rate_loose = f"Rs. {item.rate_per_piece:.2f}"
+                rate_sqm = format_currency(item.rate_per_sqm)
+                rate_main = format_currency(item.rate_per_box)
+                rate_loose = format_currency(item.rate_per_piece)
             elif item.accessory_id:
                 accessory = self.accessories.get(item.accessory_id)
                 if accessory:
@@ -220,7 +221,7 @@ class InvoicePrintWindow:
                 qty_main = str(item.boxes)  # Reuse boxes for quantity
                 qty_loose = "-"
                 rate_sqm = "-"
-                rate_main = f"Rs. {item.rate_per_box:.2f}"
+                rate_main = format_currency(item.rate_per_box)
                 rate_loose = "-"
             elif item.sanitary_product_id:
                 sanitary_product = self.sanitary_products.get(item.sanitary_product_id)
@@ -239,7 +240,7 @@ class InvoicePrintWindow:
                 qty_main = str(item.boxes)
                 qty_loose = "-"
                 rate_sqm = "-"
-                rate_main = f"Rs. {item.rate_per_box:.2f}"
+                rate_main = format_currency(item.rate_per_box)
                 rate_loose = "-"
             else:
                 product_name = "Unknown Item"
@@ -261,7 +262,7 @@ class InvoicePrintWindow:
                 rate_sqm,
                 rate_main,
                 rate_loose,
-                f"Rs. {item.line_total:.2f}"
+                format_currency(item.line_total)
             ]
             
             for col_idx, data in enumerate(row_data):
@@ -279,23 +280,24 @@ class InvoicePrintWindow:
         totals_right = tk.Frame(totals_frame, bg="white")
         totals_right.pack(side=tk.RIGHT, padx=20)
         
-        tk.Label(totals_right, text=f"Sub Total:        Rs. {self.invoice.subtotal:.2f}", 
+        tk.Label(totals_right, text=f"Sub Total:        {format_currency(self.invoice.subtotal)}",
                 font=("Arial", 11), bg="white", anchor=tk.E).pack(anchor=tk.E, pady=2)
         
         if self.invoice.discount > 0:
-            tk.Label(totals_right, text=f"Discount:         Rs. {self.invoice.discount:.2f}", 
+            tk.Label(totals_right, text=f"Discount:         {format_currency(self.invoice.discount)}",
                     font=("Arial", 11), bg="white", anchor=tk.E).pack(anchor=tk.E, pady=2)
         
-        tk.Label(totals_right, text=f"Grand Total:      Rs. {self.invoice.grand_total:.2f}", 
+        tk.Label(totals_right, text=f"Grand Total:      {format_currency(self.invoice.grand_total)}",
                 font=("Arial", 12, "bold"), bg="white", anchor=tk.E, fg="#27ae60").pack(anchor=tk.E, pady=(5, 2))
         
-        tk.Label(totals_right, text=f"Paid Amount:      Rs. {self.invoice.paid_amount:.2f}", 
+        tk.Label(totals_right, text=f"Paid Amount:      {format_currency(self.invoice.paid_amount)}",
                 font=("Arial", 11), bg="white", anchor=tk.E).pack(anchor=tk.E, pady=2)
         
-        if self.invoice.balance > 0:
-            tk.Label(totals_right, text=f"Balance:          Rs. {self.invoice.balance:.2f}", 
+        display_balance = normalize_display_amount(self.invoice.balance)
+        if display_balance > 0:
+            tk.Label(totals_right, text=f"Balance:          {format_currency(display_balance)}",
                     font=("Arial", 11, "bold"), bg="white", anchor=tk.E, fg="#e74c3c").pack(anchor=tk.E, pady=2)
-        elif self.invoice.balance == 0:
+        elif display_balance == 0:
             tk.Label(totals_right, text="Balance:          Rs. 0.00 (Paid)", 
                     font=("Arial", 11, "bold"), bg="white", anchor=tk.E, fg="#27ae60").pack(anchor=tk.E, pady=2)
 
@@ -616,10 +618,7 @@ class InvoicePrintWindow:
 
     @staticmethod
     def money_text(value):
-        try:
-            return f"Rs. {float(value or 0):.2f}"
-        except (TypeError, ValueError):
-            return "Rs. 0.00"
+        return format_currency(value)
 
     @staticmethod
     def quantity_text(value):

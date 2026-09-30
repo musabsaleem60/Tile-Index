@@ -9,6 +9,7 @@ from app.api.deps import ensure_branch_access, get_current_user
 from app.db.session import get_db
 from app.models.entities import Branch, Inventory, Invoice, SanitaryInventory, User
 from app.services.tile_pricing import resolve_tile_price
+from app.core.currency import format_currency
 
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -226,4 +227,4 @@ def _sanitary_stock_items(rows: list[SanitaryInventory]) -> tuple[list[dict], fl
 
 
 def _money(value) -> str:
-    return f"Rs. {float(value or 0):.2f}"
+    return format_currency(value)

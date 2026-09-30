@@ -23,6 +23,7 @@ from utils.invoice_printer import InvoicePrintWindow
 from utils.grade_constants import VALID_GRADES, GRADE_1
 from utils.searchable_combobox import SearchableCombobox
 from utils.accessory_labels import accessory_display_label
+from utils.currency import clamp_currency_zero, format_currency
 from utils.invoice_draft_store import DRAFT_SCHEMA_VERSION, InvoiceDraftStore
 from ui.theme import COLORS, FONTS, SIZES, SPACING
 
@@ -471,8 +472,8 @@ class InvoiceWindow:
                             rate_line = "No rate set for this size and grade"
                         else:
                             rate_line = (
-                                f"Selected source rate/box: Rs. {selected_stock.get('rate_per_box'):.2f} | "
-                                f"rate/piece: Rs. {selected_stock.get('rate_per_piece'):.2f}"
+                                f"Selected source rate/box: {format_currency(selected_stock.get('rate_per_box'))} | "
+                                f"rate/piece: {format_currency(selected_stock.get('rate_per_piece'))}"
                             )
                     else:
                         rate_line = "Select a source branch"
@@ -512,7 +513,7 @@ class InvoiceWindow:
                     available = 0
                 self.stock_info_label.configure(
                     text=(
-                        "\n".join(branch_lines + [f"Selected source: {available} items | Unit Price: Rs. {accessory.unit_price:.2f}"])
+                        "\n".join(branch_lines + [f"Selected source: {available} items | Unit Price: {format_currency(accessory.unit_price)}"])
                         if branch_lines else "No stock available"
                     ),
                     text_color=COLORS["primary"] if branch_lines else COLORS["danger"]
@@ -545,7 +546,7 @@ class InvoiceWindow:
                 self.stock_info_label.configure(
                     text=(
                         "\n".join(branch_lines + [
-                            f"Selected source: {available} items | Unit Price: Rs. {product.sale_price:.2f}"
+                            f"Selected source: {available} items | Unit Price: {format_currency(product.sale_price)}"
                         ]) if branch_lines else "No stock available"
                     ),
                     text_color=COLORS["primary"] if branch_lines else COLORS["danger"],
@@ -825,9 +826,9 @@ class InvoiceWindow:
                 item.get('grade') or '-',
                 item.get('boxes', 0),
                 item.get('loose_pieces', 0),
-                f"Rs. {float(item.get('rate_per_box') or 0):.2f}",
-                f"Rs. {float(item.get('rate_per_piece') or 0):.2f}",
-                f"Rs. {float(item.get('line_total') or 0):.2f}"
+                format_currency(item.get('rate_per_box')),
+                format_currency(item.get('rate_per_piece')),
+                format_currency(item.get('line_total'))
             ), tags=('draft_error',) if item.get('draft_error') else ())
     
     def update_totals(self, event=None):
@@ -844,12 +845,12 @@ class InvoiceWindow:
         except:
             paid = 0
         
-        grand_total = subtotal - discount
-        balance = grand_total - paid
+        grand_total = clamp_currency_zero(subtotal - discount)
+        balance = clamp_currency_zero(grand_total - paid)
         
-        self.subtotal_label.configure(text=f"Rs. {subtotal:.2f}")
-        self.grand_total_label.configure(text=f"Rs. {grand_total:.2f}")
-        self.balance_label.configure(text=f"Rs. {balance:.2f}")
+        self.subtotal_label.configure(text=format_currency(subtotal))
+        self.grand_total_label.configure(text=format_currency(grand_total))
+        self.balance_label.configure(text=format_currency(balance))
 
     def _draft_item_payload(self, item):
         item_type = item.get('type', '').lower()
@@ -1203,8 +1204,9 @@ class InvoiceWindow:
             discount = float(self.discount_entry.get() or "0")
             paid_amount = float(self.paid_entry.get() or "0")
             subtotal = sum(item['line_total'] for item in self.invoice_items)
-            grand_total = subtotal - discount
-            if paid_amount > grand_total:
+            grand_total = clamp_currency_zero(subtotal - discount)
+            balance = clamp_currency_zero(grand_total - paid_amount)
+            if balance < 0:
                 raise ValueError("Paid amount exceeds invoice total")
             
             # Prepare items data

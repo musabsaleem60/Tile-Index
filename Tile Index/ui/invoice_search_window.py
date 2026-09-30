@@ -11,6 +11,7 @@ from repositories.branch_repository import BranchRepository
 from services.invoice_service import InvoiceService
 from services.auth_service import AuthenticationService
 from utils.datetime_format import format_business_datetime
+from utils.currency import format_currency, normalize_display_amount
 from utils.invoice_printer import InvoicePrintWindow
 from utils.searchable_combobox import SearchableCombobox
 from ui.theme import COLORS, FONTS, SIZES, SPACING
@@ -242,9 +243,9 @@ class InvoiceSearchWindow:
                     date_str,
                     invoice.customer_name,
                     branch_name,
-                    f"Rs. {invoice.grand_total:.2f}",
-                    f"Rs. {invoice.paid_amount:.2f}",
-                    f"Rs. {invoice.balance:.2f}",
+                    format_currency(invoice.grand_total),
+                    format_currency(invoice.paid_amount),
+                    format_currency(invoice.balance),
                     str(invoice.id)  # Store invoice ID in hidden column
                 ))
                 if status_text == "VOID":
@@ -318,7 +319,7 @@ class InvoiceSearchWindow:
             if getattr(invoice, "status", "active") == "void":
                 messagebox.showerror("Record Payment", "Invoice is void, cannot record payment")
                 return
-            if float(invoice.balance or 0) <= 0:
+            if normalize_display_amount(invoice.balance) <= 0:
                 messagebox.showinfo("Record Payment", "This invoice has no remaining balance.")
                 return
         except Exception as exc:
@@ -335,7 +336,7 @@ class InvoiceSearchWindow:
 
         ctk.CTkLabel(
             dialog,
-            text=f"{invoice.invoice_number} | Balance: Rs. {float(invoice.balance or 0):.2f}",
+            text=f"{invoice.invoice_number} | Balance: {format_currency(invoice.balance)}",
             font=FONTS["body_bold"],
             text_color=COLORS["text"],
             height=SIZES["section_label_height"],
@@ -375,7 +376,7 @@ class InvoiceSearchWindow:
                 )
                 messagebox.showinfo(
                     "Payment Recorded",
-                    f"Payment recorded.\nPaid: Rs. {updated.paid_amount:.2f}\nBalance: Rs. {updated.balance:.2f}",
+                    f"Payment recorded.\nPaid: {format_currency(updated.paid_amount)}\nBalance: {format_currency(updated.balance)}",
                 )
                 dialog.destroy()
                 self.search_invoices()

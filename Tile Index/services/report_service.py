@@ -14,6 +14,7 @@ from services.invoice_service import InvoiceService
 from desktop_client.remote_state import is_api_authenticated
 from desktop_client.session import api_client
 from desktop_client.api_client import ApiClientError
+from utils.currency import format_currency
 
 
 class ReportService:
@@ -134,7 +135,7 @@ class ReportService:
                 'rate_per_box': price["rate_per_box"] if price else None,
                 'rate_per_piece': price["rate_per_piece"] if price else None,
                 'stock_value': stock_value,
-                'value_display': f"Rs. {stock_value:.2f}" if price else "No Rate Set"
+                'value_display': format_currency(stock_value) if price else "No Rate Set"
             })
 
         sanitary_inventory = SanitaryInventoryRepository.get_all_by_branch(branch_id)
@@ -232,7 +233,7 @@ class ReportService:
                     'rate_per_box': price["rate_per_box"] if price else None,
                     'rate_per_piece': price["rate_per_piece"] if price else None,
                     'stock_value': stock_value,
-                    'value_display': f"Rs. {stock_value:.2f}" if price else "No Rate Set"
+                    'value_display': format_currency(stock_value) if price else "No Rate Set"
                 })
 
             for inv in sanitary_inventory:

@@ -182,13 +182,16 @@ class SanitaryWindow:
         stock_display_frame.grid_rowconfigure(1, weight=1)
         stock_display_frame.grid_columnconfigure(0, weight=1)
 
-        stock_columns = ('S.No', 'Company', 'Category', 'Color', 'SKU', 'Sale', 'Qty', 'Value')
+        stock_columns = ('Company', 'Category', 'Color', 'Sale', 'Qty')
         self.stock_tree = ttk.Treeview(stock_display_frame, columns=stock_columns, show='headings', height=10)
         for col in stock_columns:
             self.stock_tree.heading(col, text=col)
             self.stock_tree.column(col, width=80, anchor=tk.CENTER)
-        self.stock_tree.column('Category', width=120, anchor=tk.W)
-        self.stock_tree.column('SKU', width=120, anchor=tk.W)
+        self.stock_tree.column('Company', width=130, anchor=tk.W)
+        self.stock_tree.column('Category', width=180, anchor=tk.W)
+        self.stock_tree.column('Color', width=100, anchor=tk.W)
+        self.stock_tree.column('Sale', width=90, anchor=tk.E)
+        self.stock_tree.column('Qty', width=70, anchor=tk.CENTER)
 
         stock_scroll = ttk.Scrollbar(stock_display_frame, orient=tk.VERTICAL, command=self.stock_tree.yview)
         self.stock_tree.configure(yscrollcommand=stock_scroll.set)
@@ -543,20 +546,16 @@ class SanitaryWindow:
             row["sanitary_product_id"]: row for row in self.fetch_inventory(self.selected_branch_id)
         }
 
-        for idx, product in enumerate(all_products, 1):
+        for product in all_products:
             inv = inventory_by_product.get(product.id)
             qty = int(inv["quantity"]) if inv else 0
-            total_value = qty * product.sale_price
 
             self.stock_tree.insert('', tk.END, values=(
-                idx,
                 product.company_name,
                 product.product_category,
                 product.color,
-                product.sku,
                 f"Rs. {product.sale_price:.0f}",
-                qty,
-                f"Rs. {total_value:.0f}"
+                qty
             ))
 
     @staticmethod

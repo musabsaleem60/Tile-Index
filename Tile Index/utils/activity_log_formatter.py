@@ -1,5 +1,7 @@
 import json
 
+from utils.currency import format_currency
+
 CATEGORY_RULES = (
     ("Returns", ("return", "refund", "settlement")),
     ("Stock", ("stock", "inventory")),
@@ -76,8 +78,8 @@ def format_activity_details(activity) -> str:
         exchanged = data.get("exchange_items") or []
         lines = [
             f"Return {data.get('return_number')} against invoice {data.get('invoice_number')}",
-            *[f"Returned: {row.get('description')} | {_quantity(row)} | Rs. {float(row.get('value', 0)):.2f}" for row in returned],
-            *[f"Exchange: {row.get('description')} | {_quantity(row)} | Rs. {float(row.get('value', 0)):.2f}" for row in exchanged],
+            *[f"Returned: {row.get('description')} | {_quantity(row)} | {format_currency(row.get('value', 0))}" for row in returned],
+            *[f"Exchange: {row.get('description')} | {_quantity(row)} | {format_currency(row.get('value', 0))}" for row in exchanged],
             _money("Returned value", data.get("returned_value")),
             _money("Exchange value", data.get("exchange_value")),
             _money("Difference", data.get("difference_amount")),
@@ -85,7 +87,7 @@ def format_activity_details(activity) -> str:
         ]
         settlement = data.get("settlement") or {}
         if settlement:
-            lines.append(f"Settlement: {settlement.get('direction')} | Rs. {float(settlement.get('amount', 0)):.2f} | {settlement.get('method') or 'unspecified'}")
+            lines.append(f"Settlement: {settlement.get('direction')} | {format_currency(settlement.get('amount', 0))} | {settlement.get('method') or 'unspecified'}")
         return _join_sentences(lines)
     if action == "Return Settlement Recorded":
         return _join_sentences([
@@ -288,7 +290,7 @@ def _money(label, value, suffix=""):
     if value is None:
         return None
     try:
-        return f"{label}: Rs. {float(value):.2f}{suffix}"
+        return f"{label}: {format_currency(value)}{suffix}"
     except Exception:
         return f"{label}: {value}{suffix}"
 
@@ -298,7 +300,7 @@ def _rate_change(data):
     new_rate = data.get("new_rate")
     if old_rate is None:
         return _money("New rate", new_rate, "/m2")
-    return f"Rate: Rs. {float(old_rate):.2f}/m2 -> Rs. {float(new_rate):.2f}/m2"
+    return f"Rate: {format_currency(old_rate)}/m2 -> {format_currency(new_rate)}/m2"
 
 
 def _impact(data):

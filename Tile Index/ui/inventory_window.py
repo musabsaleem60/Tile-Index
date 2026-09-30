@@ -15,6 +15,7 @@ from models.product import Product
 from utils.validators import validate_positive_number, validate_integer, validate_required, validate_grade
 from utils.grade_constants import VALID_GRADES, GRADE_1
 from utils.searchable_combobox import SearchableCombobox
+from utils.currency import format_currency
 from desktop_client.remote_state import is_api_authenticated
 from desktop_client.api_client import ApiClientError
 from desktop_client.session import api_client
@@ -716,9 +717,9 @@ class InventoryWindow:
                     self.stock_display_text.insert(tk.END, f"  Loose Pieces: {inv.loose_pieces}\n")
                     self.stock_display_text.insert(tk.END, f"  Total Pieces: {total_pieces}\n")
                     if inv.rate_per_sqm and inv.rate_per_box and inv.rate_per_piece:
-                        self.stock_display_text.insert(tk.END, f"  Rate per m²: Rs. {inv.rate_per_sqm:.2f}\n")
-                        self.stock_display_text.insert(tk.END, f"  Rate per Box: Rs. {inv.rate_per_box:.2f}\n")
-                        self.stock_display_text.insert(tk.END, f"  Rate per Piece: Rs. {inv.rate_per_piece:.2f}\n\n")
+                        self.stock_display_text.insert(tk.END, f"  Rate per m²: {format_currency(inv.rate_per_sqm)}\n")
+                        self.stock_display_text.insert(tk.END, f"  Rate per Box: {format_currency(inv.rate_per_box)}\n")
+                        self.stock_display_text.insert(tk.END, f"  Rate per Piece: {format_currency(inv.rate_per_piece)}\n\n")
                     else:
                         self.stock_display_text.insert(tk.END, "  Rate: No rate set for this size and grade\n\n")
                 else:

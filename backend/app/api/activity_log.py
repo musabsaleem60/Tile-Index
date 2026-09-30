@@ -12,6 +12,7 @@ from app.models.entities import (
     ActivityLog, Branch, Invoice, InvoiceItem, InvoiceReturn, InvoiceReturnItem,
     Product, ProductClientCode, ReturnExchangeItem, StockTransaction, User,
 )
+from app.core.currency import format_currency
 from app.schemas.common import ActivityLogOut
 from app.services.audit import EVENT_CATEGORIES, infer_event_category
 
@@ -134,7 +135,7 @@ def product_history(
             "date": invoice.invoice_date, "user": username or "Unknown", "branch": branch_name,
             "category": "Sales", "action": "Invoice Sale" if invoice.status != "void" else "Voided Invoice Sale",
             "reference": invoice.invoice_number,
-            "summary": f"{item.boxes} boxes + {item.loose_pieces} loose | {item.grade} | Rs. {float(item.line_total):.2f}",
+            "summary": f"{item.boxes} boxes + {item.loose_pieces} loose | {item.grade} | {format_currency(item.line_total)}",
             "details": f"Customer: {invoice.customer_name}; status: {invoice.status}",
             "raw": {"invoice_id": invoice.id, "invoice_item_id": item.id, "status": invoice.status,
                     "boxes_from_boxes": item.boxes_from_boxes, "pieces_from_loose": item.pieces_from_loose},
@@ -152,7 +153,7 @@ def product_history(
         timeline.append({
             "date": record.return_date, "user": username, "branch": branch_name,
             "category": "Returns", "action": "Item Returned", "reference": record.return_number,
-            "summary": f"{item.boxes} boxes + {item.loose_pieces} loose | Rs. {float(item.discounted_line_total):.2f}",
+            "summary": f"{item.boxes} boxes + {item.loose_pieces} loose | {format_currency(item.discounted_line_total)}",
             "details": f"Original invoice: {invoice.invoice_number}; reason: {record.reason}",
             "raw": {"return_id": record.id, "invoice_id": invoice.id, "invoice_item_id": item.invoice_item_id},
         })
@@ -168,7 +169,7 @@ def product_history(
         timeline.append({
             "date": record.return_date, "user": username, "branch": branch_name,
             "category": "Returns", "action": "Exchange Item Issued", "reference": record.return_number,
-            "summary": f"{item.boxes} boxes + {item.loose_pieces} loose | Rs. {float(item.line_total):.2f}",
+            "summary": f"{item.boxes} boxes + {item.loose_pieces} loose | {format_currency(item.line_total)}",
             "details": f"Original invoice: {invoice.invoice_number}; reason: {record.reason}",
             "raw": {"return_id": record.id, "invoice_id": invoice.id, "exchange_item_id": item.id},
         })

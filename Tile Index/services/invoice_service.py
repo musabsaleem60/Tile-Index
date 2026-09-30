@@ -20,6 +20,7 @@ from zoneinfo import ZoneInfo
 from desktop_client.remote_state import is_api_authenticated
 from desktop_client.session import api_client
 from utils.accessory_labels import accessory_display_label
+from utils.currency import clamp_currency_zero
 
 
 class InvoiceService:
@@ -222,12 +223,10 @@ class InvoiceService:
         
         # Calculate totals
         invoice.subtotal = subtotal
-        invoice.grand_total = subtotal - discount
-        if paid_amount > invoice.grand_total:
+        invoice.grand_total = clamp_currency_zero(subtotal - discount)
+        invoice.balance = clamp_currency_zero(invoice.grand_total - paid_amount)
+        if invoice.balance < 0:
             raise ValueError("Paid amount exceeds invoice total")
-        invoice.balance = invoice.grand_total - paid_amount
-        if abs(invoice.balance) < 0.005:
-            invoice.balance = 0
         
         # Save invoice (this will generate invoice number)
         invoice = InvoiceRepository.create(invoice)

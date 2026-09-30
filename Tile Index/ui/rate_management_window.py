@@ -12,6 +12,7 @@ from repositories.product_repository import ProductRepository
 from ui.theme import COLORS, FONTS, SIZES, SPACING
 from utils.grade_constants import VALID_GRADES
 from utils.searchable_combobox import SearchableCombobox
+from utils.currency import format_currency
 
 
 class RateManagementWindow:
@@ -462,10 +463,7 @@ class RateManagementWindow:
     def money(value):
         if value is None:
             return ""
-        try:
-            return f"Rs. {float(value):.2f}"
-        except Exception:
-            return str(value)
+        return format_currency(value)
 
     @staticmethod
     def format_number(value):

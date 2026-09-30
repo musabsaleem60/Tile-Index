@@ -9,6 +9,7 @@ from services.invoice_service import InvoiceService
 from repositories.product_repository import ProductRepository
 from ui.theme import COLORS, FONTS, SIZES
 from utils.return_printer import ReturnPrinter
+from utils.currency import clamp_currency_zero, format_currency, normalize_display_amount
 
 
 class InvoiceReturnDialog:
@@ -209,7 +210,7 @@ class InvoiceReturnDialog:
             value = quantity * float(row.get("unit_price") or 0)
             qty_text = f"{quantity} units"
         self.exchange_rows.append(payload)
-        item_id = self.exchange_tree.insert("", tk.END, values=(row["_label"], branch["branch_name"], qty_text, f"Rs. {value:.2f}"))
+        item_id = self.exchange_tree.insert("", tk.END, values=(row["_label"], branch["branch_name"], qty_text, format_currency(value)))
         self.exchange_tree.set(item_id, "item", row["_label"])
         self._update_totals()
 
@@ -243,18 +244,22 @@ class InvoiceReturnDialog:
                 exchanged += float(self.exchange_tree.set(item_id, "value").replace("Rs. ", ""))
             except ValueError:
                 pass
-        return round(returned, 2), round(exchanged, 2), round(returned - exchanged, 2)
+        returned = round(returned, 2)
+        exchanged = round(exchanged, 2)
+        difference = clamp_currency_zero(round(returned - exchanged, 2))
+        return returned, exchanged, difference
 
     def _update_totals(self):
         returned, exchanged, difference = self._calculate_totals()
-        direction = "Refund due" if difference > 0 else "Additional payment due" if difference < 0 else "Even exchange"
-        self.totals_label.configure(text=f"Returned: Rs. {returned:.2f}\nExchange: Rs. {exchanged:.2f}\n{direction}: Rs. {abs(difference):.2f}")
+        display_difference = normalize_display_amount(difference)
+        direction = "Refund due" if display_difference > 0 else "Additional payment due" if display_difference < 0 else "Even exchange"
+        self.totals_label.configure(text=f"Returned: {format_currency(returned)}\nExchange: {format_currency(exchanged)}\n{direction}: {format_currency(abs(display_difference))}")
 
     def _history_text(self):
         rows = self.history.get("returns", [])
         if not rows:
             return "No previous returns for this invoice."
-        return "Previous returns: " + ", ".join(f"{r['return_number']} (Rs. {float(r['returned_value']):.2f})" for r in rows)
+        return "Previous returns: " + ", ".join(f"{r['return_number']} ({format_currency(r['returned_value'])})" for r in rows)
 
     def _submit(self):
         reason = self.reason.get().strip()
@@ -291,7 +296,7 @@ class InvoiceReturnDialog:
             return
         try:
             result = InvoiceService.create_return(self.invoice.id, payload)
-            messagebox.showinfo("Return Completed", f"{result['return_number']} completed.\nDifference: Rs. {float(result['difference_amount']):.2f}", parent=self.window)
+            messagebox.showinfo("Return Completed", f"{result['return_number']} completed.\nDifference: {format_currency(result['difference_amount'])}", parent=self.window)
             if messagebox.askyesno("Return Note", "Generate and open the return note PDF?", parent=self.window):
                 try:
                     path = ReturnPrinter(self.invoice, result).generate_pdf()

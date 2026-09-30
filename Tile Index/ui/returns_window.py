@@ -9,6 +9,7 @@ from services.auth_service import AuthenticationService
 from services.invoice_service import InvoiceService
 from ui.theme import COLORS, FONTS, SIZES, SPACING
 from utils.datetime_format import format_business_datetime
+from utils.currency import clamp_currency_zero, format_amount, format_currency
 from utils.return_printer import ReturnPrinter
 from utils.searchable_combobox import SearchableCombobox
 
@@ -122,8 +123,8 @@ class ReturnsWindow:
                 item = self.tree.insert("", tk.END, values=(
                     row["return_number"], format_business_datetime(row["return_date"], fmt="%Y-%m-%d"),
                     row["invoice_number"], row["branch_name"], row["customer_name"],
-                    f"Rs. {float(row['returned_value']):.2f}", f"Rs. {float(row['exchange_value']):.2f}",
-                    f"Rs. {float(row['difference_amount']):.2f}", row["settlement_status"],
+                    format_currency(row['returned_value']), format_currency(row['exchange_value']),
+                    format_currency(row['difference_amount']), row["settlement_status"],
                 ))
                 self.return_ids[item] = (row["id"], row["invoice_id"])
             if not rows:
@@ -146,8 +147,8 @@ class ReturnsWindow:
             branch_names = {branch.id: branch.name for branch in self.branches}
             lines = [
                 f"Return: {self.current_return['return_number']} | Reason: {self.current_return['reason']}",
-                f"Returned value: Rs. {float(self.current_return['returned_value']):.2f} | Exchange value: Rs. {float(self.current_return['exchange_value']):.2f}",
-                f"Difference: Rs. {float(self.current_return['difference_amount']):.2f} | Outstanding: Rs. {float(self.current_return['outstanding_amount']):.2f}",
+                f"Returned value: {format_currency(self.current_return['returned_value'])} | Exchange value: {format_currency(self.current_return['exchange_value'])}",
+                f"Difference: {format_currency(self.current_return['difference_amount'])} | Outstanding: {format_currency(self.current_return['outstanding_amount'])}",
                 "", "Returned items:",
             ]
             lines.extend(self._return_item_lines(self.current_return.get("return_items", []), invoice_items, branch_names))
@@ -159,7 +160,8 @@ class ReturnsWindow:
             self.detail_text.delete("1.0", tk.END)
             self.detail_text.insert("1.0", "\n".join(lines))
             self.detail_text.configure(state="disabled")
-            self.settle_button.configure(state=tk.NORMAL if float(self.current_return["outstanding_amount"]) > 0 else tk.DISABLED)
+            outstanding = clamp_currency_zero(self.current_return["outstanding_amount"])
+            self.settle_button.configure(state=tk.NORMAL if outstanding > 0 else tk.DISABLED)
         except Exception as exc:
             messagebox.showerror("Return Details", str(exc))
 
@@ -170,16 +172,16 @@ class ReturnsWindow:
             item = invoice_items.get(row["invoice_item_id"])
             label = getattr(item, "description", None) or f"Invoice item {row['invoice_item_id']}"
             source = branch_names.get(row["source_branch_id"], f"Branch {row['source_branch_id']}")
-            result.append(f"{label} | Source: {source} | {row['boxes']} boxes + {row['loose_pieces']} loose | {row['quantity']} units | Rs. {float(row['discounted_line_total']):.2f}")
+            result.append(f"{label} | Source: {source} | {row['boxes']} boxes + {row['loose_pieces']} loose | {row['quantity']} units | {format_currency(row['discounted_line_total'])}")
         return result or ["None"]
 
     @staticmethod
     def _exchange_item_lines(rows, branch_names):
-        return [f"{r['description']} | Source: {branch_names.get(r['source_branch_id'], r['source_branch_id'])} | {r['boxes']} boxes + {r['loose_pieces']} loose | {r['quantity']} units | Rs. {float(r['line_total']):.2f}" for r in rows] or ["None"]
+        return [f"{r['description']} | Source: {branch_names.get(r['source_branch_id'], r['source_branch_id'])} | {r['boxes']} boxes + {r['loose_pieces']} loose | {r['quantity']} units | {format_currency(r['line_total'])}" for r in rows] or ["None"]
 
     @staticmethod
     def _settlement_lines(rows):
-        return [f"{format_business_datetime(r['settlement_date'], fmt='%Y-%m-%d')} | {r['direction']} | Rs. {float(r['amount']):.2f} | {r.get('method') or '-'}" for r in rows] or ["None"]
+        return [f"{format_business_datetime(r['settlement_date'], fmt='%Y-%m-%d')} | {r['direction']} | {format_currency(r['amount'])} | {r.get('method') or '-'}" for r in rows] or ["None"]
 
     def print_return(self):
         ids = self._selected_ids()
@@ -199,7 +201,7 @@ class ReturnsWindow:
         if not ids or not self.current_return:
             messagebox.showwarning("Returns", "Please select a return.")
             return
-        outstanding = float(self.current_return["outstanding_amount"])
+        outstanding = clamp_currency_zero(self.current_return["outstanding_amount"])
         dialog = ctk.CTkToplevel(self.parent)
         dialog.title("Record Return Settlement")
         dialog.geometry("430x300")
@@ -207,15 +209,15 @@ class ReturnsWindow:
         dialog.transient(self.parent.winfo_toplevel())
         amount = self._entry(dialog, 180)
         method = tk.StringVar(value="cash")
-        self._label(dialog, f"Outstanding: Rs. {outstanding:.2f}").pack(pady=(22, 8))
+        self._label(dialog, f"Outstanding: {format_currency(outstanding)}").pack(pady=(22, 8))
         amount.pack(pady=6)
-        amount.insert(0, f"{outstanding:.2f}")
+        amount.insert(0, format_amount(outstanding))
         ttk.Combobox(dialog, textvariable=method, values=("cash", "card", "bank", "other"), state="readonly", width=18).pack(pady=6)
 
         def save():
             try:
                 value = float(amount.get())
-                if value <= 0 or value > outstanding:
+                if value <= 0 or clamp_currency_zero(outstanding - value) < 0:
                     raise ValueError("Settlement amount must be positive and cannot exceed the outstanding amount")
                 InvoiceService.add_return_settlement(ids[0], {
                     "amount": value, "direction": self.current_return["difference_direction"],

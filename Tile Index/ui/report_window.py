@@ -14,6 +14,7 @@ from repositories.branch_repository import BranchRepository
 from services.report_service import ReportService
 from ui.theme import COLORS, FONTS, SIZES, SPACING
 from utils.datetime_format import format_business_datetime
+from utils.currency import format_currency
 from utils.report_printer import ReportPrinter
 from utils.searchable_combobox import SearchableCombobox
 
@@ -454,10 +455,7 @@ class ReportWindow:
 
     @staticmethod
     def money(value):
-        try:
-            return f"Rs. {float(value or 0):.2f}"
-        except Exception:
-            return "Rs. 0.00"
+        return format_currency(value)
 
     @staticmethod
     def time_text(value):

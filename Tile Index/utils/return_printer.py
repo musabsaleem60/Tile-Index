@@ -8,6 +8,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from repositories.branch_repository import BranchRepository
+from utils.currency import format_currency, normalize_display_amount
 
 
 class ReturnPrinter:
@@ -46,7 +47,7 @@ class ReturnPrinter:
             item = originals.get(row["invoice_item_id"])
             description = getattr(item, "description", None) or f"Invoice item {row['invoice_item_id']}"
             qty = f"{row['boxes']} boxes + {row['loose_pieces']} loose" if row["item_type"] == "tile" else f"{row['quantity']} units"
-            returned_rows.append([description, qty, branches.get(row["source_branch_id"], str(row["source_branch_id"])), f"Rs. {float(row['discounted_line_total']):.2f}"])
+            returned_rows.append([description, qty, branches.get(row["source_branch_id"], str(row["source_branch_id"])), format_currency(row['discounted_line_total'])])
         story.extend([Paragraph("<b>Returned Items</b>", normal), self._table(returned_rows), Spacer(1, 10)])
 
         exchanges = self.record.get("exchange_items", [])
@@ -54,16 +55,16 @@ class ReturnPrinter:
             exchange_rows = [["Exchange item", "Quantity", "Source branch", "Value"]]
             for row in exchanges:
                 qty = f"{row['boxes']} boxes + {row['loose_pieces']} loose" if row["item_type"] == "tile" else f"{row['quantity']} units"
-                exchange_rows.append([row["description"], qty, branches.get(row["source_branch_id"], str(row["source_branch_id"])), f"Rs. {float(row['line_total']):.2f}"])
+                exchange_rows.append([row["description"], qty, branches.get(row["source_branch_id"], str(row["source_branch_id"])), format_currency(row['line_total'])])
             story.extend([Paragraph("<b>Exchange Items</b>", normal), self._table(exchange_rows), Spacer(1, 10)])
 
-        difference = float(self.record["difference_amount"])
+        difference = normalize_display_amount(self.record["difference_amount"])
         direction = "Refund owed to customer" if difference > 0 else "Additional payment owed by customer" if difference < 0 else "Even exchange"
         story.extend([
-            Paragraph(f"Returned value: Rs. {float(self.record['returned_value']):.2f}", normal),
-            Paragraph(f"Exchange value: Rs. {float(self.record['exchange_value']):.2f}", normal),
-            Paragraph(f"<b>{direction}: Rs. {abs(difference):.2f}</b>", normal),
-            Paragraph(f"Settled: Rs. {float(self.record.get('settled_amount', 0)):.2f} &nbsp;&nbsp; Outstanding: Rs. {float(self.record.get('outstanding_amount', 0)):.2f}", normal),
+            Paragraph(f"Returned value: {format_currency(self.record['returned_value'])}", normal),
+            Paragraph(f"Exchange value: {format_currency(self.record['exchange_value'])}", normal),
+            Paragraph(f"<b>{direction}: {format_currency(abs(difference))}</b>", normal),
+            Paragraph(f"Settled: {format_currency(self.record.get('settled_amount', 0))} &nbsp;&nbsp; Outstanding: {format_currency(self.record.get('outstanding_amount', 0))}", normal),
             Spacer(1, 18),
             Paragraph("Customer signature: ____________________ &nbsp;&nbsp;&nbsp; Authorized by: ____________________", normal),
         ])
