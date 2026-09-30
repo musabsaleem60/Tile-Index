@@ -1,8 +1,7 @@
 param(
     [string]$Version,
     [string]$PackageDir = ".\dist\TileIndex",
-    [string]$OutputDir = ".\dist\installer",
-    [string]$CertThumbprint = "5654E094C05235013364F2B2B3ACB04DAB803913"
+    [string]$OutputDir = ".\dist\installer"
 )
 
 $ErrorActionPreference = "Stop"
@@ -39,7 +38,6 @@ $issPath = Join-Path $projectRoot "scripts\TileIndexInstaller.iss"
     /DAppVersion="$Version" `
     /DPackageDir="$resolvedPackage" `
     /DOutputDir="$resolvedOutput" `
-    /DCertThumbprint="$CertThumbprint" `
     $issPath
 
 if ($LASTEXITCODE -ne 0) {
