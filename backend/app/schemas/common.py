@@ -66,6 +66,18 @@ class SanitaryProductOut(SanitaryProductIn, ORMModel):
     created_at: datetime | None = None
 
 
+class LoosePcsProductIn(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    size: str = Field(min_length=1, max_length=80)
+    price: float = Field(ge=0)
+
+
+class LoosePcsProductOut(LoosePcsProductIn, ORMModel):
+    id: int
+    sku: str
+    created_at: datetime | None = None
+
+
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -142,11 +154,20 @@ class SanitaryInventoryOut(ORMModel):
     updated_at: datetime | None = None
 
 
+class LoosePcsInventoryOut(ORMModel):
+    id: int
+    branch_id: int
+    product_id: int
+    quantity: int
+    updated_at: datetime | None = None
+
+
 class InvoiceItemIn(BaseModel):
     item_type: str
     product_id: int | None = None
     accessory_id: int | None = None
     sanitary_product_id: int | None = None
+    loose_pcs_product_id: int | None = None
     source_branch_id: int | None = None
     grade: str | None = None
     boxes: int = Field(default=0, ge=0)
@@ -169,6 +190,7 @@ class InvoiceItemOut(ORMModel):
     product_id: int | None = None
     accessory_id: int | None = None
     sanitary_product_id: int | None = None
+    loose_pcs_product_id: int | None = None
     source_branch_id: int
     item_type: str
     description: str
@@ -279,6 +301,7 @@ class ReturnExchangeItemOut(ORMModel):
     product_id: int | None = None
     accessory_id: int | None = None
     sanitary_product_id: int | None = None
+    loose_pcs_product_id: int | None = None
     source_branch_id: int
     item_type: str
     description: str
@@ -390,6 +413,7 @@ class ActivityLogOut(ORMModel):
     product_id: int | None = None
     accessory_id: int | None = None
     sanitary_product_id: int | None = None
+    loose_pcs_product_id: int | None = None
     invoice_id: int | None = None
     return_id: int | None = None
 

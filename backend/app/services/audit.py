@@ -35,6 +35,7 @@ def write_audit_log(
     product_id: int | None = None,
     accessory_id: int | None = None,
     sanitary_product_id: int | None = None,
+    loose_pcs_product_id: int | None = None,
     invoice_id: int | None = None,
     return_id: int | None = None,
 ) -> ActivityLog:
@@ -47,6 +48,7 @@ def write_audit_log(
     product_id = product_id or detail_data.get("product_id")
     accessory_id = accessory_id or detail_data.get("accessory_id")
     sanitary_product_id = sanitary_product_id or detail_data.get("sanitary_product_id")
+    loose_pcs_product_id = loose_pcs_product_id or detail_data.get("loose_pcs_product_id")
     invoice_id = invoice_id or detail_data.get("invoice_id")
     return_id = return_id or detail_data.get("return_id")
 
@@ -68,6 +70,7 @@ def write_audit_log(
         product_id=product_id,
         accessory_id=accessory_id,
         sanitary_product_id=sanitary_product_id,
+        loose_pcs_product_id=loose_pcs_product_id,
         invoice_id=invoice_id,
         return_id=return_id,
     )

@@ -9,6 +9,8 @@ from app.models.entities import (
     AccessoryInventory,
     Branch,
     Inventory,
+    LoosePcsInventory,
+    LoosePcsProduct,
     Product,
     SanitaryInventory,
     SanitaryProduct,
@@ -27,7 +29,7 @@ router = APIRouter(prefix="/stock", tags=["stock"])
 
 @router.get("/overview")
 def stock_overview(
-    item_type: str = Query("all", pattern="^(all|tiles|accessories|sanitary)$"),
+    item_type: str = Query("all", pattern="^(all|tiles|accessories|sanitary|loose_pcs)$"),
     q: str | None = None,
     branch_id: int | None = None,
     grade: str | None = None,
@@ -52,15 +54,19 @@ def stock_overview(
         "sanitary": _sanitary_rows(db, branches, search_text, branch_id, include_zero)
         if item_type in ("all", "sanitary")
         else [],
+        "loose_pcs": _loose_pcs_rows(db, branches, search_text, branch_id, include_zero)
+        if item_type in ("all", "loose_pcs")
+        else [],
     }
 
 
 @router.get("/item")
 def stock_item(
-    item_type: str = Query(pattern="^(tile|accessory|sanitary)$"),
+    item_type: str = Query(pattern="^(tile|accessory|sanitary|loose_pcs)$"),
     product_id: int | None = None,
     accessory_id: int | None = None,
     sanitary_product_id: int | None = None,
+    loose_pcs_product_id: int | None = None,
     grade: str | None = None,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -93,6 +99,14 @@ def stock_item(
             "branches": _branch_rows(branches),
             "item": _sanitary_item_row(db, branches, product),
         }
+
+    if item_type == "loose_pcs":
+        if loose_pcs_product_id is None:
+            raise HTTPException(status_code=400, detail="loose_pcs_product_id is required")
+        product = db.get(LoosePcsProduct, loose_pcs_product_id)
+        if not product:
+            raise HTTPException(status_code=404, detail="Loose Pcs product not found")
+        return {"branches": _branch_rows(branches), "item": _loose_pcs_item_row(db, branches, product)}
 
     if accessory_id is None:
         raise HTTPException(
@@ -225,6 +239,23 @@ def _sanitary_item_row(db: Session, branches, product: SanitaryProduct):
         "category": product.product_category,
         "unit_price": float(product.sale_price or 0),
         "total_quantity": total_quantity,
+        "branches": branch_rows,
+    }
+
+
+def _loose_pcs_item_row(db: Session, branches, product: LoosePcsProduct):
+    inventory = db.scalars(select(LoosePcsInventory).where(LoosePcsInventory.product_id == product.id)).all()
+    by_branch = {row.branch_id: row for row in inventory}
+    branch_rows = [
+        {"branch_id": branch.id, "branch_name": branch.name,
+         "quantity": int(by_branch[branch.id].quantity) if branch.id in by_branch else 0}
+        for branch in branches
+    ]
+    return {
+        "kind": "loose_pcs", "loose_pcs_product_id": product.id,
+        "product": f"{product.name} - {product.size}", "size": product.size,
+        "sku": product.sku, "unit_price": float(product.price),
+        "total_quantity": sum(row["quantity"] for row in branch_rows),
         "branches": branch_rows,
     }
 
@@ -394,6 +425,34 @@ def _sanitary_rows(db: Session, branches, search_text: str, branch_id: int | Non
             "sku": product.sku,
             "unit_price": float(product.sale_price or 0),
             "total_quantity": total_quantity,
+            "branches": branch_rows,
+        })
+    return rows
+
+
+def _loose_pcs_rows(db: Session, branches, search_text: str, branch_id: int | None, include_zero: bool):
+    products = db.scalars(select(LoosePcsProduct).order_by(LoosePcsProduct.name, LoosePcsProduct.size)).all()
+    inventory = db.scalars(select(LoosePcsInventory)).all()
+    by_key = {(row.product_id, row.branch_id): row for row in inventory}
+    rows = []
+    for product in products:
+        label = f"{product.name} - {product.size}"
+        if search_text and all(search_text not in value.lower() for value in (label, product.sku)):
+            continue
+        branch_rows = [
+            {"branch_id": branch.id, "branch_name": branch.name,
+             "quantity": int(by_key[(product.id, branch.id)].quantity) if (product.id, branch.id) in by_key else 0}
+            for branch in branches
+        ]
+        total = sum(row["quantity"] for row in branch_rows)
+        if not include_zero and (total <= 0 or branch_id is not None and not any(
+            row["branch_id"] == branch_id and row["quantity"] > 0 for row in branch_rows
+        )):
+            continue
+        rows.append({
+            "kind": "loose_pcs", "loose_pcs_product_id": product.id,
+            "product": label, "size": product.size, "sku": product.sku,
+            "unit_price": float(product.price), "total_quantity": total,
             "branches": branch_rows,
         })
     return rows

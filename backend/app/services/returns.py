@@ -13,6 +13,7 @@ from app.models.entities import (
     InvoiceItem,
     InvoiceReturn,
     InvoiceReturnItem,
+    LoosePcsInventory,
     Product,
     ReturnExchangeItem,
     ReturnSettlement,
@@ -155,6 +156,7 @@ def create_return(db: Session, invoice_id: int, payload, user: User) -> dict:
             product_id=built.product_id,
             accessory_id=built.accessory_id,
             sanitary_product_id=built.sanitary_product_id,
+            loose_pcs_product_id=built.loose_pcs_product_id,
             source_branch_id=built.source_branch_id,
             item_type=built.item_type,
             description=built.description,
@@ -272,6 +274,7 @@ def _restore_return_item(db, record, original, request, user, discount_factor):
             notes=stock_note,
         ))
         gross = Decimal(str(original.line_total)) * Decimal(requested_quantity) / Decimal(original.quantity)
+
     elif original.item_type == "accessory":
         restore_boxes, restore_loose = 0, requested_quantity
         inventory = db.scalar(select(AccessoryInventory).where(
@@ -288,7 +291,33 @@ def _restore_return_item(db, record, original, request, user, discount_factor):
             notes=stock_note,
         ))
         gross = Decimal(str(original.line_total)) * Decimal(requested_quantity) / Decimal(original.quantity)
-    else:
+    elif original.item_type == "loose_pcs":
+        restore_boxes, restore_loose = 0, requested_quantity
+        inventory = db.scalar(select(LoosePcsInventory).where(
+            LoosePcsInventory.branch_id == original.source_branch_id,
+            LoosePcsInventory.product_id == original.loose_pcs_product_id,
+        ).with_for_update())
+        if not inventory:
+            inventory = LoosePcsInventory(
+                branch_id=original.source_branch_id,
+                product_id=original.loose_pcs_product_id, quantity=0,
+            )
+            db.add(inventory)
+        inventory.quantity += requested_quantity
+        db.add(StockTransaction(
+            user_id=user.id, branch_id=original.source_branch_id,
+            loose_pcs_product_id=original.loose_pcs_product_id,
+            item_type="loose_pcs", transaction_type="IN", quantity=requested_quantity,
+            notes=stock_note,
+        ))
+        write_audit_log(db, user, "Loose Pcs Returned", {
+            "return_number": record.return_number, "invoice_number": original_invoice.invoice_number,
+            "name": original.description, "quantity": requested_quantity,
+        }, original.source_branch_id, event_category="Returns",
+            loose_pcs_product_id=original.loose_pcs_product_id,
+            invoice_id=original_invoice.id, return_id=record.id)
+        gross = Decimal(str(original.line_total)) * Decimal(requested_quantity) / Decimal(original.quantity)
+    elif original.item_type == "sanitary":
         restore_boxes, restore_loose = 0, requested_quantity
         inventory = db.scalar(select(SanitaryInventory).where(
             SanitaryInventory.branch_id == original.source_branch_id,
@@ -308,6 +337,8 @@ def _restore_return_item(db, record, original, request, user, discount_factor):
             transaction_type="IN", quantity=requested_quantity, notes=note,
         ))
         gross = Decimal(str(original.line_total)) * Decimal(requested_quantity) / Decimal(original.quantity)
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported return item type: {original.item_type}")
 
     discounted = (gross * discount_factor).quantize(MONEY, rounding=ROUND_HALF_UP)
     return InvoiceReturnItem(

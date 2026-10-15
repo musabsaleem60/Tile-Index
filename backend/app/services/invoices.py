@@ -11,6 +11,8 @@ from app.models.entities import (
     InvoiceItem,
     InvoicePayment,
     InvoiceReturn,
+    LoosePcsInventory,
+    LoosePcsProduct,
     Product,
     SanitaryInventory,
     SanitaryProduct,
@@ -100,8 +102,17 @@ def create_invoice(db: Session, payload: InvoiceCreate, user: User) -> Invoice:
             product_id=item.product_id,
             accessory_id=item.accessory_id,
             sanitary_product_id=item.sanitary_product_id,
+            loose_pcs_product_id=item.loose_pcs_product_id,
             invoice_id=invoice.id,
         )
+    for item in invoice.items:
+        if item.item_type == "loose_pcs":
+            write_audit_log(db, user, "Loose Pcs Sold", {
+                "invoice_number": invoice.invoice_number, "name": item.description,
+                "quantity": item.quantity, "source_branch_id": item.source_branch_id,
+                "unit_price": item.unit_price, "line_total": item.line_total,
+            }, item.source_branch_id, event_category="Sales",
+                loose_pcs_product_id=item.loose_pcs_product_id, invoice_id=invoice.id)
     db.flush()
     db.refresh(invoice)
     return db.scalar(
@@ -135,6 +146,8 @@ def _build_invoice_item_and_update_stock(db: Session, invoice: Invoice, requeste
         return _build_accessory_item(db, invoice, requested_item, user)
     if requested_item.item_type == "sanitary":
         return _build_sanitary_item(db, invoice, requested_item, user)
+    if requested_item.item_type == "loose_pcs":
+        return _build_loose_pcs_item(db, invoice, requested_item, user)
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid item type")
 
 
@@ -334,6 +347,39 @@ def _build_sanitary_item(db: Session, invoice: Invoice, requested_item, user: Us
     )
 
 
+def _build_loose_pcs_item(db: Session, invoice: Invoice, requested_item, user: User) -> InvoiceItem:
+    if not requested_item.loose_pcs_product_id:
+        raise HTTPException(status_code=400, detail="Loose Pcs product is required")
+    product = db.get(LoosePcsProduct, requested_item.loose_pcs_product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Loose Pcs product not found")
+    selling_branch = db.get(Branch, invoice.branch_id)
+    source_branch = _source_branch(db, invoice, requested_item)
+    row = db.scalar(select(LoosePcsInventory).where(
+        LoosePcsInventory.branch_id == source_branch.id,
+        LoosePcsInventory.product_id == product.id,
+    ).with_for_update())
+    quantity = requested_item.quantity
+    if quantity <= 0 or requested_item.boxes or requested_item.loose_pieces:
+        raise HTTPException(status_code=400, detail="Enter a positive Loose Pcs quantity without boxes or loose fields")
+    if not row or row.quantity < quantity:
+        raise HTTPException(status_code=400, detail="Insufficient Loose Pcs stock")
+    row.quantity -= quantity
+    price = float(product.price)
+    db.add(StockTransaction(
+        user_id=user.id, branch_id=source_branch.id, loose_pcs_product_id=product.id,
+        item_type="loose_pcs", transaction_type="OUT", quantity=quantity,
+        notes=_stock_note(invoice, selling_branch, source_branch),
+    ))
+    return InvoiceItem(
+        item_type="loose_pcs", loose_pcs_product_id=product.id,
+        source_branch_id=source_branch.id, description=f"{product.name} - {product.size}",
+        tile_size=product.size, grade="-", boxes=0, loose_pieces=0, quantity=quantity,
+        rate_per_piece=price, unit_price=price, line_total=quantity * price,
+        boxes_from_boxes=0, pieces_from_loose=quantity,
+    )
+
+
 def record_invoice_payment(db: Session, invoice_id: int, payload, user: User) -> Invoice:
     invoice = db.scalar(
         select(Invoice)
@@ -434,6 +480,8 @@ def void_invoice(db: Session, invoice_id: int, reason: str, user: User) -> Invoi
             _restore_accessory_item(db, invoice, item, user)
         elif item.item_type == "sanitary":
             _restore_sanitary_item(db, invoice, item, user)
+        elif item.item_type == "loose_pcs":
+            _restore_loose_pcs_item(db, invoice, item, user)
         else:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported invoice item type: {item.item_type}")
 
@@ -558,3 +606,25 @@ def _restore_sanitary_item(db: Session, invoice: Invoice, item: InvoiceItem, use
         quantity=item.pieces_from_loose,
         notes=f"Void invoice {invoice.invoice_number}",
     ))
+
+
+def _restore_loose_pcs_item(db: Session, invoice: Invoice, item: InvoiceItem, user: User) -> None:
+    source_branch_id = item.source_branch_id or invoice.branch_id
+    row = db.scalar(select(LoosePcsInventory).where(
+        LoosePcsInventory.branch_id == source_branch_id,
+        LoosePcsInventory.product_id == item.loose_pcs_product_id,
+    ).with_for_update())
+    if not row:
+        row = LoosePcsInventory(branch_id=source_branch_id, product_id=item.loose_pcs_product_id, quantity=0)
+        db.add(row)
+    row.quantity += item.pieces_from_loose
+    db.add(StockTransaction(
+        user_id=user.id, branch_id=source_branch_id, loose_pcs_product_id=item.loose_pcs_product_id,
+        item_type="loose_pcs", transaction_type="IN", quantity=item.pieces_from_loose,
+        notes=f"Void invoice {invoice.invoice_number}",
+    ))
+    write_audit_log(db, user, "Loose Pcs Sale Voided", {
+        "invoice_number": invoice.invoice_number, "name": item.description,
+        "quantity": item.pieces_from_loose,
+    }, source_branch_id, event_category="Sales",
+        loose_pcs_product_id=item.loose_pcs_product_id, invoice_id=invoice.id)

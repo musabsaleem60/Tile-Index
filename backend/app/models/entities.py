@@ -263,6 +263,37 @@ class SanitaryInventory(Base):
     )
 
 
+class LoosePcsProduct(Base):
+    __tablename__ = "loose_pcs_products"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    size: Mapped[str] = mapped_column(String(80), nullable=False)
+    price: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
+    sku: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("name", "size", name="uq_loose_pcs_name_size"),
+        CheckConstraint("price >= 0", name="ck_loose_pcs_price"),
+    )
+
+
+class LoosePcsInventory(Base):
+    __tablename__ = "loose_pcs_inventory"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), nullable=False)
+    product_id: Mapped[int] = mapped_column(ForeignKey("loose_pcs_products.id", ondelete="RESTRICT"), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("branch_id", "product_id", name="uq_loose_pcs_inventory_branch_product"),
+        CheckConstraint("quantity >= 0", name="ck_loose_pcs_inventory_quantity"),
+    )
+
+
 class Invoice(Base):
     __tablename__ = "invoices"
 
@@ -305,6 +336,7 @@ class InvoiceItem(Base):
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"))
     accessory_id: Mapped[int | None] = mapped_column(ForeignKey("accessories.id", ondelete="RESTRICT"))
     sanitary_product_id: Mapped[int | None] = mapped_column(ForeignKey("sanitary_products.id", ondelete="RESTRICT"))
+    loose_pcs_product_id: Mapped[int | None] = mapped_column(ForeignKey("loose_pcs_products.id", ondelete="RESTRICT"))
     source_branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), nullable=False)
     item_type: Mapped[str] = mapped_column(String(30), nullable=False)
     description: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -325,10 +357,11 @@ class InvoiceItem(Base):
     product = relationship("Product")
     accessory = relationship("Accessory")
     sanitary_product = relationship("SanitaryProduct")
+    loose_pcs_product = relationship("LoosePcsProduct")
     source_branch = relationship("Branch")
 
     __table_args__ = (
-        CheckConstraint("item_type IN ('tile', 'accessory', 'sanitary')", name="ck_invoice_items_type"),
+        CheckConstraint("item_type IN ('tile', 'accessory', 'sanitary', 'loose_pcs')", name="ck_invoice_items_type"),
     )
 
 
@@ -394,6 +427,10 @@ class InvoiceReturnItem(Base):
     boxes_restored_to_boxes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     pieces_restored_to_loose: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
+    __table_args__ = (
+        CheckConstraint("item_type IN ('tile', 'accessory', 'sanitary', 'loose_pcs')", name="ck_invoice_return_items_type"),
+    )
+
 
 class ReturnExchangeItem(Base):
     __tablename__ = "return_exchange_items"
@@ -403,6 +440,7 @@ class ReturnExchangeItem(Base):
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"))
     accessory_id: Mapped[int | None] = mapped_column(ForeignKey("accessories.id", ondelete="RESTRICT"))
     sanitary_product_id: Mapped[int | None] = mapped_column(ForeignKey("sanitary_products.id", ondelete="RESTRICT"))
+    loose_pcs_product_id: Mapped[int | None] = mapped_column(ForeignKey("loose_pcs_products.id", ondelete="RESTRICT"))
     source_branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), nullable=False)
     item_type: Mapped[str] = mapped_column(String(30), nullable=False)
     description: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -418,6 +456,10 @@ class ReturnExchangeItem(Base):
     line_total: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
     boxes_from_boxes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     pieces_from_loose: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("item_type IN ('tile', 'accessory', 'sanitary', 'loose_pcs')", name="ck_return_exchange_items_type"),
+    )
 
 
 class ReturnSettlement(Base):
@@ -445,6 +487,7 @@ class StockTransaction(Base):
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"))
     accessory_id: Mapped[int | None] = mapped_column(ForeignKey("accessories.id", ondelete="RESTRICT"))
     sanitary_product_id: Mapped[int | None] = mapped_column(ForeignKey("sanitary_products.id", ondelete="RESTRICT"))
+    loose_pcs_product_id: Mapped[int | None] = mapped_column(ForeignKey("loose_pcs_products.id", ondelete="RESTRICT"))
     item_type: Mapped[str] = mapped_column(String(30), default="tile", nullable=False)
     grade: Mapped[str | None] = mapped_column(String(80))
     transaction_type: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -542,5 +585,6 @@ class ActivityLog(Base):
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"))
     accessory_id: Mapped[int | None] = mapped_column(ForeignKey("accessories.id", ondelete="SET NULL"))
     sanitary_product_id: Mapped[int | None] = mapped_column(ForeignKey("sanitary_products.id", ondelete="SET NULL"))
+    loose_pcs_product_id: Mapped[int | None] = mapped_column(ForeignKey("loose_pcs_products.id", ondelete="SET NULL"))
     invoice_id: Mapped[int | None] = mapped_column(ForeignKey("invoices.id", ondelete="SET NULL"))
     return_id: Mapped[int | None] = mapped_column(ForeignKey("invoice_returns.id", ondelete="SET NULL"))

@@ -29,6 +29,7 @@ def search_activity_log(
     view: str = Query("business", pattern="^(business|access|all)$"),
     event_category: str | None = None,
     product_id: int | None = None,
+    loose_pcs_product_id: int | None = None,
     invoice_number: str | None = None,
     return_number: str | None = None,
     date_from: date | None = None,
@@ -61,6 +62,8 @@ def search_activity_log(
             details_text.like(f'%"product_id": {product_id}%'),
             details_text.like(f'%"product_id":{product_id}%'),
         ))
+    if loose_pcs_product_id:
+        query = query.where(ActivityLog.loose_pcs_product_id == loose_pcs_product_id)
     if invoice_number:
         query = query.where(cast(ActivityLog.action_details, String).ilike(f"%{invoice_number.strip()}%"))
     if return_number:
