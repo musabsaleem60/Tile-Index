@@ -20,6 +20,12 @@ ITEM_TABLES = (
     ("invoice_return_items", "ck_invoice_return_items_type"),
     ("return_exchange_items", "ck_return_exchange_items_type"),
 )
+REFERENCE_FKS = {
+    "invoice_items": "fk_invoice_items_loose_pcs_product_id",
+    "return_exchange_items": "fk_return_exchange_items_loose_pcs_product_id",
+    "stock_transactions": "fk_stock_transactions_loose_pcs_product_id",
+    "activity_log": "fk_activity_log_loose_pcs_product_id",
+}
 
 
 def _has_table(name):
@@ -33,7 +39,7 @@ def _add_reference(table, column, ondelete):
     with op.batch_alter_table(table) as batch:
         batch.add_column(sa.Column(column, sa.Integer(), nullable=True))
         batch.create_foreign_key(
-            f"fk_{table}_{column}_loose_pcs_products",
+            REFERENCE_FKS[table],
             "loose_pcs_products", [column], ["id"], ondelete=ondelete,
         )
 
@@ -65,8 +71,16 @@ def upgrade():
         op.create_table(
             "loose_pcs_inventory",
             sa.Column("id", sa.Integer(), primary_key=True),
-            sa.Column("branch_id", sa.Integer(), sa.ForeignKey("branches.id", ondelete="RESTRICT"), nullable=False),
-            sa.Column("product_id", sa.Integer(), sa.ForeignKey("loose_pcs_products.id", ondelete="RESTRICT"), nullable=False),
+            sa.Column(
+                "branch_id", sa.Integer(),
+                sa.ForeignKey("branches.id", name="fk_loose_pcs_inventory_branch_id_branches", ondelete="RESTRICT"),
+                nullable=False,
+            ),
+            sa.Column(
+                "product_id", sa.Integer(),
+                sa.ForeignKey("loose_pcs_products.id", name="fk_loose_pcs_inventory_product_id_loose_pcs_products", ondelete="RESTRICT"),
+                nullable=False,
+            ),
             sa.Column("quantity", sa.Integer(), nullable=False, server_default="0"),
             sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
             sa.UniqueConstraint("branch_id", "product_id", name="uq_loose_pcs_inventory_branch_product"),
@@ -93,7 +107,7 @@ def downgrade():
     for table in ("activity_log", "stock_transactions", "return_exchange_items", "invoice_items"):
         foreign_keys = {item["name"] for item in sa.inspect(op.get_bind()).get_foreign_keys(table)}
         with op.batch_alter_table(table) as batch:
-            name = f"fk_{table}_loose_pcs_product_id_loose_pcs_products"
+            name = REFERENCE_FKS[table]
             if name in foreign_keys:
                 batch.drop_constraint(name, type_="foreignkey")
             batch.drop_column("loose_pcs_product_id")
