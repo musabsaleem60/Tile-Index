@@ -64,6 +64,22 @@ class InvoiceService:
                         "boxes": item.get("quantity", 0),
                         "loose_pieces": 0,
                     })
+                elif item.get('loose_pcs_product_id'):
+                    api_items.append({
+                        "item_type": "loose_pcs",
+                        "loose_pcs_product_id": item["loose_pcs_product_id"],
+                        "source_branch_id": item.get("source_branch_id"),
+                        "quantity": item.get("quantity", 0),
+                        "boxes": 0,
+                        "loose_pieces": 0,
+                    })
+                elif item.get('master_sanitary_product_id'):
+                    api_items.append({
+                        "item_type": "master_sanitary",
+                        "master_sanitary_product_id": item["master_sanitary_product_id"],
+                        "source_branch_id": item.get("source_branch_id"),
+                        "quantity": item.get("quantity", 0), "boxes": 0, "loose_pieces": 0,
+                    })
 
             data = api_client.post("/invoices", {
                 "branch_id": branch_id,
@@ -75,6 +91,9 @@ class InvoiceService:
                 "items": api_items,
             })
             return InvoiceService._invoice_from_api(data)
+
+        if any(item.get('loose_pcs_product_id') or item.get('master_sanitary_product_id') for item in items_data):
+            raise ValueError("Loose Pcs and Master Sanitary invoices require the backend connection")
 
         # Validate inputs
         if not customer_name or not customer_name.strip():
@@ -434,6 +453,8 @@ class InvoiceService:
                 product_id=item.get("product_id"),
                 accessory_id=item.get("accessory_id"),
                 sanitary_product_id=item.get("sanitary_product_id"),
+                loose_pcs_product_id=item.get("loose_pcs_product_id"),
+                master_sanitary_product_id=item.get("master_sanitary_product_id"),
                 source_branch_id=item.get("source_branch_id"),
                 tile_size=item.get("tile_size"),
                 grade=item.get("grade"),

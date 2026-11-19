@@ -3,7 +3,7 @@
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, select, text
-from app.api import activity_log, auth, catalog, inventory, invoices, loose_pcs, rates, reports, returns, stock, updates
+from app.api import activity_log, auth, catalog, inventory, invoices, loose_pcs, master_sanitary, rates, reports, returns, stock, updates
 from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.models.entities import TileRate
@@ -52,8 +52,10 @@ app.include_router(auth.router)
 app.include_router(activity_log.router)
 app.include_router(catalog.router)
 app.include_router(loose_pcs.catalog_router)
+app.include_router(master_sanitary.catalog_router)
 app.include_router(inventory.router)
 app.include_router(loose_pcs.inventory_router)
+app.include_router(master_sanitary.inventory_router)
 app.include_router(invoices.router)
 app.include_router(returns.router)
 app.include_router(rates.router)

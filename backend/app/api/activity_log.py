@@ -30,6 +30,7 @@ def search_activity_log(
     event_category: str | None = None,
     product_id: int | None = None,
     loose_pcs_product_id: int | None = None,
+    master_sanitary_product_id: int | None = None,
     invoice_number: str | None = None,
     return_number: str | None = None,
     date_from: date | None = None,
@@ -64,6 +65,8 @@ def search_activity_log(
         ))
     if loose_pcs_product_id:
         query = query.where(ActivityLog.loose_pcs_product_id == loose_pcs_product_id)
+    if master_sanitary_product_id:
+        query = query.where(ActivityLog.master_sanitary_product_id == master_sanitary_product_id)
     if invoice_number:
         query = query.where(cast(ActivityLog.action_details, String).ilike(f"%{invoice_number.strip()}%"))
     if return_number:

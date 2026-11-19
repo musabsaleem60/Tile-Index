@@ -10,12 +10,15 @@ class InvoiceItem:
     def __init__(self, id=None, invoice_id=None, product_id=None, accessory_id=None,
                  sanitary_product_id=None, tile_size=None, grade=None, boxes=0, loose_pieces=0, rate_per_sqm=0,
                  rate_per_box=0, rate_per_piece=0, line_total=0, boxes_from_boxes=None, pieces_from_loose=None,
-                 source_branch_id=None, item_type=None, description=None, quantity=0, unit_price=0):
+                 source_branch_id=None, item_type=None, description=None, quantity=0, unit_price=0,
+                 loose_pcs_product_id=None, master_sanitary_product_id=None):
         self.id = id
         self.invoice_id = invoice_id
         self.product_id = product_id
         self.accessory_id = accessory_id
         self.sanitary_product_id = sanitary_product_id
+        self.loose_pcs_product_id = loose_pcs_product_id
+        self.master_sanitary_product_id = master_sanitary_product_id
         self.tile_size = tile_size
         self.grade = grade  # G1, G2, or G3
         self.boxes = boxes
@@ -43,6 +46,8 @@ class InvoiceItem:
             'product_id': self.product_id,
             'accessory_id': self.accessory_id,
             'sanitary_product_id': self.sanitary_product_id,
+            'loose_pcs_product_id': self.loose_pcs_product_id,
+            'master_sanitary_product_id': self.master_sanitary_product_id,
             'tile_size': self.tile_size,
             'grade': self.grade,
             'boxes': self.boxes,
@@ -69,6 +74,8 @@ class InvoiceItem:
             product_id=data.get('product_id'),
             accessory_id=data.get('accessory_id'),
             sanitary_product_id=data.get('sanitary_product_id'),
+            loose_pcs_product_id=data.get('loose_pcs_product_id'),
+            master_sanitary_product_id=data.get('master_sanitary_product_id'),
             tile_size=data.get('tile_size'),
             grade=data.get('grade'),
             boxes=data.get('boxes', 0),

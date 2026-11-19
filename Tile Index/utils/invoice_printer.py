@@ -19,6 +19,7 @@ from repositories.product_repository import ProductRepository
 from repositories.accessory_repository import AccessoryRepository
 from repositories.sanitary_repository import SanitaryProductRepository
 from services.invoice_service import InvoiceService
+from desktop_client.session import api_client
 from utils.accessory_labels import accessory_display_label
 from utils.currency import format_currency, normalize_display_amount
 from utils.datetime_format import format_business_datetime
@@ -53,6 +54,8 @@ class InvoicePrintWindow:
         self.products = {p.id: p for p in ProductRepository.get_all()}
         self.accessories = {a.id: a for a in AccessoryRepository.get_all()}
         self.sanitary_products = {p.id: p for p in SanitaryProductRepository.get_all()}
+        self.loose_pcs_products = {p["id"]: p for p in api_client.get("/catalog/loose-pcs")}
+        self.master_sanitary_products = {p["id"]: p for p in api_client.get("/catalog/master-sanitary")}
         
         self.setup_ui()
 
@@ -242,6 +245,32 @@ class InvoicePrintWindow:
                 rate_sqm = "-"
                 rate_main = format_currency(item.rate_per_box)
                 rate_loose = "-"
+            elif item.loose_pcs_product_id:
+                product = self.loose_pcs_products.get(item.loose_pcs_product_id)
+                product_name = item.description or (product["name"] if product else "Unknown Loose Pcs Product")
+                source_note = self.source_branch_note(item)
+                if source_note:
+                    product_name = f"{product_name}\n{source_note}"
+                size = item.tile_size or (product["size"] if product else "-")
+                grade = "-"
+                qty_main = "-"
+                qty_loose = str(item.quantity)
+                rate_sqm = "-"
+                rate_main = "-"
+                rate_loose = format_currency(item.unit_price)
+            elif item.master_sanitary_product_id:
+                product = self.master_sanitary_products.get(item.master_sanitary_product_id)
+                product_name = item.description or (f"{product['name']} - {product['color']}" if product else "Unknown Master Sanitary Product")
+                source_note = self.source_branch_note(item)
+                if source_note:
+                    product_name = f"{product_name}\n{source_note}"
+                size = item.tile_size or (product["color"] if product else "-")
+                grade = "-"
+                qty_main = "-"
+                qty_loose = str(item.quantity)
+                rate_sqm = "-"
+                rate_main = "-"
+                rate_loose = format_currency(item.unit_price)
             else:
                 product_name = "Unknown Item"
                 size = "-"
@@ -476,11 +505,11 @@ class InvoicePrintWindow:
                 Paragraph(self.item_label_pdf(item), normal),
                 Paragraph(self.escape_text(self.item_size(item)), normal),
                 Paragraph(self.escape_text(item.grade or "-"), normal),
-                self.quantity_text(item.boxes),
-                self.quantity_text(item.loose_pieces) if item.product_id else "-",
+                "-" if item.loose_pcs_product_id or item.master_sanitary_product_id else self.quantity_text(item.boxes),
+                self.quantity_text(item.quantity) if item.loose_pcs_product_id or item.master_sanitary_product_id else self.quantity_text(item.loose_pieces) if item.product_id else "-",
                 self.money_text(item.rate_per_sqm) if item.product_id else "-",
-                self.money_text(item.rate_per_box),
-                self.money_text(item.rate_per_piece) if item.product_id else "-",
+                "-" if item.loose_pcs_product_id or item.master_sanitary_product_id else self.money_text(item.rate_per_box),
+                self.money_text(item.unit_price) if item.loose_pcs_product_id or item.master_sanitary_product_id else self.money_text(item.rate_per_piece) if item.product_id else "-",
                 self.money_text(item.line_total),
             ])
 
@@ -642,6 +671,12 @@ class InvoicePrintWindow:
             if sanitary_product:
                 return f"{sanitary_product.company_name} - {sanitary_product.product_category}"
             return "Unknown Sanitary Product"
+        if item.loose_pcs_product_id:
+            product = self.loose_pcs_products.get(item.loose_pcs_product_id)
+            return item.description or (product["name"] if product else "Unknown Loose Pcs Product")
+        if item.master_sanitary_product_id:
+            product = self.master_sanitary_products.get(item.master_sanitary_product_id)
+            return item.description or (f"{product['name']} - {product['color']}" if product else "Unknown Master Sanitary Product")
         return "Unknown Item"
 
     def item_label_pdf(self, item):
@@ -667,5 +702,11 @@ class InvoicePrintWindow:
         if item.sanitary_product_id:
             sanitary_product = self.sanitary_products.get(item.sanitary_product_id)
             return sanitary_product.color if sanitary_product else "-"
+        if item.loose_pcs_product_id:
+            product = self.loose_pcs_products.get(item.loose_pcs_product_id)
+            return item.tile_size or (product["size"] if product else "-")
+        if item.master_sanitary_product_id:
+            product = self.master_sanitary_products.get(item.master_sanitary_product_id)
+            return item.tile_size or (product["color"] if product else "-")
         return "-"
 

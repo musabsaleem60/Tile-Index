@@ -294,6 +294,40 @@ class LoosePcsInventory(Base):
     )
 
 
+class MasterSanitaryProduct(Base):
+    __tablename__ = "master_sanitary_products"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    color: Mapped[str] = mapped_column(String(80), nullable=False)
+    normalized_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    normalized_color: Mapped[str] = mapped_column(String(80), nullable=False)
+    sku: Mapped[str] = mapped_column(String(40), nullable=False)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("normalized_name", "normalized_color", name="uq_ms_product_identity"),
+        UniqueConstraint("sku", name="uq_ms_product_sku"),
+    )
+
+
+class MasterSanitaryInventory(Base):
+    __tablename__ = "master_sanitary_inventory"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", name="fk_ms_inventory_branch", ondelete="RESTRICT"), nullable=False)
+    product_id: Mapped[int] = mapped_column(ForeignKey("master_sanitary_products.id", name="fk_ms_inventory_product", ondelete="RESTRICT"), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    price: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("branch_id", "product_id", name="uq_ms_inventory_branch_product"),
+        CheckConstraint("quantity >= 0", name="ck_ms_inventory_quantity"),
+        CheckConstraint("price IS NULL OR price >= 0", name="ck_ms_inventory_price"),
+    )
+
+
 class Invoice(Base):
     __tablename__ = "invoices"
 
@@ -337,6 +371,7 @@ class InvoiceItem(Base):
     accessory_id: Mapped[int | None] = mapped_column(ForeignKey("accessories.id", ondelete="RESTRICT"))
     sanitary_product_id: Mapped[int | None] = mapped_column(ForeignKey("sanitary_products.id", ondelete="RESTRICT"))
     loose_pcs_product_id: Mapped[int | None] = mapped_column(ForeignKey("loose_pcs_products.id", ondelete="RESTRICT"))
+    master_sanitary_product_id: Mapped[int | None] = mapped_column(ForeignKey("master_sanitary_products.id", name="fk_invoice_items_ms_product", ondelete="RESTRICT"))
     source_branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), nullable=False)
     item_type: Mapped[str] = mapped_column(String(30), nullable=False)
     description: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -358,10 +393,11 @@ class InvoiceItem(Base):
     accessory = relationship("Accessory")
     sanitary_product = relationship("SanitaryProduct")
     loose_pcs_product = relationship("LoosePcsProduct")
+    master_sanitary_product = relationship("MasterSanitaryProduct")
     source_branch = relationship("Branch")
 
     __table_args__ = (
-        CheckConstraint("item_type IN ('tile', 'accessory', 'sanitary', 'loose_pcs')", name="ck_invoice_items_type"),
+        CheckConstraint("item_type IN ('tile', 'accessory', 'sanitary', 'loose_pcs', 'master_sanitary')", name="ck_invoice_items_type"),
     )
 
 
@@ -428,7 +464,7 @@ class InvoiceReturnItem(Base):
     pieces_restored_to_loose: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     __table_args__ = (
-        CheckConstraint("item_type IN ('tile', 'accessory', 'sanitary', 'loose_pcs')", name="ck_invoice_return_items_type"),
+        CheckConstraint("item_type IN ('tile', 'accessory', 'sanitary', 'loose_pcs', 'master_sanitary')", name="ck_invoice_return_items_type"),
     )
 
 
@@ -441,6 +477,7 @@ class ReturnExchangeItem(Base):
     accessory_id: Mapped[int | None] = mapped_column(ForeignKey("accessories.id", ondelete="RESTRICT"))
     sanitary_product_id: Mapped[int | None] = mapped_column(ForeignKey("sanitary_products.id", ondelete="RESTRICT"))
     loose_pcs_product_id: Mapped[int | None] = mapped_column(ForeignKey("loose_pcs_products.id", ondelete="RESTRICT"))
+    master_sanitary_product_id: Mapped[int | None] = mapped_column(ForeignKey("master_sanitary_products.id", name="fk_return_exchange_items_ms_product", ondelete="RESTRICT"))
     source_branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), nullable=False)
     item_type: Mapped[str] = mapped_column(String(30), nullable=False)
     description: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -458,7 +495,7 @@ class ReturnExchangeItem(Base):
     pieces_from_loose: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     __table_args__ = (
-        CheckConstraint("item_type IN ('tile', 'accessory', 'sanitary', 'loose_pcs')", name="ck_return_exchange_items_type"),
+        CheckConstraint("item_type IN ('tile', 'accessory', 'sanitary', 'loose_pcs', 'master_sanitary')", name="ck_return_exchange_items_type"),
     )
 
 
@@ -488,6 +525,7 @@ class StockTransaction(Base):
     accessory_id: Mapped[int | None] = mapped_column(ForeignKey("accessories.id", ondelete="RESTRICT"))
     sanitary_product_id: Mapped[int | None] = mapped_column(ForeignKey("sanitary_products.id", ondelete="RESTRICT"))
     loose_pcs_product_id: Mapped[int | None] = mapped_column(ForeignKey("loose_pcs_products.id", ondelete="RESTRICT"))
+    master_sanitary_product_id: Mapped[int | None] = mapped_column(ForeignKey("master_sanitary_products.id", name="fk_stock_transactions_ms_product", ondelete="RESTRICT"))
     item_type: Mapped[str] = mapped_column(String(30), default="tile", nullable=False)
     grade: Mapped[str | None] = mapped_column(String(80))
     transaction_type: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -586,5 +624,6 @@ class ActivityLog(Base):
     accessory_id: Mapped[int | None] = mapped_column(ForeignKey("accessories.id", ondelete="SET NULL"))
     sanitary_product_id: Mapped[int | None] = mapped_column(ForeignKey("sanitary_products.id", ondelete="SET NULL"))
     loose_pcs_product_id: Mapped[int | None] = mapped_column(ForeignKey("loose_pcs_products.id", ondelete="SET NULL"))
+    master_sanitary_product_id: Mapped[int | None] = mapped_column(ForeignKey("master_sanitary_products.id", name="fk_activity_log_ms_product", ondelete="SET NULL"))
     invoice_id: Mapped[int | None] = mapped_column(ForeignKey("invoices.id", ondelete="SET NULL"))
     return_id: Mapped[int | None] = mapped_column(ForeignKey("invoice_returns.id", ondelete="SET NULL"))

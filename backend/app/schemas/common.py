@@ -78,6 +78,22 @@ class LoosePcsProductOut(LoosePcsProductIn, ORMModel):
     created_at: datetime | None = None
 
 
+class MasterSanitaryProductIn(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    color: str = Field(min_length=1, max_length=80)
+
+
+class MasterSanitaryPriceIn(BaseModel):
+    branch_id: int
+    price: float = Field(ge=0)
+
+
+class MasterSanitaryProductOut(MasterSanitaryProductIn, ORMModel):
+    id: int
+    sku: str
+    created_at: datetime | None = None
+
+
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -162,12 +178,22 @@ class LoosePcsInventoryOut(ORMModel):
     updated_at: datetime | None = None
 
 
+class MasterSanitaryInventoryOut(ORMModel):
+    id: int
+    branch_id: int
+    product_id: int
+    quantity: int
+    price: float | None = None
+    updated_at: datetime | None = None
+
+
 class InvoiceItemIn(BaseModel):
     item_type: str
     product_id: int | None = None
     accessory_id: int | None = None
     sanitary_product_id: int | None = None
     loose_pcs_product_id: int | None = None
+    master_sanitary_product_id: int | None = None
     source_branch_id: int | None = None
     grade: str | None = None
     boxes: int = Field(default=0, ge=0)
@@ -191,6 +217,7 @@ class InvoiceItemOut(ORMModel):
     accessory_id: int | None = None
     sanitary_product_id: int | None = None
     loose_pcs_product_id: int | None = None
+    master_sanitary_product_id: int | None = None
     source_branch_id: int
     item_type: str
     description: str
@@ -302,6 +329,7 @@ class ReturnExchangeItemOut(ORMModel):
     accessory_id: int | None = None
     sanitary_product_id: int | None = None
     loose_pcs_product_id: int | None = None
+    master_sanitary_product_id: int | None = None
     source_branch_id: int
     item_type: str
     description: str
@@ -414,6 +442,7 @@ class ActivityLogOut(ORMModel):
     accessory_id: int | None = None
     sanitary_product_id: int | None = None
     loose_pcs_product_id: int | None = None
+    master_sanitary_product_id: int | None = None
     invoice_id: int | None = None
     return_id: int | None = None
 

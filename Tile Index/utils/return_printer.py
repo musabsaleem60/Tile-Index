@@ -46,7 +46,7 @@ class ReturnPrinter:
         for row in self.record.get("return_items", []):
             item = originals.get(row["invoice_item_id"])
             description = getattr(item, "description", None) or f"Invoice item {row['invoice_item_id']}"
-            qty = f"{row['boxes']} boxes + {row['loose_pieces']} loose" if row["item_type"] == "tile" else f"{row['quantity']} units"
+            qty = f"{row['boxes']} boxes + {row['loose_pieces']} loose" if row["item_type"] == "tile" else f"{row['quantity']} {'pieces' if row['item_type'] in ('loose_pcs', 'master_sanitary') else 'units'}"
             returned_rows.append([description, qty, branches.get(row["source_branch_id"], str(row["source_branch_id"])), format_currency(row['discounted_line_total'])])
         story.extend([Paragraph("<b>Returned Items</b>", normal), self._table(returned_rows), Spacer(1, 10)])
 
@@ -54,7 +54,7 @@ class ReturnPrinter:
         if exchanges:
             exchange_rows = [["Exchange item", "Quantity", "Source branch", "Value"]]
             for row in exchanges:
-                qty = f"{row['boxes']} boxes + {row['loose_pieces']} loose" if row["item_type"] == "tile" else f"{row['quantity']} units"
+                qty = f"{row['boxes']} boxes + {row['loose_pieces']} loose" if row["item_type"] == "tile" else f"{row['quantity']} {'pieces' if row['item_type'] in ('loose_pcs', 'master_sanitary') else 'units'}"
                 exchange_rows.append([row["description"], qty, branches.get(row["source_branch_id"], str(row["source_branch_id"])), format_currency(row['line_total'])])
             story.extend([Paragraph("<b>Exchange Items</b>", normal), self._table(exchange_rows), Spacer(1, 10)])
 

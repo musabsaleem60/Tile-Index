@@ -48,6 +48,29 @@ def format_activity_details(activity) -> str:
         return _format_tile_stock(data, include_reason=action == "Stock OUT")
     if action in {"Accessory Stock IN", "Accessory Stock OUT"}:
         return _format_accessory_stock(data, include_reason=action == "Accessory Stock OUT")
+    if action in {"Loose Pcs Stock IN", "Loose Pcs Stock OUT", "Master Sanitary Stock IN", "Master Sanitary Stock OUT"}:
+        return _join_sentences([
+            f"{data.get('name')} | {data.get('quantity')} pieces",
+            f"Reason: {data.get('reason')}" if data.get('reason') else None,
+            f"DC# {data.get('dc_number')}" if data.get('dc_number') else None,
+        ])
+    if action == "Master Sanitary Price Updated":
+        previous = data.get("old_price")
+        return _join_sentences([
+            f"{data.get('name')}: {format_currency(previous) if previous is not None else 'No price set'} -> {format_currency(data.get('new_price'))}",
+        ])
+    if action in {"Loose Pcs Added", "Loose Pcs Edited", "Loose Pcs Deleted", "Master Sanitary Added", "Master Sanitary Edited", "Master Sanitary Deleted"}:
+        return _join_sentences([
+            f"{action}: {data.get('name')} - {data.get('color') or data.get('size')}",
+            _money("Price", data.get('price', (data.get('after') or {}).get('price')))
+            if data.get('price', (data.get('after') or {}).get('price')) is not None else None,
+        ])
+    if action in {"Loose Pcs Sold", "Loose Pcs Sale Voided", "Loose Pcs Returned", "Master Sanitary Sold", "Master Sanitary Sale Voided", "Master Sanitary Returned", "Master Sanitary Exchanged"}:
+        return _join_sentences([
+            f"{action}: {data.get('name')} | {data.get('quantity')} pieces",
+            f"Invoice: {data.get('invoice_number')}" if data.get('invoice_number') else None,
+            f"Return: {data.get('return_number')}" if data.get('return_number') else None,
+        ])
     if action == "Invoice Created":
         return _join_sentences([
             f"Invoice {data.get('invoice_number')}" if data.get("invoice_number") else None,

@@ -14,6 +14,7 @@ from app.models.entities import (
     InvoiceReturn,
     InvoiceReturnItem,
     LoosePcsInventory,
+    MasterSanitaryInventory,
     Product,
     ReturnExchangeItem,
     ReturnSettlement,
@@ -157,6 +158,7 @@ def create_return(db: Session, invoice_id: int, payload, user: User) -> dict:
             accessory_id=built.accessory_id,
             sanitary_product_id=built.sanitary_product_id,
             loose_pcs_product_id=built.loose_pcs_product_id,
+            master_sanitary_product_id=built.master_sanitary_product_id,
             source_branch_id=built.source_branch_id,
             item_type=built.item_type,
             description=built.description,
@@ -175,6 +177,14 @@ def create_return(db: Session, invoice_id: int, payload, user: User) -> dict:
         )
         record.exchange_items.append(line)
         exchange_total += _money(built.line_total)
+        if built.item_type == "master_sanitary":
+            write_audit_log(db, user, "Master Sanitary Exchanged", {
+                "return_number": record.return_number, "invoice_number": invoice.invoice_number,
+                "name": built.description, "quantity": built.quantity,
+                "unit_price": built.unit_price, "line_total": built.line_total,
+            }, built.source_branch_id, event_category="Returns",
+                master_sanitary_product_id=built.master_sanitary_product_id,
+                invoice_id=invoice.id, return_id=record.id)
         activity_exchanges.append({
             "description": built.description,
             "source_branch_id": built.source_branch_id,
@@ -315,6 +325,32 @@ def _restore_return_item(db, record, original, request, user, discount_factor):
             "name": original.description, "quantity": requested_quantity,
         }, original.source_branch_id, event_category="Returns",
             loose_pcs_product_id=original.loose_pcs_product_id,
+            invoice_id=original_invoice.id, return_id=record.id)
+        gross = Decimal(str(original.line_total)) * Decimal(requested_quantity) / Decimal(original.quantity)
+    elif original.item_type == "master_sanitary":
+        restore_boxes, restore_loose = 0, requested_quantity
+        inventory = db.scalar(select(MasterSanitaryInventory).where(
+            MasterSanitaryInventory.branch_id == original.source_branch_id,
+            MasterSanitaryInventory.product_id == original.master_sanitary_product_id,
+        ).with_for_update())
+        if not inventory:
+            inventory = MasterSanitaryInventory(
+                branch_id=original.source_branch_id,
+                product_id=original.master_sanitary_product_id, quantity=0,
+            )
+            db.add(inventory)
+        inventory.quantity += requested_quantity
+        db.add(StockTransaction(
+            user_id=user.id, branch_id=original.source_branch_id,
+            master_sanitary_product_id=original.master_sanitary_product_id,
+            item_type="master_sanitary", transaction_type="IN", quantity=requested_quantity,
+            notes=stock_note,
+        ))
+        write_audit_log(db, user, "Master Sanitary Returned", {
+            "return_number": record.return_number, "invoice_number": original_invoice.invoice_number,
+            "name": original.description, "quantity": requested_quantity,
+        }, original.source_branch_id, event_category="Returns",
+            master_sanitary_product_id=original.master_sanitary_product_id,
             invoice_id=original_invoice.id, return_id=record.id)
         gross = Decimal(str(original.line_total)) * Decimal(requested_quantity) / Decimal(original.quantity)
     elif original.item_type == "sanitary":

@@ -25,6 +25,8 @@ class StockOverviewWindow:
         self.tiles = []
         self.accessories = []
         self.sanitary = []
+        self.loose_pcs = []
+        self.master_sanitary = []
         self.rows_by_iid = {}
 
         self.setup_ui()
@@ -55,7 +57,7 @@ class StockOverviewWindow:
 
         self.tab_control = ctk.CTkSegmentedButton(
             controls,
-            values=["Tiles", "Accessories", "Sanitary"],
+            values=["Tiles", "Accessories", "Sanitary", "Loose Pcs", "Master Sanitary"],
             command=self.on_tab_change,
             selected_color=COLORS["primary"],
             selected_hover_color=COLORS["primary_hover"],
@@ -213,6 +215,8 @@ class StockOverviewWindow:
             "Tiles": "tiles",
             "Accessories": "accessories",
             "Sanitary": "sanitary",
+            "Loose Pcs": "loose_pcs",
+            "Master Sanitary": "master_sanitary",
         }[value]
         self.configure_for_tab()
         self.refresh_data()
@@ -246,8 +250,8 @@ class StockOverviewWindow:
             self.category_combo.configure(state="readonly" if self.active_tab == "accessories" else "disabled")
             columns = ("product", "category", "total_quantity")
             headings = {
-                "product": "Accessory" if self.active_tab == "accessories" else "Sanitary Product",
-                "category": "Category",
+                "product": {"accessories": "Accessory", "sanitary": "Sanitary Product", "loose_pcs": "Loose Pcs Product", "master_sanitary": "Master Sanitary Product"}[self.active_tab],
+                "category": "Size" if self.active_tab == "loose_pcs" else "Color" if self.active_tab == "master_sanitary" else "Category",
                 "total_quantity": "Total Qty",
             }
             widths = {
@@ -297,6 +301,8 @@ class StockOverviewWindow:
             self.tiles = data.get("tiles", [])
             self.accessories = data.get("accessories", [])
             self.sanitary = data.get("sanitary", [])
+            self.loose_pcs = data.get("loose_pcs", [])
+            self.master_sanitary = data.get("master_sanitary", [])
             self.update_branch_filter()
             self.populate_table()
         except ApiClientError as exc:
@@ -327,6 +333,8 @@ class StockOverviewWindow:
             "tiles": self.tiles,
             "accessories": self.accessories,
             "sanitary": self.sanitary,
+            "loose_pcs": self.loose_pcs,
+            "master_sanitary": self.master_sanitary,
         }[self.active_tab]
         for index, row in enumerate(rows):
             iid = str(index)
@@ -343,7 +351,7 @@ class StockOverviewWindow:
             else:
                 values = (
                     row.get("product", ""),
-                    row.get("category", ""),
+                    row.get("size", "") if self.active_tab == "loose_pcs" else row.get("color", "") if self.active_tab == "master_sanitary" else row.get("category", ""),
                     self.format_int(row.get("total_quantity")),
                 )
             self.tree.insert("", tk.END, iid=iid, values=values)
@@ -352,6 +360,8 @@ class StockOverviewWindow:
             "tiles": "tile rows",
             "accessories": "accessory rows",
             "sanitary": "sanitary rows",
+            "loose_pcs": "loose pcs rows",
+            "master_sanitary": "master sanitary rows",
         }[self.active_tab]
         if rows:
             self.status_label.configure(text=f"{len(rows)} {noun} found")

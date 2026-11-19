@@ -9,6 +9,8 @@ import customtkinter as ctk
 from ui.inventory_window import InventoryWindow
 from ui.accessory_window import AccessoryWindow
 from ui.sanitary_window import SanitaryWindow
+from ui.loose_pcs_window import LoosePcsWindow
+from ui.master_sanitary_window import MasterSanitaryWindow
 from ui.invoice_window import InvoiceWindow
 from ui.invoice_search_window import InvoiceSearchWindow
 from ui.returns_window import ReturnsWindow
@@ -220,6 +222,8 @@ class MainWindow:
             ("Stock Overview", COLORS["search"], COLORS["search_hover"], self.open_stock_overview),
             ("Accessories", COLORS["accessory"], COLORS["accessory_hover"], self.open_accessories),
             ("Sanitary", COLORS["accessory"], COLORS["accessory_hover"], self.open_sanitary),
+            ("Loose Pcs", COLORS["accessory"], COLORS["accessory_hover"], self.open_loose_pcs),
+            ("Master Sanitary", COLORS["accessory"], COLORS["accessory_hover"], self.open_master_sanitary),
             ("Invoice & Billing", COLORS["success"], COLORS["success_hover"], self.open_invoice),
             ("Search Invoices", COLORS["search"], COLORS["search_hover"], self.open_invoice_search),
             ("Returns", COLORS["search"], COLORS["search_hover"], self.open_returns),
@@ -386,6 +390,12 @@ class MainWindow:
     def open_sanitary(self):
         """Open sanitary management within the same window"""
         self.switch_view(SanitaryWindow, self.current_user)
+
+    def open_loose_pcs(self):
+        self.switch_view(LoosePcsWindow, self.current_user)
+
+    def open_master_sanitary(self):
+        self.switch_view(MasterSanitaryWindow, self.current_user)
 
     def open_invoice(self):
         """Open invoice creation within the same window"""

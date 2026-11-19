@@ -17,6 +17,8 @@ class StockOverviewTabTests(unittest.TestCase):
         for label, item_type in (
             ("Accessories", "accessories"),
             ("Sanitary", "sanitary"),
+            ("Loose Pcs", "loose_pcs"),
+            ("Master Sanitary", "master_sanitary"),
             ("Tiles", "tiles"),
         ):
             calls.clear()
@@ -34,6 +36,12 @@ class StockOverviewTabTests(unittest.TestCase):
             if "item_type=sanitary" in url:
                 count = 214 if include_zero else 110
                 return {"branches": [], "tiles": [], "accessories": [], "sanitary": [{"id": n} for n in range(count)]}
+            if "item_type=loose_pcs" in url:
+                count = 29 if include_zero else 25
+                return {"branches": [], "tiles": [], "accessories": [], "sanitary": [], "loose_pcs": [{"id": n} for n in range(count)]}
+            if "item_type=master_sanitary" in url:
+                count = 4 if include_zero else 3
+                return {"branches": [], "tiles": [], "accessories": [], "sanitary": [], "master_sanitary": [{"id": n} for n in range(count)]}
             count = 10 if include_zero else 5
             return {"branches": [], "tiles": [{"id": n} for n in range(count)], "accessories": [], "sanitary": []}
 
@@ -48,7 +56,7 @@ class StockOverviewTabTests(unittest.TestCase):
             selected_branch_id=lambda: None,
             update_branch_filter=lambda: None,
             populate_table=lambda: None,
-            branches=[], tiles=[], accessories=[], sanitary=[],
+            branches=[], tiles=[], accessories=[], sanitary=[], loose_pcs=[], master_sanitary=[],
         )
 
         StockOverviewWindow.refresh_data(window)
@@ -56,6 +64,12 @@ class StockOverviewTabTests(unittest.TestCase):
         window.active_tab = "sanitary"
         StockOverviewWindow.refresh_data(window)
         self.assertEqual(len(window.sanitary), 110)
+        window.active_tab = "loose_pcs"
+        StockOverviewWindow.refresh_data(window)
+        self.assertEqual(len(window.loose_pcs), 25)
+        window.active_tab = "master_sanitary"
+        StockOverviewWindow.refresh_data(window)
+        self.assertEqual(len(window.master_sanitary), 3)
         window.active_tab = "tiles"
         StockOverviewWindow.refresh_data(window)
         self.assertEqual(len(window.tiles), 5)
@@ -67,6 +81,12 @@ class StockOverviewTabTests(unittest.TestCase):
         window.active_tab = "sanitary"
         StockOverviewWindow.refresh_data(window)
         self.assertEqual(len(window.sanitary), 214)
+        window.active_tab = "loose_pcs"
+        StockOverviewWindow.refresh_data(window)
+        self.assertEqual(len(window.loose_pcs), 29)
+        window.active_tab = "master_sanitary"
+        StockOverviewWindow.refresh_data(window)
+        self.assertEqual(len(window.master_sanitary), 4)
         window.active_tab = "tiles"
         StockOverviewWindow.refresh_data(window)
         self.assertEqual(len(window.tiles), 10)

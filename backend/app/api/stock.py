@@ -11,6 +11,8 @@ from app.models.entities import (
     Inventory,
     LoosePcsInventory,
     LoosePcsProduct,
+    MasterSanitaryInventory,
+    MasterSanitaryProduct,
     Product,
     SanitaryInventory,
     SanitaryProduct,
@@ -29,7 +31,7 @@ router = APIRouter(prefix="/stock", tags=["stock"])
 
 @router.get("/overview")
 def stock_overview(
-    item_type: str = Query("all", pattern="^(all|tiles|accessories|sanitary|loose_pcs)$"),
+    item_type: str = Query("all", pattern="^(all|tiles|accessories|sanitary|loose_pcs|master_sanitary)$"),
     q: str | None = None,
     branch_id: int | None = None,
     grade: str | None = None,
@@ -57,16 +59,20 @@ def stock_overview(
         "loose_pcs": _loose_pcs_rows(db, branches, search_text, branch_id, include_zero)
         if item_type in ("all", "loose_pcs")
         else [],
+        "master_sanitary": _master_sanitary_rows(db, branches, search_text, branch_id, include_zero)
+        if item_type in ("all", "master_sanitary")
+        else [],
     }
 
 
 @router.get("/item")
 def stock_item(
-    item_type: str = Query(pattern="^(tile|accessory|sanitary|loose_pcs)$"),
+    item_type: str = Query(pattern="^(tile|accessory|sanitary|loose_pcs|master_sanitary)$"),
     product_id: int | None = None,
     accessory_id: int | None = None,
     sanitary_product_id: int | None = None,
     loose_pcs_product_id: int | None = None,
+    master_sanitary_product_id: int | None = None,
     grade: str | None = None,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -107,6 +113,14 @@ def stock_item(
         if not product:
             raise HTTPException(status_code=404, detail="Loose Pcs product not found")
         return {"branches": _branch_rows(branches), "item": _loose_pcs_item_row(db, branches, product)}
+
+    if item_type == "master_sanitary":
+        if master_sanitary_product_id is None:
+            raise HTTPException(status_code=400, detail="master_sanitary_product_id is required")
+        product = db.get(MasterSanitaryProduct, master_sanitary_product_id)
+        if not product:
+            raise HTTPException(status_code=404, detail="Master Sanitary product not found")
+        return {"branches": _branch_rows(branches), "item": _master_sanitary_item_row(db, branches, product)}
 
     if accessory_id is None:
         raise HTTPException(
@@ -257,6 +271,23 @@ def _loose_pcs_item_row(db: Session, branches, product: LoosePcsProduct):
         "sku": product.sku, "unit_price": float(product.price),
         "total_quantity": sum(row["quantity"] for row in branch_rows),
         "branches": branch_rows,
+    }
+
+
+def _master_sanitary_item_row(db: Session, branches, product: MasterSanitaryProduct):
+    inventory = db.scalars(select(MasterSanitaryInventory).where(MasterSanitaryInventory.product_id == product.id)).all()
+    by_branch = {row.branch_id: row for row in inventory}
+    branch_rows = [
+        {"branch_id": branch.id, "branch_name": branch.name,
+         "quantity": int(by_branch[branch.id].quantity) if branch.id in by_branch else 0,
+         "unit_price": float(by_branch[branch.id].price) if branch.id in by_branch and by_branch[branch.id].price is not None else None}
+        for branch in branches
+    ]
+    return {
+        "kind": "master_sanitary", "master_sanitary_product_id": product.id,
+        "product": f"{product.name} - {product.color}", "color": product.color,
+        "sku": product.sku, "unit_price": None,
+        "total_quantity": sum(row["quantity"] for row in branch_rows), "branches": branch_rows,
     }
 
 
@@ -454,5 +485,33 @@ def _loose_pcs_rows(db: Session, branches, search_text: str, branch_id: int | No
             "product": label, "size": product.size, "sku": product.sku,
             "unit_price": float(product.price), "total_quantity": total,
             "branches": branch_rows,
+        })
+    return rows
+
+
+def _master_sanitary_rows(db: Session, branches, search_text: str, branch_id: int | None, include_zero: bool):
+    products = db.scalars(select(MasterSanitaryProduct).order_by(MasterSanitaryProduct.name, MasterSanitaryProduct.color)).all()
+    inventory = db.scalars(select(MasterSanitaryInventory)).all()
+    by_key = {(row.product_id, row.branch_id): row for row in inventory}
+    rows = []
+    for product in products:
+        label = f"{product.name} - {product.color}"
+        if search_text and all(search_text not in value.lower() for value in (label, product.sku)):
+            continue
+        branch_rows = [
+            {"branch_id": branch.id, "branch_name": branch.name,
+             "quantity": int(by_key[(product.id, branch.id)].quantity) if (product.id, branch.id) in by_key else 0,
+             "unit_price": float(by_key[(product.id, branch.id)].price) if (product.id, branch.id) in by_key and by_key[(product.id, branch.id)].price is not None else None}
+            for branch in branches
+        ]
+        total = sum(row["quantity"] for row in branch_rows)
+        if not include_zero and (total <= 0 or branch_id is not None and not any(
+            row["branch_id"] == branch_id and row["quantity"] > 0 for row in branch_rows
+        )):
+            continue
+        rows.append({
+            "kind": "master_sanitary", "master_sanitary_product_id": product.id,
+            "product": label, "color": product.color, "sku": product.sku,
+            "unit_price": None, "total_quantity": total, "branches": branch_rows,
         })
     return rows

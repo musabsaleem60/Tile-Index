@@ -66,7 +66,7 @@ class InvoiceReturnDialog:
         exchange = self._panel(page, "Optional Exchange Items")
         exchange.pack(fill=tk.X, pady=(0, 10))
         self.exchange_type = tk.StringVar(value="tile")
-        type_combo = ttk.Combobox(exchange, textvariable=self.exchange_type, values=("tile", "accessory", "sanitary"), state="readonly", width=14)
+        type_combo = ttk.Combobox(exchange, textvariable=self.exchange_type, values=("tile", "accessory", "sanitary", "Loose Pcs", "Master Sanitary"), state="readonly", width=16)
         type_combo.grid(row=1, column=0, padx=6, pady=6)
         type_combo.bind("<<ComboboxSelected>>", lambda _e: self._load_exchange_catalog())
         self.exchange_product = tk.StringVar()
@@ -124,8 +124,8 @@ class InvoiceReturnDialog:
 
     def _load_exchange_catalog(self):
         try:
-            kind = self.exchange_type.get()
-            plural = {"tile": "tiles", "accessory": "accessories", "sanitary": "sanitary"}[kind]
+            kind = self.exchange_type.get().replace("Loose Pcs", "loose_pcs").replace("Master Sanitary", "master_sanitary")
+            plural = {"tile": "tiles", "accessory": "accessories", "sanitary": "sanitary", "loose_pcs": "loose_pcs", "master_sanitary": "master_sanitary"}[kind]
             data = api_client.get(f"/stock/overview?item_type={plural}&include_zero=false")
             self.catalog_rows = self._catalog_rows_from_response(data, kind)
             labels = []
@@ -163,7 +163,7 @@ class InvoiceReturnDialog:
     @staticmethod
     def _catalog_rows_from_response(data, kind):
         """Map the stock-overview response to the selected catalogue."""
-        key = {"tile": "tiles", "accessory": "accessories", "sanitary": "sanitary"}[kind]
+        key = {"tile": "tiles", "accessory": "accessories", "sanitary": "sanitary", "loose_pcs": "loose_pcs", "master_sanitary": "master_sanitary"}[kind]
         rows = data.get(key)
         if not isinstance(rows, list):
             raise ValueError(f"Stock overview response is missing the '{key}' list")
@@ -191,12 +191,12 @@ class InvoiceReturnDialog:
         except ValueError:
             messagebox.showerror("Exchange Item", "Quantities must be whole numbers.", parent=self.window)
             return
-        kind = self.exchange_type.get()
+        kind = self.exchange_type.get().replace("Loose Pcs", "loose_pcs").replace("Master Sanitary", "master_sanitary")
         quantity = loose if kind != "tile" else 0
         if boxes < 0 or loose < 0 or (boxes == 0 and loose == 0):
             messagebox.showerror("Exchange Item", "Enter a positive exchange quantity.", parent=self.window)
             return
-        payload = {"item_type": kind, "source_branch_id": branch["branch_id"], "boxes": boxes if kind == "tile" else quantity, "loose_pieces": loose if kind == "tile" else 0, "quantity": quantity}
+        payload = {"item_type": kind, "source_branch_id": branch["branch_id"], "boxes": boxes if kind == "tile" else quantity if kind not in ("loose_pcs", "master_sanitary") else 0, "loose_pieces": loose if kind == "tile" else 0, "quantity": quantity}
         if kind == "tile":
             payload.update(product_id=row["product_id"], grade=row["grade"])
             value = boxes * float(row.get("rate_per_box") or 0) + loose * float(row.get("rate_per_piece") or 0)
@@ -205,6 +205,17 @@ class InvoiceReturnDialog:
             payload["accessory_id"] = row["accessory_id"]
             value = quantity * float(row.get("unit_price") or 0)
             qty_text = f"{quantity} units"
+        elif kind == "loose_pcs":
+            payload["loose_pcs_product_id"] = row["loose_pcs_product_id"]
+            value = quantity * float(row.get("unit_price") or 0)
+            qty_text = f"{quantity} pieces"
+        elif kind == "master_sanitary":
+            payload["master_sanitary_product_id"] = row["master_sanitary_product_id"]
+            if branch.get("unit_price") is None:
+                messagebox.showerror("Exchange Item", "No Master Sanitary price set for this source branch.", parent=self.window)
+                return
+            value = quantity * float(branch["unit_price"])
+            qty_text = f"{quantity} pieces"
         else:
             payload["sanitary_product_id"] = row["sanitary_product_id"]
             value = quantity * float(row.get("unit_price") or 0)

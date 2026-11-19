@@ -42,6 +42,8 @@ class InvoiceWindow:
         self.products = ProductRepository.get_all()
         self.accessories = AccessoryService.get_all_accessories()
         self.sanitary_products = SanitaryProductRepository.get_all()
+        self.loose_pcs_products = api_client.get("/catalog/loose-pcs")
+        self.master_sanitary_products = api_client.get("/catalog/master-sanitary")
         self.selected_branch_id = None
         self.invoice_items = []  # List of item dicts
         self.source_branch_options = []
@@ -147,7 +149,7 @@ class InvoiceWindow:
         self.form_label(item_frame, "Item Type:").grid(row=1, column=0, sticky=tk.W, pady=3, padx=8)
         self.item_type_var = tk.StringVar(value="Tiles")
         item_type_combo = ttk.Combobox(item_frame, textvariable=self.item_type_var, width=SIZES["dropdown_width"], state="readonly", font=FONTS["small"])
-        item_type_combo['values'] = ("Tiles", "Accessories", "Sanitary")
+        item_type_combo['values'] = ("Tiles", "Accessories", "Sanitary", "Loose Pcs", "Master Sanitary")
         item_type_combo.grid(row=1, column=1, pady=3, padx=8, sticky=tk.W)
         item_type_combo.bind('<<ComboboxSelected>>', self.on_item_type_change)
         
@@ -400,6 +402,26 @@ class InvoiceWindow:
             self.boxes_label.configure(text="Quantity:")
             self.pieces_label.grid_remove()
             self.item_pieces_entry.grid_remove()
+        elif item_type == "Loose Pcs":
+            self.product_label.configure(text="Loose Pcs Product:")
+            self.product_combo.set_completion_list([self.format_loose_pcs(p) for p in self.loose_pcs_products])
+            self.grade_label.grid_remove()
+            self.grade_combo.grid_remove()
+            self.source_branch_label.grid()
+            self.source_branch_combo.grid()
+            self.boxes_label.configure(text="Quantity (pieces):")
+            self.pieces_label.grid_remove()
+            self.item_pieces_entry.grid_remove()
+        elif item_type == "Master Sanitary":
+            self.product_label.configure(text="Master Sanitary Product:")
+            self.product_combo.set_completion_list([self.format_master_sanitary(p) for p in self.master_sanitary_products])
+            self.grade_label.grid_remove()
+            self.grade_combo.grid_remove()
+            self.source_branch_label.grid()
+            self.source_branch_combo.grid()
+            self.boxes_label.configure(text="Quantity (pieces):")
+            self.pieces_label.grid_remove()
+            self.item_pieces_entry.grid_remove()
             
         self.update_stock_info()
     
@@ -551,6 +573,52 @@ class InvoiceWindow:
                     ),
                     text_color=COLORS["primary"] if branch_lines else COLORS["danger"],
                 )
+            elif item_type == "Loose Pcs":
+                product = next((p for p in self.loose_pcs_products if self.format_loose_pcs(p) == item_str), None)
+                if not product:
+                    self.stock_info_label.configure(text="")
+                    return
+                overview_row = self.load_stock_overview_row("loose_pcs", product["id"])
+                self.current_stock_overview_row = overview_row
+                self.stock_lookup_confirmed = True
+                self.source_branch_combo.configure(state="readonly")
+                self.add_item_button.configure(state="normal")
+                if int(overview_row.get("total_quantity") or 0) > 0:
+                    self.update_source_branch_options(overview_row)
+                    branch_lines = [f"{b['branch_name']}: {b.get('quantity', 0)} pieces" for b in overview_row.get("branches", [])]
+                    selected = self.selected_source_stock()
+                    available = selected.get("quantity", 0) if selected else 0
+                    summary = "\n".join(branch_lines + [f"Selected source: {available} pieces | Unit Price: {format_currency(product['price'])}"])
+                else:
+                    self.update_source_branch_options(None)
+                    summary = "No stock available"
+                self.stock_info_label.configure(
+                    text=summary,
+                    text_color=COLORS["primary"] if int(overview_row.get("total_quantity") or 0) > 0 else COLORS["danger"],
+                )
+            elif item_type == "Master Sanitary":
+                product = next((p for p in self.master_sanitary_products if self.format_master_sanitary(p) == item_str), None)
+                if not product:
+                    self.stock_info_label.configure(text="")
+                    return
+                overview_row = self.load_stock_overview_row("master_sanitary", product["id"])
+                self.current_stock_overview_row = overview_row
+                self.stock_lookup_confirmed = True
+                self.source_branch_combo.configure(state="readonly")
+                self.add_item_button.configure(state="normal")
+                if int(overview_row.get("total_quantity") or 0) > 0:
+                    self.update_source_branch_options(overview_row)
+                    branch_lines = [f"{b['branch_name']}: {b.get('quantity', 0)} pieces" for b in overview_row.get("branches", [])]
+                    selected = self.selected_source_stock()
+                    available = selected.get("quantity", 0) if selected else 0
+                    source_price = selected.get("unit_price") if selected else None
+                    price_text = format_currency(source_price) if source_price is not None else "No price set"
+                    summary = "\n".join(branch_lines + [f"Selected source: {available} pieces | Unit Price: {price_text}"])
+                else:
+                    self.update_source_branch_options(None)
+                    summary = "No stock available"
+                self.stock_info_label.configure(text=summary,
+                    text_color=COLORS["primary"] if int(overview_row.get("total_quantity") or 0) > 0 else COLORS["danger"])
         except ApiClientError as exc:
             logger.warning("Stock lookup failed: %s", exc, exc_info=True)
             self.set_stock_lookup_failed()
@@ -575,12 +643,18 @@ class InvoiceWindow:
             "tiles": "tile",
             "accessories": "accessory",
             "sanitary": "sanitary",
+            "loose_pcs": "loose_pcs",
+            "master_sanitary": "master_sanitary",
         }[item_type]}
         if item_type == "tiles":
             params["product_id"] = str(item_id)
             params["grade"] = grade
         elif item_type == "accessories":
             params["accessory_id"] = str(item_id)
+        elif item_type == "loose_pcs":
+            params["loose_pcs_product_id"] = str(item_id)
+        elif item_type == "master_sanitary":
+            params["master_sanitary_product_id"] = str(item_id)
         else:
             params["sanitary_product_id"] = str(item_id)
         data = api_client.get(f"/stock/item?{urlencode(params)}")
@@ -778,6 +852,53 @@ class InvoiceWindow:
                     'rate_per_piece': 0,
                     'line_total': quantity * product.sale_price,
                 }
+            elif item_type == "Loose Pcs":
+                product = next((p for p in self.loose_pcs_products if self.format_loose_pcs(p) == item_str), None)
+                if not product:
+                    raise ValueError("Loose Pcs product not found")
+                quantity = validate_integer(self.item_boxes_entry.get() or "0", "Quantity")
+                if quantity <= 0:
+                    raise ValueError("Please enter a valid quantity")
+                source_branch_id = self.selected_source_branch_id()
+                if not self.confirm_cross_branch_source(source_branch_id):
+                    return
+                source_stock = self.selected_source_stock()
+                available = int(source_stock.get("quantity") or 0) if source_stock else 0
+                if quantity > available:
+                    raise ValueError(f"Insufficient stock for {self.format_loose_pcs(product)} at {self.source_branch_var.get()}. Available: {available}")
+                item_data = {
+                    'type': 'Loose Pcs', 'loose_pcs_product_id': product['id'],
+                    'source_branch_id': source_branch_id, 'source_branch_name': self.source_branch_var.get(),
+                    'product_name': self.format_loose_pcs(product), 'tile_size': product['size'],
+                    'grade': '-', 'boxes': quantity, 'loose_pieces': 0,
+                    'rate_per_box': float(product['price']), 'rate_per_piece': 0,
+                    'line_total': quantity * float(product['price']),
+                }
+            elif item_type == "Master Sanitary":
+                product = next((p for p in self.master_sanitary_products if self.format_master_sanitary(p) == item_str), None)
+                if not product:
+                    raise ValueError("Master Sanitary product not found")
+                quantity = validate_integer(self.item_boxes_entry.get() or "0", "Quantity")
+                if quantity <= 0:
+                    raise ValueError("Please enter a valid quantity")
+                source_branch_id = self.selected_source_branch_id()
+                if not self.confirm_cross_branch_source(source_branch_id):
+                    return
+                source_stock = self.selected_source_stock()
+                available = int(source_stock.get("quantity") or 0) if source_stock else 0
+                if quantity > available:
+                    raise ValueError(f"Insufficient stock for {self.format_master_sanitary(product)} at {self.source_branch_var.get()}. Available: {available}")
+                if source_stock.get("unit_price") is None:
+                    raise ValueError("No Master Sanitary price set for this source branch")
+                rate = float(source_stock["unit_price"])
+                item_data = {
+                    'type': 'Master Sanitary', 'master_sanitary_product_id': product['id'],
+                    'source_branch_id': source_branch_id, 'source_branch_name': self.source_branch_var.get(),
+                    'product_name': self.format_master_sanitary(product), 'tile_size': product['color'],
+                    'grade': '-', 'boxes': quantity, 'loose_pieces': 0,
+                    'rate_per_box': rate, 'rate_per_piece': 0,
+                    'line_total': quantity * rate,
+                }
             
             self.invoice_items.append(item_data)
             self.update_items_table()
@@ -824,10 +945,10 @@ class InvoiceWindow:
                 item.get('source_branch_name', self.invoice_branch_name()),
                 item.get('tile_size', '-'),
                 item.get('grade') or '-',
-                item.get('boxes', 0),
-                item.get('loose_pieces', 0),
-                format_currency(item.get('rate_per_box')),
-                format_currency(item.get('rate_per_piece')),
+                '-' if item.get('type') in ('Loose Pcs', 'Master Sanitary') else item.get('boxes', 0),
+                item.get('boxes', 0) if item.get('type') in ('Loose Pcs', 'Master Sanitary') else item.get('loose_pieces', 0),
+                '-' if item.get('type') in ('Loose Pcs', 'Master Sanitary') else format_currency(item.get('rate_per_box')),
+                format_currency(item.get('rate_per_box')) if item.get('type') in ('Loose Pcs', 'Master Sanitary') else format_currency(item.get('rate_per_piece')),
                 format_currency(item.get('line_total'))
             ), tags=('draft_error',) if item.get('draft_error') else ())
     
@@ -856,11 +977,17 @@ class InvoiceWindow:
         item_type = item.get('type', '').lower()
         if item_type == 'tiles':
             item_type = 'tile'
+        elif item_type == 'loose pcs':
+            item_type = 'loose_pcs'
+        elif item_type == 'master sanitary':
+            item_type = 'master_sanitary'
         return {
             'item_type': item_type,
             'product_id': item.get('product_id'),
             'accessory_id': item.get('accessory_id'),
             'sanitary_product_id': item.get('sanitary_product_id'),
+            'loose_pcs_product_id': item.get('loose_pcs_product_id'),
+            'master_sanitary_product_id': item.get('master_sanitary_product_id'),
             'source_branch_id': item.get('source_branch_id'),
             'grade': item.get('grade') if item_type == 'tile' else None,
             'boxes': item.get('boxes', 0) if item_type == 'tile' else 0,
@@ -1003,10 +1130,12 @@ class InvoiceWindow:
         item_type = str(saved.get('item_type') or '').lower()
         quantity = int(saved.get('quantity') or 0)
         return {
-            'type': {'tile': 'Tiles', 'accessory': 'Accessory', 'sanitary': 'Sanitary'}.get(item_type, item_type.title()),
+            'type': {'tile': 'Tiles', 'accessory': 'Accessory', 'sanitary': 'Sanitary', 'loose_pcs': 'Loose Pcs', 'master_sanitary': 'Master Sanitary'}.get(item_type, item_type.title()),
             'product_id': saved.get('product_id'),
             'accessory_id': saved.get('accessory_id'),
             'sanitary_product_id': saved.get('sanitary_product_id'),
+            'loose_pcs_product_id': saved.get('loose_pcs_product_id'),
+            'master_sanitary_product_id': saved.get('master_sanitary_product_id'),
             'source_branch_id': saved.get('source_branch_id'),
             'source_branch_name': saved.get('source_branch_name', 'Unavailable branch'),
             'product_name': saved.get('display_label') or 'Unavailable item',
@@ -1112,6 +1241,50 @@ class InvoiceWindow:
                 '_draft_available_units': int(stock.get('quantity') or 0),
             }
 
+        if item_type == 'loose_pcs':
+            product = next((p for p in self.loose_pcs_products if p['id'] == saved.get('loose_pcs_product_id')), None)
+            if not product:
+                return self._invalid_draft_item(saved, "Loose Pcs product was deleted or is unavailable")
+            overview = self.load_stock_overview_row('loose_pcs', product['id'])
+            stock = self._overview_branch(overview, source_branch_id)
+            quantity = int(saved.get('quantity') or 0)
+            if not stock:
+                return self._invalid_draft_item(saved, "Saved source branch is no longer valid for this product")
+            if quantity > int(stock.get('quantity') or 0):
+                return self._invalid_draft_item(saved, f"Insufficient stock at {source_branch.name}: requested {quantity}, available {int(stock.get('quantity') or 0)}")
+            rate = float(product['price'])
+            return {
+                'type': 'Loose Pcs', 'loose_pcs_product_id': product['id'],
+                'source_branch_id': source_branch_id, 'source_branch_name': source_branch.name,
+                'product_name': self.format_loose_pcs(product), 'tile_size': product['size'],
+                'grade': '-', 'boxes': quantity, 'loose_pieces': 0,
+                'rate_per_box': rate, 'rate_per_piece': 0, 'line_total': quantity * rate,
+                '_draft_requested_units': quantity, '_draft_available_units': int(stock.get('quantity') or 0),
+            }
+
+        if item_type == 'master_sanitary':
+            product = next((p for p in self.master_sanitary_products if p['id'] == saved.get('master_sanitary_product_id')), None)
+            if not product:
+                return self._invalid_draft_item(saved, "Master Sanitary product was deleted or is unavailable")
+            overview = self.load_stock_overview_row('master_sanitary', product['id'])
+            stock = self._overview_branch(overview, source_branch_id)
+            quantity = int(saved.get('quantity') or 0)
+            if not stock:
+                return self._invalid_draft_item(saved, "Saved source branch is no longer valid for this product")
+            if quantity > int(stock.get('quantity') or 0):
+                return self._invalid_draft_item(saved, f"Insufficient stock at {source_branch.name}: requested {quantity}, available {int(stock.get('quantity') or 0)}")
+            if stock.get('unit_price') is None:
+                return self._invalid_draft_item(saved, "No Master Sanitary price set for this source branch")
+            rate = float(stock['unit_price'])
+            return {
+                'type': 'Master Sanitary', 'master_sanitary_product_id': product['id'],
+                'source_branch_id': source_branch_id, 'source_branch_name': source_branch.name,
+                'product_name': self.format_master_sanitary(product), 'tile_size': product['color'],
+                'grade': '-', 'boxes': quantity, 'loose_pieces': 0,
+                'rate_per_box': rate, 'rate_per_piece': 0, 'line_total': quantity * rate,
+                '_draft_requested_units': quantity, '_draft_available_units': int(stock.get('quantity') or 0),
+            }
+
         return self._invalid_draft_item(saved, "Unknown item type")
 
     @staticmethod
@@ -1122,7 +1295,7 @@ class InvoiceWindow:
             if item.get('draft_error'):
                 continue
             item_type = item.get('type')
-            item_id = item.get('product_id') or item.get('accessory_id') or item.get('sanitary_product_id')
+            item_id = item.get('product_id') or item.get('accessory_id') or item.get('sanitary_product_id') or item.get('loose_pcs_product_id') or item.get('master_sanitary_product_id')
             key = (item_type, item_id, item.get('source_branch_id'), item.get('grade'))
             running[key] = running.get(key, 0) + int(item.get('_draft_requested_units') or 0)
             available = int(item.get('_draft_available_units') or 0)
@@ -1135,6 +1308,7 @@ class InvoiceWindow:
 
     def refresh_resumed_draft_lines(self, show_result=False):
         saved_items = [self._draft_item_payload(item) for item in self.invoice_items]
+        self._refresh_master_sanitary_for_draft(saved_items)
         self.invoice_items = self._flag_combined_draft_shortages(
             [self._rebuild_draft_item(item) for item in saved_items]
         )
@@ -1149,11 +1323,17 @@ class InvoiceWindow:
             )
         return errors
 
+    def _refresh_master_sanitary_for_draft(self, saved_items):
+        if any(item.get('item_type') == 'master_sanitary' for item in saved_items):
+            self.master_sanitary_products = api_client.get('/catalog/master-sanitary')
+
     def resume_draft(self, draft):
         try:
             branch = self._branch_by_id(draft.get('branch_id'))
             if not branch:
                 raise ValueError("The draft branch is unavailable or is not accessible to this user")
+
+            self._refresh_master_sanitary_for_draft(draft.get('items', []))
 
             self.clear_invoice(prompt_for_saved_draft=False)
             self.branch_var.set(branch.name)
@@ -1232,6 +1412,18 @@ class InvoiceWindow:
                         'source_branch_id': item.get('source_branch_id'),
                         'quantity': item['boxes'],
                     })
+                elif item.get('type') == 'Loose Pcs':
+                    items_data.append({
+                        'loose_pcs_product_id': item['loose_pcs_product_id'],
+                        'source_branch_id': item.get('source_branch_id'),
+                        'quantity': item['boxes'],
+                    })
+                elif item.get('type') == 'Master Sanitary':
+                    items_data.append({
+                        'master_sanitary_product_id': item['master_sanitary_product_id'],
+                        'source_branch_id': item.get('source_branch_id'),
+                        'quantity': item['boxes'],
+                    })
             
             # Check branch access for employees
             from services.auth_service import AuthenticationService
@@ -1307,5 +1499,13 @@ class InvoiceWindow:
             product.product_category,
             product.color,
         ) if part)
+
+    @staticmethod
+    def format_loose_pcs(product):
+        return f"{product['name']} - {product['size']}"
+
+    @staticmethod
+    def format_master_sanitary(product):
+        return f"{product['name']} - {product['color']}"
 
 

@@ -13,6 +13,8 @@ from app.models.entities import (
     InvoiceReturn,
     LoosePcsInventory,
     LoosePcsProduct,
+    MasterSanitaryInventory,
+    MasterSanitaryProduct,
     Product,
     SanitaryInventory,
     SanitaryProduct,
@@ -103,6 +105,7 @@ def create_invoice(db: Session, payload: InvoiceCreate, user: User) -> Invoice:
             accessory_id=item.accessory_id,
             sanitary_product_id=item.sanitary_product_id,
             loose_pcs_product_id=item.loose_pcs_product_id,
+            master_sanitary_product_id=item.master_sanitary_product_id,
             invoice_id=invoice.id,
         )
     for item in invoice.items:
@@ -113,6 +116,13 @@ def create_invoice(db: Session, payload: InvoiceCreate, user: User) -> Invoice:
                 "unit_price": item.unit_price, "line_total": item.line_total,
             }, item.source_branch_id, event_category="Sales",
                 loose_pcs_product_id=item.loose_pcs_product_id, invoice_id=invoice.id)
+        elif item.item_type == "master_sanitary":
+            write_audit_log(db, user, "Master Sanitary Sold", {
+                "invoice_number": invoice.invoice_number, "name": item.description,
+                "quantity": item.quantity, "source_branch_id": item.source_branch_id,
+                "unit_price": item.unit_price, "line_total": item.line_total,
+            }, item.source_branch_id, event_category="Sales",
+                master_sanitary_product_id=item.master_sanitary_product_id, invoice_id=invoice.id)
     db.flush()
     db.refresh(invoice)
     return db.scalar(
@@ -148,6 +158,8 @@ def _build_invoice_item_and_update_stock(db: Session, invoice: Invoice, requeste
         return _build_sanitary_item(db, invoice, requested_item, user)
     if requested_item.item_type == "loose_pcs":
         return _build_loose_pcs_item(db, invoice, requested_item, user)
+    if requested_item.item_type == "master_sanitary":
+        return _build_master_sanitary_item(db, invoice, requested_item, user)
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid item type")
 
 
@@ -380,6 +392,41 @@ def _build_loose_pcs_item(db: Session, invoice: Invoice, requested_item, user: U
     )
 
 
+def _build_master_sanitary_item(db: Session, invoice: Invoice, requested_item, user: User) -> InvoiceItem:
+    if not requested_item.master_sanitary_product_id:
+        raise HTTPException(status_code=400, detail="Master Sanitary product is required")
+    product = db.get(MasterSanitaryProduct, requested_item.master_sanitary_product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Master Sanitary product not found")
+    selling_branch = db.get(Branch, invoice.branch_id)
+    source_branch = _source_branch(db, invoice, requested_item)
+    row = db.scalar(select(MasterSanitaryInventory).where(
+        MasterSanitaryInventory.branch_id == source_branch.id,
+        MasterSanitaryInventory.product_id == product.id,
+    ).with_for_update())
+    quantity = requested_item.quantity
+    if quantity <= 0 or requested_item.boxes or requested_item.loose_pieces:
+        raise HTTPException(status_code=400, detail="Enter a positive Master Sanitary quantity without boxes or loose fields")
+    if not row or row.quantity < quantity:
+        raise HTTPException(status_code=400, detail="Insufficient Master Sanitary stock")
+    if row.price is None:
+        raise HTTPException(status_code=400, detail="No Master Sanitary price set for this source branch")
+    price = float(row.price)
+    row.quantity -= quantity
+    db.add(StockTransaction(
+        user_id=user.id, branch_id=source_branch.id, master_sanitary_product_id=product.id,
+        item_type="master_sanitary", transaction_type="OUT", quantity=quantity,
+        notes=_stock_note(invoice, selling_branch, source_branch),
+    ))
+    return InvoiceItem(
+        item_type="master_sanitary", master_sanitary_product_id=product.id,
+        source_branch_id=source_branch.id, description=f"{product.name} - {product.color}",
+        tile_size=product.color, grade="-", boxes=0, loose_pieces=0, quantity=quantity,
+        rate_per_piece=price, unit_price=price, line_total=quantity * price,
+        boxes_from_boxes=0, pieces_from_loose=quantity,
+    )
+
+
 def record_invoice_payment(db: Session, invoice_id: int, payload, user: User) -> Invoice:
     invoice = db.scalar(
         select(Invoice)
@@ -482,6 +529,8 @@ def void_invoice(db: Session, invoice_id: int, reason: str, user: User) -> Invoi
             _restore_sanitary_item(db, invoice, item, user)
         elif item.item_type == "loose_pcs":
             _restore_loose_pcs_item(db, invoice, item, user)
+        elif item.item_type == "master_sanitary":
+            _restore_master_sanitary_item(db, invoice, item, user)
         else:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported invoice item type: {item.item_type}")
 
@@ -628,3 +677,26 @@ def _restore_loose_pcs_item(db: Session, invoice: Invoice, item: InvoiceItem, us
         "quantity": item.pieces_from_loose,
     }, source_branch_id, event_category="Sales",
         loose_pcs_product_id=item.loose_pcs_product_id, invoice_id=invoice.id)
+
+
+def _restore_master_sanitary_item(db: Session, invoice: Invoice, item: InvoiceItem, user: User) -> None:
+    source_branch_id = item.source_branch_id or invoice.branch_id
+    row = db.scalar(select(MasterSanitaryInventory).where(
+        MasterSanitaryInventory.branch_id == source_branch_id,
+        MasterSanitaryInventory.product_id == item.master_sanitary_product_id,
+    ).with_for_update())
+    if not row:
+        row = MasterSanitaryInventory(branch_id=source_branch_id, product_id=item.master_sanitary_product_id, quantity=0)
+        db.add(row)
+    row.quantity += item.pieces_from_loose
+    db.add(StockTransaction(
+        user_id=user.id, branch_id=source_branch_id,
+        master_sanitary_product_id=item.master_sanitary_product_id,
+        item_type="master_sanitary", transaction_type="IN", quantity=item.pieces_from_loose,
+        notes=f"Void invoice {invoice.invoice_number}",
+    ))
+    write_audit_log(db, user, "Master Sanitary Sale Voided", {
+        "invoice_number": invoice.invoice_number, "name": item.description,
+        "quantity": item.pieces_from_loose,
+    }, source_branch_id, event_category="Sales",
+        master_sanitary_product_id=item.master_sanitary_product_id, invoice_id=invoice.id)
